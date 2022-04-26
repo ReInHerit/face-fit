@@ -4,7 +4,7 @@ import cv2
 # import kivy module
 import kivy
 from kivy.metrics import dp
-import FaceFit_V1kivy as ff
+import FaceFit_kivy as ff
 kivy.require("1.9.1")
 import random
 

@@ -15,7 +15,6 @@ import json
 # import kivy module
 import kivy
 from kivy.metrics import dp
-import FaceFit_V1kivy as ff
 kivy.require("1.9.1")
 import random
 
@@ -50,12 +49,15 @@ font = cv2.FONT_HERSHEY_SIMPLEX
 final_morphs = []
 # For static images:
 ref_files = []
+ref_images = []
 project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
 ref_path = project_path + '/images/'
 buttons = []
 result_buttons = []
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
-selected = {}
+selected = -1
+out = []
+curr = 0
 delta = 5
 
 
@@ -269,28 +271,95 @@ class MyButton(ToggleButtonBehavior, Image):
         # return np.clip(dst, 0, 255).astype(np.uint8)
 
 
-
-class KivyCamera(Image):
+class cam(Image):
     def __init__(self, capture, fps, **kwargs):
-        super(KivyCamera, self).__init__(**kwargs)
+        super(cam, self).__init__(**kwargs)
+
         self.capture = capture
+        # print(selected.index(ref))
+
+        self.cur_id = curr
         Clock.schedule_interval(self.update, 1.0 / fps)
 
     def update(self, dt):
-        ret, frame = self.capture.read()
-        if ret:
-            # convert it to texture
-            buf1 = cv2.flip(frame, 0)
-            buf = buf1.tostring()
-            image_texture = Texture.create(
-                size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-            image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-            # display image from the texture
-            self.texture = image_texture
+        # cap = cv2.VideoCapture(0)
+        # cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
+    # print(cap_frame)
+    # # Resize reference image
+    # size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
+    # ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
+    #     print('selected', selected)
+    #     print(self.capture.isOpened())
+        while self.capture.isOpened():
+            success, image = self.capture.read()
+            image = cv2.flip(image, 1)
+
+            if selected > -1 and success:
+                self.cur_id=selected
+
+                image.flags.writeable = True
+                ref_obj = ref[self.cur_id]
+
+                cam_obj.get_landmarks(image)
+                raw_image = cam_obj.image.copy()
+
+                web_image = np.asarray(raw_image)
+
+                if cam_obj.beta >= ref_obj.beta + delta:
+                    text1 = 'left'
+                elif cam_obj.beta <= ref_obj.beta - delta:
+                    text1 = 'right'
+                else:
+                    text1 = 'ok'
+
+                if cam_obj.alpha >= ref_obj.alpha + delta:
+                    text2 = 'down'
+                elif cam_obj.alpha <= ref_obj.alpha - delta:
+                    text2 = 'up'
+                else:
+                    text2 = 'ok'
+                if ref_obj.tilt['angle'] >= cam_obj.tilt['angle'] + delta:
+                    text3 = 'left'
+                elif ref_obj.tilt['angle'] <= cam_obj.tilt['angle'] - delta:
+                    text3 = 'right'
+                else:
+                    text3 = 'ok'
+
+                # WRITE ON IMAGE
+                rect = (cam_obj.delta_x // 2 + 40, cam_obj.delta_y // 2 + 40)
+
+                out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, self.cur_id)
+                buf = out.tobytes()
+                image_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
+                image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+                # display image from the texture
+                self.texture = image_texture
+            # return self.texture
+# class KivyCamera(Image):
+#     def __init__(self, capture, fps, **kwargs):
+#         super(KivyCamera, self).__init__(**kwargs)
+#         self.capture = capture
+#         Clock.schedule_interval(self.update, 1.0 / fps)
+#
+#     def update(self, dt):
+#         ret, frame = self.capture.read()
+#         if ret:
+#             # convert it to texture
+#             buf1 = cv2.flip(frame, 0)
+#             buf = buf1.tostring()
+#             image_texture = Texture.create(
+#                 size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
+#             image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+#             # display image from the texture
+#             self.texture = image_texture
+
+
 # class in which we are creating the button
 class BoxLayoutApp(App):
+    global selected
     def build(self):
-
+        # self.selected = {}
+        # print(selected)
         image_dir = "images/"  # Directory to read
         self.image_name = ""  # Manage image file names
 
@@ -310,8 +379,13 @@ class BoxLayoutApp(App):
 
         c_box = BoxLayout(orientation='vertical', size=(dp(800),dp(1000)), size_hint=(0.6, 1))
         title = Label(text='Questo è il titolo', size_hint=(1, 0.2) )
-        self.capture = cv2.VideoCapture(0)
-        self.my_camera = KivyCamera(capture=self.capture, fps=30, size_hint=(1, 1))
+        if selected > -1:
+            print('selected')
+            self.capture = cv2.VideoCapture(0)
+            self.my_camera = cam(capture=self.capture, fps=30, size_hint=(1, 1))
+        else:
+            print('unselected')
+            self.my_camera = Label(text='unselected')
         title2 = Label(text='Questo è il titolo',size_hint=(1, 0.1))
         feed = Image(color=(1, 1, 1),
                      opacity=1,
@@ -342,14 +416,18 @@ class BoxLayoutApp(App):
         # Load image button
     def image_load(self, im_dir, grid):
         if im_dir == "images/" :
-            images = ref_files  # sorted(os.listdir(im_dir))
-
-            for image in images:
+            # images = ref_files  # sorted(os.listdir(im_dir))
+            for idx, file in enumerate(ref_files):
+                ref_img = cv2.imread(file)
+                ref.append(Face('ref'))
+                ref[idx].get_landmarks(ref_img)
+            # for image in ref_files:
                 button = MyButton(size_hint_y=None,
                                   height=150,
-                                  source=os.path.join(im_dir, image),
+                                  source=os.path.join(im_dir, file),
                                   group="g1")
                 buttons.append(button)
+                ref_images.append(file)
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
 
@@ -371,10 +449,15 @@ class BoxLayoutApp(App):
         global selected
         for b in range(0, len(buttons)):
             buttons[b].__setattr__('height', 150)
-            selected = ref[b]
-            print(selected)
+            # print(buttons[b])
+            # selected = -1
+            Clock.schedule_once(self.update)
+
             if buttons[b] == btn and btn.state == 'down':
                 btn.__setattr__('height', 200)
+                selected = b
+                # print(selected)
+                Clock.schedule_once(self.update)
 
         return btn
 
@@ -387,7 +470,7 @@ class BoxLayoutApp(App):
 
     # Screen update
     def update(self, t):
-        self.image.source = self.image_name
+        self.build()
 
 
 # CALCULATORS
@@ -821,11 +904,13 @@ with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
 
 ref = []
-for idx, file in enumerate(ref_files):
-    ref_img = cv2.imread(file)
-    ref.append(Face('ref'))
-    ref[idx].get_landmarks(ref_img)
+# for idx, file in enumerate(ref_files):
+#     ref_img = cv2.imread(file)
+#     ref.append(Face('ref'))
+#     ref[idx].get_landmarks(ref_img)
 cam_obj = Face('cam')
+app = BoxLayoutApp()
+app.run()
 inter = SetInterval(2, match)
 
 
@@ -833,9 +918,9 @@ inter = SetInterval(2, match)
 # RUN CAM #
 ###########
 def cam():
-    for r in range(0, len(ref)):
-        ref_image = ref[r].image
-
+    global out
+    ref_image = selected.image
+    print(ref.index(selected))
     cap = cv2.VideoCapture(0)
     cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
     print(cap_frame)

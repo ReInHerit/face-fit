@@ -1,0 +1,17 @@
+<MyLayout>
+    BoxLayout:
+        orientation: "horizontal"
+        size: root.width, root.height
+        Label:
+            id: p_b_label
+            text: '0% Progress'
+            pos_hint: {.01:'y'}
+            size_hint: .2,1
+        ProgressBar:
+            id: my_p_b
+            # set default value
+            value: 0
+            min: 0
+            max: 1
+            pos_hint: {.2:'y'}
+            size_hint: .5,1

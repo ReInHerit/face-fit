@@ -4,7 +4,7 @@ import numpy as np
 import time
 import threading
 
-from kivy.properties import Clock
+from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty
 from kivy.uix.behaviors import ToggleButtonBehavior
 from pynput.keyboard import Key, Controller
 import glob
@@ -17,7 +17,8 @@ import kivy
 from kivy.metrics import dp
 kivy.require("1.9.1")
 import random
-
+import io
+from kivy.core.image import Image as CoreImage
 import os
 from kivy.app import App
 from kivy.uix.label import Label
@@ -26,6 +27,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.behaviors import ToggleButtonBehavior
+from kivy.core.camera import Camera as CoreCamera
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from kivy.config import Config
@@ -46,7 +48,7 @@ LIPS = mp_face_mesh.FACEMESH_LIPS
 FACE_OVAL = mp_face_mesh.FACEMESH_FACE_OVAL
 keyboard = Controller()
 font = cv2.FONT_HERSHEY_SIMPLEX
-final_morphs = []
+final_morphs = {}
 # For static images:
 ref_files = []
 ref_images = []
@@ -56,6 +58,7 @@ buttons = []
 result_buttons = []
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 selected = -1
+raw_image = []
 out = []
 curr = 0
 delta = 5
@@ -144,7 +147,7 @@ class Face:
             min_detection_confidence=0.5) as face_m:
 
             self.image = image
-            picture = image
+            picture = image#.astype('uint8')
             # Convert the BGR image to RGB before processing.
             result = face_m.process(cv2.cvtColor(picture, cv2.COLOR_BGR2RGB))
             if result.multi_face_landmarks:
@@ -271,87 +274,166 @@ class MyButton(ToggleButtonBehavior, Image):
         # return np.clip(dst, 0, 255).astype(np.uint8)
 
 
-class cam(Image):
-    def __init__(self, capture, fps, **kwargs):
-        super(cam, self).__init__(**kwargs)
-
-        self.capture = capture
-        # print(selected.index(ref))
-
-        self.cur_id = curr
-        Clock.schedule_interval(self.update, 1.0 / fps)
-
-    def update(self, dt):
-        # cap = cv2.VideoCapture(0)
-        # cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
-    # print(cap_frame)
-    # # Resize reference image
-    # size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
-    # ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
-    #     print('selected', selected)
-    #     print(self.capture.isOpened())
-        while self.capture.isOpened():
-            success, image = self.capture.read()
-            image = cv2.flip(image, 1)
-
-            if selected > -1 and success:
-                self.cur_id=selected
-
-                image.flags.writeable = True
-                ref_obj = ref[self.cur_id]
-
-                cam_obj.get_landmarks(image)
-                raw_image = cam_obj.image.copy()
-
-                web_image = np.asarray(raw_image)
-
-                if cam_obj.beta >= ref_obj.beta + delta:
-                    text1 = 'left'
-                elif cam_obj.beta <= ref_obj.beta - delta:
-                    text1 = 'right'
-                else:
-                    text1 = 'ok'
-
-                if cam_obj.alpha >= ref_obj.alpha + delta:
-                    text2 = 'down'
-                elif cam_obj.alpha <= ref_obj.alpha - delta:
-                    text2 = 'up'
-                else:
-                    text2 = 'ok'
-                if ref_obj.tilt['angle'] >= cam_obj.tilt['angle'] + delta:
-                    text3 = 'left'
-                elif ref_obj.tilt['angle'] <= cam_obj.tilt['angle'] - delta:
-                    text3 = 'right'
-                else:
-                    text3 = 'ok'
-
-                # WRITE ON IMAGE
-                rect = (cam_obj.delta_x // 2 + 40, cam_obj.delta_y // 2 + 40)
-
-                out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, self.cur_id)
-                buf = out.tobytes()
-                image_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
-                image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-                # display image from the texture
-                self.texture = image_texture
-            # return self.texture
-# class KivyCamera(Image):
+# class cam(Image):
 #     def __init__(self, capture, fps, **kwargs):
-#         super(KivyCamera, self).__init__(**kwargs)
+#         super(cam, self).__init__(**kwargs)
+#
 #         self.capture = capture
+#         # print(selected.index(ref))
+#
+#         self.cur_id = curr
 #         Clock.schedule_interval(self.update, 1.0 / fps)
 #
 #     def update(self, dt):
-#         ret, frame = self.capture.read()
-#         if ret:
-#             # convert it to texture
-#             buf1 = cv2.flip(frame, 0)
-#             buf = buf1.tostring()
-#             image_texture = Texture.create(
-#                 size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-#             image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-#             # display image from the texture
-#             self.texture = image_texture
+#         # cap = cv2.VideoCapture(0)
+#         # cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
+#     # print(cap_frame)
+#     # # Resize reference image
+#     # size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
+#     # ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
+#     #     print('selected', selected)
+#     #     print(self.capture.isOpened())
+#         while self.capture.isOpened():
+#             success, image = self.capture.read()
+#             image = cv2.flip(image, 1)
+#
+#             if selected > -1 and success:
+#                 self.cur_id=selected
+#
+#                 image.flags.writeable = True
+#                 ref_obj = ref[self.cur_id]
+#
+#                 cam_obj.get_landmarks(image)
+#                 raw_image = cam_obj.image.copy()
+#
+#                 web_image = np.asarray(raw_image)
+#
+#                 if cam_obj.beta >= ref_obj.beta + delta:
+#                     text1 = 'left'
+#                 elif cam_obj.beta <= ref_obj.beta - delta:
+#                     text1 = 'right'
+#                 else:
+#                     text1 = 'ok'
+#
+#                 if cam_obj.alpha >= ref_obj.alpha + delta:
+#                     text2 = 'down'
+#                 elif cam_obj.alpha <= ref_obj.alpha - delta:
+#                     text2 = 'up'
+#                 else:
+#                     text2 = 'ok'
+#                 if ref_obj.tilt['angle'] >= cam_obj.tilt['angle'] + delta:
+#                     text3 = 'left'
+#                 elif ref_obj.tilt['angle'] <= cam_obj.tilt['angle'] - delta:
+#                     text3 = 'right'
+#                 else:
+#                     text3 = 'ok'
+#
+#                 # WRITE ON IMAGE
+#                 rect = (cam_obj.delta_x // 2 + 40, cam_obj.delta_y // 2 + 40)
+#
+#                 out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, self.cur_id)
+#                 buf = out.tobytes()
+#                 image_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
+#                 image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+#                 # display image from the texture
+#                 self.texture = image_texture
+#             # return self.texture
+# # class KivyCamera(Image):
+# #     def __init__(self, capture, fps, **kwargs):
+# #         super(KivyCamera, self).__init__(**kwargs)
+# #         self.capture = capture
+# #         Clock.schedule_interval(self.update, 1.0 / fps)
+# #
+# #     def update(self, dt):
+# #         ret, frame = self.capture.read()
+# #         if ret:
+# #             # convert it to texture
+# #             buf1 = cv2.flip(frame, 0)
+# #             buf = buf1.tostring()
+# #             image_texture = Texture.create(
+# #                 size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
+# #             image_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+# #             # display image from the texture
+# #             self.texture = image_texture
+
+class Camera(Image):
+
+
+    def __init__(self, **kwargs):
+        super(Camera, self).__init__(**kwargs)
+        # Connect to 0th camera
+        self.capture = cv2.VideoCapture(0)
+        self.reference = selected
+        # Set drawing interval
+        Clock.schedule_interval(self.update, 1.0 / 30)
+
+    # Drawing method to execute at intervals
+    def update(self, dt):
+        global raw_image, selected
+        self.reference = selected
+        success, self.frame = self.capture.read()
+        image = cv2.flip(self.frame, 1)
+
+        if success and self.reference != -1:
+            image.flags.writeable = True
+            cam_obj.get_landmarks(image)
+            raw_image = cam_obj.image.copy()
+
+            web_image = np.asarray(raw_image)
+
+            if cam_obj.beta >= ref[self.reference].beta + delta:
+                text1 = 'left'
+            elif cam_obj.beta <= ref[self.reference].beta - delta:
+                text1 = 'right'
+            else:
+                text1 = 'ok'
+
+            if cam_obj.alpha >= ref[self.reference].alpha + delta:
+                text2 = 'down'
+            elif cam_obj.alpha <= ref[self.reference].alpha - delta:
+                text2 = 'up'
+            else:
+                text2 = 'ok'
+            if ref[self.reference].tilt['angle'] >= cam_obj.tilt['angle'] + delta:
+                text3 = 'left'
+            elif ref[self.reference].tilt['angle'] <= cam_obj.tilt['angle'] - delta:
+                text3 = 'right'
+            else:
+                text3 = 'ok'
+
+            # WRITE ON IMAGE
+            rect = (cam_obj.delta_x // 2 + 40, cam_obj.delta_y // 2 + 40)
+            # print(rect)
+            hud = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, self.reference)
+
+            # Convert to Kivy Texture
+            buf = cv2.flip(hud, 0).tobytes()
+            texture = Texture.create(size=(self.frame.shape[1], self.frame.shape[0]), colorfmt='bgr')
+            texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+            if match():
+                print('matchiato')
+                path = 'images/final_morphs/morph_' + str(self.reference) + '.png'
+                cv2.imwrite(path, final_morphs[self.reference])
+                result_buttons[self.reference].source = path
+                selected = -1
+            else:
+                print('nulla')
+
+            # Change the texture of the instance
+            self.texture = texture
+        elif success and self.reference == -1:
+            buf = cv2.flip(image, 0).tobytes()
+            texture = Texture.create(size=(self.frame.shape[1], self.frame.shape[0]), colorfmt='bgr')
+            texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+            self.texture = texture
+
+    def on_play(self, instance, value):
+        if not self._camera:
+            return
+        if value:
+            self._camera.start()
+        else:
+            self._camera.stop()
 
 
 # class in which we are creating the button
@@ -379,17 +461,16 @@ class BoxLayoutApp(App):
 
         c_box = BoxLayout(orientation='vertical', size=(dp(800),dp(1000)), size_hint=(0.6, 1))
         title = Label(text='Questo è il titolo', size_hint=(1, 0.2) )
-        if selected > -1:
-            print('selected')
-            self.capture = cv2.VideoCapture(0)
-            self.my_camera = cam(capture=self.capture, fps=30, size_hint=(1, 1))
-        else:
-            print('unselected')
-            self.my_camera = Label(text='unselected')
+        # if selected > -1:
+        #     print('selected')
+        #     self.capture = cv2.VideoCapture(0)
+        #     self.my_camera = cam(capture=self.capture, fps=30, size_hint=(1, 1))
+        # else:
+        #     print('unselected')
+        #     self.my_camera = Label(text='unselected')
+        self.my_camera = Camera()
         title2 = Label(text='Questo è il titolo',size_hint=(1, 0.1))
-        feed = Image(color=(1, 1, 1),
-                     opacity=1,
-                     size_hint=(1, 0.3))
+        feed = Image(color=(1, 1, 1), opacity=1, size_hint=(1, 0.3))
         c_box.add_widget(title)
         c_box.add_widget(self.my_camera)
         c_box.add_widget(title2)
@@ -401,7 +482,7 @@ class BoxLayoutApp(App):
         box_results = GridLayout(padding=[0, 25, 0, 0], cols=1, spacing=20, size_hint_y=None)
         box_results.bind(minimum_height=box_results.setter('height'))
         # Batch definition of image buttons, arranged in grid layout
-        box_results = self.image_load(image_dir, box_results)
+        box_results = self.image_load("results_images/", box_results)
         sc_view_results.add_widget(box_results)
         r_box.add_widget(title_r)
         r_box.add_widget(sc_view_results)
@@ -432,12 +513,18 @@ class BoxLayoutApp(App):
                 grid.add_widget(button)
 
         elif im_dir == "results_images/":
-            images = final_morphs  # sorted(os.listdir(im_dir))
-
-            for image in images:
+            # images = final_morphs  # sorted(os.listdir(im_dir))
+            for idx, file in enumerate(ref_files):
+                im_dir = 'images/Thumbs/'
+                thumb = 'morph_thumb.jpg'
+                if idx <= 9:
+                    num = str(idx)
+                else:
+                    num = '0' + str(idx)
                 button = MyButton(size_hint_y=None,
                                   height=150,
-                                  source=os.path.join(im_dir, image),
+                                  disabled=True,
+                                  source=os.path.join(im_dir, thumb),
                                   group="g2")
                 result_buttons.append(button)
                 button.bind(on_press=self.select)
@@ -448,16 +535,18 @@ class BoxLayoutApp(App):
     def select(self, btn):
         global selected
         for b in range(0, len(buttons)):
-            buttons[b].__setattr__('height', 150)
+
             # print(buttons[b])
-            # selected = -1
-            Clock.schedule_once(self.update)
+
+            # Clock.schedule_once(self.update)
 
             if buttons[b] == btn and btn.state == 'down':
                 btn.__setattr__('height', 200)
                 selected = b
-                # print(selected)
-                Clock.schedule_once(self.update)
+            elif buttons[b] == btn and btn.state == 'normal':
+                buttons[b].__setattr__('height', 150)
+                selected = -1
+
 
         return btn
 
@@ -576,19 +665,21 @@ def match():
 
     if len(cam_obj.points) != 0:
         # CHECK HEAD ORIENTATION
-        if cam_obj.where_looks == ref[r].where_looks and \
-                ref[r].tilt['angle'] - delta <= cam_obj.tilt['angle'] <= ref[r].tilt['angle'] + delta:
+        if cam_obj.where_looks == ref[selected].where_looks and \
+                ref[selected].tilt['angle'] - delta <= cam_obj.tilt['angle'] <= ref[selected].tilt['angle'] + delta:
             print('match_angles')
             # CHECK EXPRESSION
             cam_exp = (cam_obj.status['l_e'], cam_obj.status['r_e'], cam_obj.status['lips'])
-            ref_exp = (ref[r].status['l_e'], ref[r].status['r_e'], ref[r].status['lips'])
+            ref_exp = (ref[selected].status['l_e'], ref[selected].status['r_e'], ref[selected].status['lips'])
             if cam_exp == ref_exp:
                 print('MATCH')
-                morphed = morph(raw_image, ref[r].image, cam_obj.pix_points, ref[r].pix_points)
-                final_morphs.append(morphed)
-                keyboard.press(Key.esc)
-                keyboard.release(Key.esc)
-
+                morphed = morph(raw_image, ref[selected].image, cam_obj.pix_points, ref[selected].pix_points)
+                final_morphs[selected] = morphed
+                return True
+                # keyboard.press(Key.esc)
+                # keyboard.release(Key.esc)
+            else:
+                return False
 
 def check_expression(img, landmarks):
     # l_eye
@@ -904,10 +995,10 @@ with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
 
 ref = []
-# for idx, file in enumerate(ref_files):
-#     ref_img = cv2.imread(file)
-#     ref.append(Face('ref'))
-#     ref[idx].get_landmarks(ref_img)
+for idx, file in enumerate(ref_files):
+    ref_img = cv2.imread(file)
+    ref.append(Face('ref'))
+    ref[idx].get_landmarks(ref_img)
 cam_obj = Face('cam')
 app = BoxLayoutApp()
 app.run()
@@ -917,64 +1008,64 @@ inter = SetInterval(2, match)
 ###########
 # RUN CAM #
 ###########
-def cam():
-    global out
-    ref_image = selected.image
-    print(ref.index(selected))
-    cap = cv2.VideoCapture(0)
-    cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
-    print(cap_frame)
-    # Resize reference image
-    size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
-    ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
+# def cam():
+#     global out
+#     ref_image = selected.image
+#     print(ref.index(selected))
+#     cap = cv2.VideoCapture(0)
+#     cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
+#     print(cap_frame)
+#     # Resize reference image
+#     size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
+#     ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
+#
+#     while cap.isOpened():
+#         success, image = cap.read()
+#         image = cv2.flip(image, 1)
+#         if not success:
+#             print("Ignoring empty camera frame.")
+#             # If loading a video, use 'break' instead of 'continue'.
+#             continue
+#
+#         image.flags.writeable = True
+#
+#         cam_obj.get_landmarks(image)
+#         raw_image = cam_obj.image.copy()
+#
+#         web_image = np.asarray(raw_image)
+#
+#         if cam_obj.beta >= ref[r].beta + delta:
+#             text1 = 'left'
+#         elif cam_obj.beta <= ref[r].beta - delta:
+#             text1 = 'right'
+#         else:
+#             text1 = 'ok'
+#
+#         if cam_obj.alpha >= ref[r].alpha + delta:
+#             text2 = 'down'
+#         elif cam_obj.alpha <= ref[r].alpha - delta:
+#             text2 = 'up'
+#         else:
+#             text2 = 'ok'
+#         if ref[r].tilt['angle'] >= cam_obj.tilt['angle'] + delta:
+#             text3 = 'left'
+#         elif ref[r].tilt['angle'] <= cam_obj.tilt['angle'] - delta:
+#             text3 = 'right'
+#         else:
+#             text3 = 'ok'
+#
+#         # WRITE ON IMAGE
+#         rect = (cam_obj.delta_x//2 + 40, cam_obj.delta_y//2 + 40)
+#         out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, r)
+#
+#         shared_window = np.concatenate((ref_image, out), axis=1)
+#         # cv2.imshow('Comparison', shared_window)
+#         # if cv2.waitKey(5) & 0xFF == 27:
+#         #     break
+#     cap.release()
 
-    while cap.isOpened():
-        success, image = cap.read()
-        image = cv2.flip(image, 1)
-        if not success:
-            print("Ignoring empty camera frame.")
-            # If loading a video, use 'break' instead of 'continue'.
-            continue
-
-        image.flags.writeable = True
-
-        cam_obj.get_landmarks(image)
-        raw_image = cam_obj.image.copy()
-
-        web_image = np.asarray(raw_image)
-
-        if cam_obj.beta >= ref[r].beta + delta:
-            text1 = 'left'
-        elif cam_obj.beta <= ref[r].beta - delta:
-            text1 = 'right'
-        else:
-            text1 = 'ok'
-
-        if cam_obj.alpha >= ref[r].alpha + delta:
-            text2 = 'down'
-        elif cam_obj.alpha <= ref[r].alpha - delta:
-            text2 = 'up'
-        else:
-            text2 = 'ok'
-        if ref[r].tilt['angle'] >= cam_obj.tilt['angle'] + delta:
-            text3 = 'left'
-        elif ref[r].tilt['angle'] <= cam_obj.tilt['angle'] - delta:
-            text3 = 'right'
-        else:
-            text3 = 'ok'
-
-        # WRITE ON IMAGE
-        rect = (cam_obj.delta_x//2 + 40, cam_obj.delta_y//2 + 40)
-        out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, r)
-
-        shared_window = np.concatenate((ref_image, out), axis=1)
-        # cv2.imshow('Comparison', shared_window)
-        # if cv2.waitKey(5) & 0xFF == 27:
-        #     break
-    cap.release()
-
-inter.cancel()
-cv2.destroyAllWindows()
-for m in final_morphs:
-    cv2.imshow('result', m)
-    cv2.waitKey(0)
+# inter.cancel()
+# cv2.destroyAllWindows()
+# for m in final_morphs:
+#     cv2.imshow('result', m)
+#     cv2.waitKey(0)

@@ -871,27 +871,34 @@ def draw_hud(img, center_point, b_box, up_down, r_l, turn_z, ref_id):
     cv2.putText(hud, txt_mouth, ((mouth_end[0] - 100), (mouth_end[1] + 20)), font, 1, color, 2)
     d = 20
     # ref[selected].image = cv2.cvtColor(ref[selected].image, cv2.COLOR_BGR2RGB)
-    passage = ref[selected].image.copy()
+    temp_ref = ref[selected].image.copy()
+    rx = (cam_obj.delta_x + 2 * d) / (ref[selected].delta_x + 2 * d)
+    ry = (cam_obj.delta_y + 2 * d) / (ref[selected].delta_y + 2 * d)
+    media_scale = round((rx + ry) / 2, 2)
     r_min_x, r_min_y = ref[selected].bb_p1
     r_max_x, r_max_y = ref[selected].bb_p2
-    point3_ref = ref[selected].pix_points[168]
-    point3_cam = cam_obj.pix_points[168]
-
-    exp_bb_reference = passage[r_min_y - d:r_max_y + d, r_min_x-d:r_max_x + d]
-
-    new_min_x = point3_cam[0] - (point3_ref[0]-(r_min_x-d))
-    new_min_y = point3_cam[1] - (point3_ref[1] - (r_min_y - d))
-    new_max_x = point3_cam[0] + (r_max_x + d - point3_ref[0])
-    new_max_y = point3_cam[1] + (r_max_y + d - point3_ref[1])
-    print(new_min_x,new_min_y, new_max_x,new_max_y )
-
-    exp_bb_cam = img.copy()
+    center_ref = ref[selected].pix_points[168]
+    center_cam = cam_obj.pix_points[168]
+    delta_r_min = [r_min_x - d, r_min_y - d]
+    delta_r_max = [r_max_x + d, r_max_y + d]
+    cropped_ref = temp_ref[delta_r_min[1]:delta_r_max[1], delta_r_min[0]:delta_r_max[0]]
+    print(center_cam, center_ref, delta_r_min, delta_r_max)
+    print(r_max_y-r_min_y+2*d, r_max_x-r_min_x+2*d, 'picture')
+    # print('rx', rx, 'ry', ry, 'media', media_scale)
+    new_min_x = center_cam[0] - int((center_ref[0] - delta_r_min[0]) )
+    new_min_y = center_cam[1] - int((center_ref[1] - delta_r_min[1]) )
+    new_max_x = center_cam[0] - int((center_ref[0] - delta_r_max[0]) )
+    new_max_y = center_cam[1] - int((center_ref[1] - delta_r_max[1]) )
+    print(new_min_x, new_max_x, new_min_y, new_max_y )
+    print(selected)
+    temp_cam = img.copy()
     # print(exp_bb_reference.shape, exp_bb_cam.shape, img.shape)
-    print(new_max_x-new_min_x, new_max_y-new_min_y, exp_bb_reference.shape)
-    exp_bb_cam[new_min_y:new_max_y, new_min_x:new_max_x] = cv2.addWeighted(img[new_min_y:new_max_y, new_min_x:new_max_x], 1, exp_bb_reference, 0.9, 1)
+    print(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x].shape, cropped_ref.shape)
+    temp_cam[new_min_y:new_max_y, new_min_x:new_max_x] = \
+        cv2.addWeighted(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x], 1, cropped_ref, .9, 1)
     mask = hud.astype(bool)
-    print(new_max_x - new_min_x, new_max_y - new_min_y, exp_bb_reference.shape)
-    out_image = exp_bb_cam.copy()
+    # print(new_max_x - new_min_x, new_max_y - new_min_y, cropped_ref.shape)
+    out_image = temp_cam.copy()
     # out_image = cv2.addWeighted(img, 1, exp_bb_cam, 0.7, 1)
     out_image[mask] = cv2.addWeighted(img, 1, hud, 0.9, 1)[mask]
     return out_image
@@ -986,7 +993,7 @@ for idx, file in enumerate(ref_files):
 cam_obj = Face('cam')
 app = BoxLayoutApp()
 app.run()
-inter = SetInterval(2, match)
+# inter = SetInterval(2, match)
 
 
 ###########

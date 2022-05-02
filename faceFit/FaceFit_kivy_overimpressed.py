@@ -65,9 +65,10 @@ drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 selected = -1
 raw_image = []
 labels = []
+view = {}
 out = []
 curr = 0
-delta = 5
+delta = 7
 
 
 # OBJECTS
@@ -94,24 +95,6 @@ class FacePart:
         v = np.array(temp_array)
         new_points = scale_numpy_array(v, 0, 1)
         self.pts = new_points.tolist()
-
-
-class SetInterval:
-    def __init__(self, interval, function):
-        self.interval = interval
-        self.action = function
-        self.stopEvent = threading.Event()
-        thread = threading.Thread(target=self.__set_interval)
-        thread.start()
-
-    def __set_interval(self):
-        next_time = time.time()+self.interval
-        while not self.stopEvent.wait(next_time-time.time()):
-            next_time += self.interval
-            self.action()
-
-    def cancel(self):
-        self.stopEvent.set()
 
 
 class Face:
@@ -222,6 +205,21 @@ class Face:
                     self.tilt = {'where':text, 'angle': angle}
                 self.np_image = np.asarray(self.np_image)
 
+    def self_hud_mask(self):
+        img1_points = self.pix_points
+        # Find convex hull
+        hull_index = cv2.convexHull(np.array(img1_points), returnPoints=False)
+        # Create convex hull lists
+        hull = []
+        for i in range(0, len(hull_index)):
+            hull.append(img1_points[hull_index[i][0]])
+        # Calculate Mask for Seamless cloning
+        hull8U = []
+        for i in range(0, len(hull)):
+            hull8U.append((hull[i][0], hull[i][1]))
+        mask = np.zeros(self.image.shape, dtype=self.image.dtype)
+        cv2.fillConvexPoly(mask, np.int32(hull8U), (255, 255, 255))
+        return mask
 
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
@@ -249,7 +247,7 @@ class MyButton(ToggleButtonBehavior, Image):
         #flip upside down
         buf = cv2.flip(im, 0)
         image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
-        image_texture.blit_buffer(buf.tostring(), colorfmt='bgr', bufferfmt='ubyte')
+        image_texture.blit_buffer(buf.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
         return image_texture
 
     #Make the image square
@@ -279,22 +277,23 @@ class Camera(Image):
         # Connect to 0th camera
         self.capture = cv2.VideoCapture(0)
         self.reference = selected
+
         # Set drawing interval
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     # Drawing method to execute at intervals
     def update(self, dt):
-        global raw_image, selected
+        global raw_image, selected, view
         self.reference = selected
         success, self.frame = self.capture.read()
         image = cv2.flip(self.frame, 1)
-
+        self.texture = view
         if success and self.reference != -1:
             image.flags.writeable = True
             cam_obj.get_landmarks(image)
             raw_image = cam_obj.image.copy()
-
-            web_image = np.asarray(raw_image)
+            #
+            # web_image = np.asarray(raw_image)
 
             if cam_obj.beta >= ref[self.reference].beta + delta:
                 text1 = 'left'
@@ -318,12 +317,17 @@ class Camera(Image):
             labels[3].__setattr__('text', str(int(cam_obj.beta)))
             labels[4].__setattr__('text', str(int(cam_obj.alpha)))
             labels[5].__setattr__('text', str(int(cam_obj.tilt['angle'])))
-            rect = (cam_obj.delta_x // 2 + 40, cam_obj.delta_y // 2 + 40)
-            hud = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, self.reference)
+            overimpressed = cut_paste(ref[self.reference], cam_obj)
+
             # Convert to Kivy Texture
-            buf = cv2.flip(hud, 0).tobytes()
-            texture = Texture.create(size=(self.frame.shape[1], self.frame.shape[0]), colorfmt='bgr')
+
+            buf = cv2.flip(overimpressed, 0).tobytes()
+            texture = Texture.create(size=(overimpressed.shape[1], overimpressed.shape[0]), colorfmt='bgr')
             texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+            print(self.texture, overimpressed.shape)
+            view.__setattr__('texture', texture)
+
+            self.texture = texture
             if match():
                 path = 'images/final_morphs/morph_' + str(self.reference) + '.png'
                 cv2.imwrite(path, final_morphs[self.reference])
@@ -332,8 +336,9 @@ class Camera(Image):
                 buttons[self.reference].height = 150
                 for i in range(0, 6):
                     labels[i].__setattr__('text', '-')
+                view.__setattr__('source', '')
                 selected = -1
-            self.texture = texture
+
         elif success and self.reference == -1:
             buf = cv2.flip(image, 0).tobytes()
             texture = Texture.create(size=(self.frame.shape[1], self.frame.shape[0]), colorfmt='bgr')
@@ -352,7 +357,7 @@ class Camera(Image):
 class BoxLayoutApp(App):  # class in which we are creating the button
     def __init__(self):
         super(BoxLayoutApp, self).__init__()
-        global labels
+        global labels, view
         self.super_box = BoxLayout(orientation='horizontal')
         # ###LEFT PART### #
         self.l_box = BoxLayout(orientation='vertical', size=(dp(400), dp(1000)), size_hint=(0.2, 1))
@@ -366,6 +371,9 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_box = BoxLayout(orientation='vertical', size=(dp(800), dp(1000)), size_hint=(.6, 1), padding=[5,5,5,5])
         self.my_camera = Camera(allow_stretch=True, keep_ratio=True, size_hint=(1, 1), width=self.c_box.size[0],
                                 height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
+        self.view = Image(source='', allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
+                          width=self.c_box.size[0], height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
+        view = self.view
         self.title2 = Label(text='Statistiche', size_hint=(1, .1))
         self.val1 = '-'
         self.riferimenti = BoxLayout(size_hint=(1, .3), orientation='horizontal')
@@ -438,7 +446,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_value_box.add_widget(self.c_value_y)
         self.c_value_box.add_widget(self.c_value_z)
         self.c_box.add_widget(title)
-        self.c_box.add_widget(self.my_camera)
+        self.c_box.add_widget(self.view)
         self.c_box.add_widget(self.title2)
         self.c_box.add_widget(self.riferimenti)
 
@@ -481,10 +489,6 @@ class BoxLayoutApp(App):  # class in which we are creating the button
             for idx, file in enumerate(ref_files):
                 im_dir = 'images/Thumbs/'
                 thumb = 'morph_thumb.jpg'
-                if idx <= 9:
-                    num = str(idx)
-                else:
-                    num = '0' + str(idx)
                 button = MyButton(size_hint_y=None,
                                   height=150,
                                   disabled=True,
@@ -498,9 +502,13 @@ class BoxLayoutApp(App):  # class in which we are creating the button
 
     def select(self, btn):
         global selected
+
         for b in range(0, len(buttons)):
-            if buttons[b] == btn and btn.state == 'down':
+            if buttons[b] == btn and btn.state == 'down' :
+                self.view.source = ref_images[b]
                 btn.__setattr__('height', 200)
+                if selected > -1 and selected != b:
+                    buttons[selected].__setattr__('height', 150)
                 labels[0].__setattr__('text', str(int(ref[b].beta)))
                 labels[1].__setattr__('text', str(int(ref[b].alpha)))
                 labels[2].__setattr__('text', str(int(ref[b].tilt['angle'])))
@@ -508,21 +516,14 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 selected = b
             elif buttons[b] == btn and btn.state == 'normal':
                 buttons[b].__setattr__('height', 150)
+                self.view.source = ''
                 for i in range(0, 6):
                     labels[i].__setattr__('text', '-')
                 selected = -1
+
+
         return btn
 
-    # When you press the image button, the image is displayed in the image widget
-    # def set_image(self, btn):
-    #     if btn.state == "down":
-    #         self.image_name = btn.source
-    #         # Update screen
-    #         Clock.schedule_once(self.update)
-    #
-    # # Screen update
-    # def update(self, t):
-    #     self.build()
 
 
 # CALCULATORS
@@ -636,13 +637,14 @@ def match():
             ref_exp = (ref[selected].status['l_e'], ref[selected].status['r_e'], ref[selected].status['lips'])
             if cam_exp == ref_exp:
                 print('MATCH')
-                morphed = morph(raw_image, ref[selected].image, cam_obj.pix_points, ref[selected].pix_points)
+                morphed = morph(cam_obj, ref[selected])
                 final_morphs[selected] = morphed
                 return True
-                # keyboard.press(Key.esc)
+                # keyboard.press(Key.esc)raw_image
                 # keyboard.release(Key.esc)
             else:
                 return False
+
 
 def check_expression(img, landmarks):
     # l_eye
@@ -710,9 +712,9 @@ def where_is_looking(img, f_landmarks, what):
         alpha = angles[0] * 360
         beta = angles[1] * 360
         # gamma = angles[2] * 360
-    else:
-        alpha = int(normalize(alpha, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -35, 'upper': 48}}))
-        beta = int(normalize(beta, {'actual': {'lower': -25, 'upper': 15}, 'desired': {'lower': -65, 'upper': 45}}))
+    else:  ## 'lower': -25, 'upper': 25}, 'desired': {'lower': -35, 'upper': 48}}
+        alpha = int(normalize(alpha, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -60, 'upper': 60}}))
+        beta = int(normalize(beta, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -60, 'upper': 60}}))
 
     # See where the user's head tilting
     if beta < -5:
@@ -904,9 +906,32 @@ def draw_hud(img, center_point, b_box, up_down, r_l, turn_z, ref_id):
     return out_image
 
 
-def morph(img1, img2, img1_points, img2_points):
-    img1_warped = np.copy(img2)
+# def draw(part, img, face_l):
+#     conn = ''
+#     dr_spec = ''
+#     if part == 'iris':
+#         conn = mp_face_mesh.FACEMESH_IRISES
+#         dr_spec = mp_drawing_styles.get_default_face_mesh_iris_connections_style()
+#     elif part == 'contours':
+#         conn = mp_face_mesh.FACEMESH_CONTOURS
+#         dr_spec = mp_drawing_styles.get_default_face_mesh_contours_style()
+#     elif part == 'tessellation':
+#         conn = mp_face_mesh.FACEMESH_TESSELATION
+#         dr_spec = mp_drawing_styles.get_default_face_mesh_tesselation_style()
+#     else:
+#         print('WRONG PART DESCRIPTOR')
+#     mp_drawing.draw_landmarks(
+#         image=img,
+#         landmark_list=face_l,
+#         connections=conn,
+#         landmark_drawing_spec=None,
+#         connection_drawing_spec=dr_spec)
 
+
+def hud_mask(mask_obj, masked_obj):
+    # img1_warped = np.copy(masked_obj)
+    img1_points = mask_obj.pix_points
+    img2_points = masked_obj.pix_points
     # Find convex hull
     hull_index = cv2.convexHull(np.array(img1_points), returnPoints=False)
 
@@ -922,8 +947,88 @@ def morph(img1, img2, img1_points, img2_points):
     for i in range(0, len(hull2)):
         hull8U.append((hull2[i][0], hull2[i][1]))
 
-    mask = np.zeros(img2.shape, dtype=img2.dtype)
+    mask = np.zeros(masked_obj.image.shape, dtype=masked_obj.image.dtype)
     cv2.fillConvexPoly(mask, np.int32(hull8U), (255, 255, 255))
+    # print('qua')
+    # cv2.imshow('',mask)
+    # cv2.waitKey(1)
+    return mask
+
+def cut_paste(obj1, obj2):
+    d = 10
+    img1 = obj1.image
+    img2 = obj2.image
+    # mask1 = obj1.self_hud_mask()
+    mask2 = obj2.self_hud_mask()
+    mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
+    # cut roi face from cam
+    temp_1 = obj1.image.copy()
+    temp_2 = obj2.image.copy()
+    masked_2 = cv2.bitwise_and(temp_2, temp_2, mask=mask2gray)
+
+
+    rx = (obj1.delta_x + 2 * d) / (obj2.delta_x + 2 * d)
+    ry = (obj1.delta_y + 2 * d) / (obj2.delta_y + 2 * d)
+    media_scale = round((rx + ry) / 2, 2)
+    min_x_2, min_y_2 = obj2.bb_p1
+    max_x_2, max_y_2 = obj2.bb_p2
+
+    center_2 = obj2.pix_points[168]
+    center_1 = obj1.pix_points[168]
+
+    delta_2_min = [min_x_2 - d, min_y_2 - d]
+    delta_2_max = [max_x_2 + d, max_y_2 + d]
+    if delta_2_min[0] < 0:
+        delta_2_min[0] = 0
+    elif delta_2_max[0] > img2.shape[1]:
+        delta_2_max[0] = img2.shape[1]
+    if delta_2_min[1] < 0:
+        delta_2_min[1] = 0
+    elif delta_2_max[1] > img2.shape[0]:
+        delta_2_max[1] = img2.shape[0]
+
+    # # cut roi face from ref
+    # min_x_1, min_y_1 = obj1.bb_p1
+    # max_x_1, max_y_1 = obj1.bb_p2
+    # delta_1_min = [min_x_1 - d, min_y_1 - d]
+    # delta_1_max = [max_x_1 + d, max_y_1 + d]
+    # cropped_1 = temp_1[delta_1_min[1]:delta_1_max[1], delta_1_min[0]:delta_1_max[0]]
+
+    new_min_x = center_1[0] - int((center_2[0] - delta_2_min[0])*media_scale)
+    new_min_y = center_1[1] - int((center_2[1] - delta_2_min[1])*media_scale)
+    new_max_x = center_1[0] + int((delta_2_max[0] - center_2[0])*media_scale)
+    new_max_y = center_1[1] + int((delta_2_max[1] - center_2[1])*media_scale)
+    if new_min_x < 0:
+        new_min_x = 0
+    elif new_min_y < 0:
+        new_min_y = 0
+    elif new_max_x > img1.shape[1]:
+        new_max_x = img1.shape[1]
+    elif new_max_y > img1.shape[0]:
+        new_max_y = img1.shape[0]
+    cropped_2 = masked_2[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
+
+    cropped_2 = cv2.resize(cropped_2,((new_max_x - new_min_x),(new_max_y - new_min_y)),interpolation=cv2.INTER_LINEAR)
+    blurred_2 = cv2.GaussianBlur(cropped_2, (3,3), sigmaX=0, sigmaY=0)
+    # Sobel Edge Detection
+    print(blurred_2.shape, blurred_2.dtype, cropped_2.shape, cropped_2.dtype)
+    sobelx = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=3)  # Sobel Edge Detection on the X axis
+    sobely = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=3)  # Sobel Edge Detection on the Y axis
+    # sobelxy = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=5)  # Combined X and Y Sobel Edge Detection
+    abs_grad_x = cv2.convertScaleAbs(sobelx)
+    abs_grad_y = cv2.convertScaleAbs(sobely)
+    edged_2 = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+    temp_1 = img1.copy()
+    copied = temp_1[new_min_y:new_max_y, new_min_x:new_max_x]
+    copied = cv2.addWeighted(temp_1[new_min_y:new_max_y, new_min_x:new_max_x], 1, edged_2, .9, 1)
+    temp_1 [new_min_y:new_max_y, new_min_x:new_max_x] = copied
+    return temp_1
+
+def morph(c_obj, r_obj):
+    img1_warped = np.copy(r_obj.image)
+    img1_points = c_obj.pix_points
+    img2_points = r_obj.pix_points
+    mask = hud_mask(c_obj, r_obj)
     # Find Centroid
     mid = cv2.moments(mask[:, :, 1])
     center = (int(mid['m10']/mid['m00']), int(mid['m01']/mid['m00']))
@@ -947,9 +1052,9 @@ def morph(img1, img2, img1_points, img2_points):
         tris2.append(tri2)
     # Apply affine transformation to Delaunay triangles
     for i in range(0, len(tris1)):
-        warp_triangle(img1, img1_warped, tris1[i], tris2[i])
+        warp_triangle(c_obj.image, img1_warped, tris1[i], tris2[i])
     # Clone seamlessly.
-    output = cv2.seamlessClone(np.uint8(img1_warped), img2, mask, center, cv2.NORMAL_CLONE)
+    output = cv2.seamlessClone(np.uint8(img1_warped), r_obj.image, mask, center, cv2.NORMAL_CLONE)
     return output
 
 
@@ -964,77 +1069,6 @@ with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
 
 ref = []
-for idx, file in enumerate(ref_files):
-    ref_img = cv2.imread(file)
-    ref.append(Face('ref'))
-    ref[idx].get_landmarks(ref_img)
 cam_obj = Face('cam')
 app = BoxLayoutApp()
 app.run()
-# inter = SetInterval(2, match)
-
-
-###########
-# RUN CAM #
-###########
-# def cam():
-#     global out
-#     ref_image = selected.image
-#     print(ref.index(selected))
-#     cap = cv2.VideoCapture(0)
-#     cap_frame = [cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)]
-#     print(cap_frame)
-#     # Resize reference image
-#     size = [int((cap_frame[1] / ref_image.shape[0]) * ref_image.shape[1]), int(cap_frame[1])]
-#     ref_image = cv2.resize(ref_image, size, cv2.INTER_AREA)
-#
-#     while cap.isOpened():
-#         success, image = cap.read()
-#         image = cv2.flip(image, 1)
-#         if not success:
-#             print("Ignoring empty camera frame.")
-#             # If loading a video, use 'break' instead of 'continue'.
-#             continue
-#
-#         image.flags.writeable = True
-#
-#         cam_obj.get_landmarks(image)
-#         raw_image = cam_obj.image.copy()
-#
-#         web_image = np.asarray(raw_image)
-#
-#         if cam_obj.beta >= ref[r].beta + delta:
-#             text1 = 'left'
-#         elif cam_obj.beta <= ref[r].beta - delta:
-#             text1 = 'right'
-#         else:
-#             text1 = 'ok'
-#
-#         if cam_obj.alpha >= ref[r].alpha + delta:
-#             text2 = 'down'
-#         elif cam_obj.alpha <= ref[r].alpha - delta:
-#             text2 = 'up'
-#         else:
-#             text2 = 'ok'
-#         if ref[r].tilt['angle'] >= cam_obj.tilt['angle'] + delta:
-#             text3 = 'left'
-#         elif ref[r].tilt['angle'] <= cam_obj.tilt['angle'] - delta:
-#             text3 = 'right'
-#         else:
-#             text3 = 'ok'
-#
-#         # WRITE ON IMAGE
-#         rect = (cam_obj.delta_x//2 + 40, cam_obj.delta_y//2 + 40)
-#         out = draw_hud(web_image, cam_obj.bb_center, rect, text2, text1, text3, r)
-#
-#         shared_window = np.concatenate((ref_image, out), axis=1)
-#         # cv2.imshow('Comparison', shared_window)
-#         # if cv2.waitKey(5) & 0xFF == 27:
-#         #     break
-#     cap.release()
-
-# inter.cancel()
-# cv2.destroyAllWindows()
-# for m in final_morphs:
-#     cv2.imshow('result', m)
-#     cv2.waitKey(0)

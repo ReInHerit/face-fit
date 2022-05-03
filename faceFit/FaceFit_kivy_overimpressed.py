@@ -1,14 +1,11 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-import time
-import threading
 
 from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle
-from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty
-from kivy.uix.behaviors import ToggleButtonBehavior
-from kivy.uix.floatlayout import FloatLayout
+from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty
+
 from pynput.keyboard import Key, Controller
 import glob
 from operator import itemgetter
@@ -19,9 +16,6 @@ import json
 import kivy
 from kivy.metrics import dp
 kivy.require("1.9.1")
-import random
-import io
-from kivy.core.image import Image as CoreImage
 import os
 from kivy.app import App
 from kivy.uix.label import Label
@@ -30,13 +24,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.behaviors import ToggleButtonBehavior
-from kivy.core.camera import Camera as CoreCamera
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
-from kivy.config import Config
-from kivy.uix.widget import Widget
-from kivy.lang import Builder
-# import kivy_box_layout as layout
 Window.maximize()
 
 mp_face_detection = mp.solutions.face_detection
@@ -68,8 +57,8 @@ labels = []
 view = {}
 out = []
 curr = 0
-delta = 7
-
+delta = 5
+sm = {}
 
 # OBJECTS
 class FacePart:
@@ -133,9 +122,6 @@ class Face:
             # Convert the BGR image to RGB before processing.
             result = face_m.process(cv2.cvtColor(picture, cv2.COLOR_BGR2RGB))
             if result.multi_face_landmarks:
-                # if not result.multi_face_landmarks:
-                #     print('oh noooo')
-                #     continue
                 self.np_image = picture.copy()
                 w, h, c = picture.shape
                 for face_landmarks in result.multi_face_landmarks:
@@ -324,7 +310,7 @@ class Camera(Image):
             buf = cv2.flip(overimpressed, 0).tobytes()
             texture = Texture.create(size=(overimpressed.shape[1], overimpressed.shape[0]), colorfmt='bgr')
             texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-            print(self.texture, overimpressed.shape)
+            # print(self.texture, overimpressed.shape)
             view.__setattr__('texture', texture)
 
             self.texture = texture
@@ -336,7 +322,8 @@ class Camera(Image):
                 buttons[self.reference].height = 150
                 for i in range(0, 6):
                     labels[i].__setattr__('text', '-')
-                view.__setattr__('source', '')
+                view.__setattr__('source', path)
+
                 selected = -1
 
         elif success and self.reference == -1:
@@ -361,7 +348,6 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.super_box = BoxLayout(orientation='horizontal')
         # ###LEFT PART### #
         self.l_box = BoxLayout(orientation='vertical', size=(dp(400), dp(1000)), size_hint=(0.2, 1))
-
         self.title_l = Label(text='Seleziona un quadro', size_hint=(1, 0.1),
                              pos_hint={'center_x': 0.5, 'center_y': 0.5})
         self.sc_view = ScrollView(size_hint=(1, 0.9))  # Definition of scroll view to place image buttons
@@ -374,6 +360,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.view = Image(source='', allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
                           width=self.c_box.size[0], height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
         view = self.view
+
         self.title2 = Label(text='Statistiche', size_hint=(1, .1))
         self.val1 = '-'
         self.riferimenti = BoxLayout(size_hint=(1, .3), orientation='horizontal')
@@ -417,7 +404,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         # ###LEFT PART### #
         self.c_box.bind(size=self._update_rect, pos=self._update_rect)
         with self.c_box.canvas.before:
-            Color(.2, .2, .2, 1)  # green; colors range from 0-1 not 0-255
+            Color(.1, .2, .2, 1)  # green; colors range from 0-1 not 0-255
             self.rect = Rectangle(size=self.c_box.size, pos=self.c_box.pos)
 
         # self.title_l = Label(text='Seleziona un quadro', size_hint=(1, 0.1), bold=True , pos_hint={'center_x': 0.5, 'center_y': 0.5})
@@ -460,6 +447,10 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.super_box.add_widget(self.l_box)
         self.super_box.add_widget(self.c_box)
         self.super_box.add_widget(self.r_box)
+        # self.first_screen.add_widget(self.progressbar)
+        # self.sm.add_widget(self.first_screen)
+        # self.main.add_widget(self.super_box)
+        # self.sm.add_widget(self.main)
 
         return self.super_box
 
@@ -582,6 +573,7 @@ def warp_triangle(img1, img2, t1, t2):
     # Get mask by filling triangle
     mask = np.zeros((r2[3], r2[2], 3), dtype=np.float32)
     cv2.fillConvexPoly(mask, np.int32(t2_rect_int), (1.0, 1.0, 1.0), 16, 0)
+    # mask = cv2.GaussianBlur(mask, (3,3), sigmaX=0, sigmaY=0)
 
     # Apply warpImage to small rectangular patches
     img1_rect = img1[r1[1]:r1[1] + r1[3], r1[0]:r1[0] + r1[2]]
@@ -638,10 +630,9 @@ def match():
             if cam_exp == ref_exp:
                 print('MATCH')
                 morphed = morph(cam_obj, ref[selected])
+
                 final_morphs[selected] = morphed
                 return True
-                # keyboard.press(Key.esc)raw_image
-                # keyboard.release(Key.esc)
             else:
                 return False
 
@@ -713,7 +704,7 @@ def where_is_looking(img, f_landmarks, what):
         beta = angles[1] * 360
         # gamma = angles[2] * 360
     else:  ## 'lower': -25, 'upper': 25}, 'desired': {'lower': -35, 'upper': 48}}
-        alpha = int(normalize(alpha, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -60, 'upper': 60}}))
+        alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
         beta = int(normalize(beta, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -60, 'upper': 60}}))
 
     # See where the user's head tilting
@@ -954,6 +945,7 @@ def hud_mask(mask_obj, masked_obj):
     # cv2.waitKey(1)
     return mask
 
+
 def cut_paste(obj1, obj2):
     d = 10
     img1 = obj1.image
@@ -1024,6 +1016,7 @@ def cut_paste(obj1, obj2):
     temp_1 [new_min_y:new_max_y, new_min_x:new_max_x] = copied
     return temp_1
 
+
 def morph(c_obj, r_obj):
     img1_warped = np.copy(r_obj.image)
     img1_points = c_obj.pix_points
@@ -1058,6 +1051,187 @@ def morph(c_obj, r_obj):
     return output
 
 
+def extract_index_nparray(nparray):
+    index = None
+    for num in nparray[0]:
+        index = num
+        break
+    return index
+
+
+def morph2(c_obj, r_obj):
+    img1_warped = np.copy(r_obj.image)
+    img1_points = np.array(c_obj.pix_points, np.int32)
+    img2_points = np.array(r_obj.pix_points, np.int32)
+    mask = hud_mask(c_obj, r_obj)
+
+    img1 = c_obj.image
+    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    mask = np.zeros_like(img1_gray)
+    img2 = r_obj.image
+    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+    # detector = dlib.get_frontal_face_detector()
+    # predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+    height, width, channels = img2.shape
+    img2_new_face = np.zeros((height, width, channels), np.uint8)
+    convexhull1 = cv2.convexHull(img1_points)
+    # cv2.polylines(img, [convexhull], True, (255, 0, 0), 3)
+    cv2.fillConvexPoly(mask, convexhull1, 255)
+    # Face 1
+    # faces = detector(img1_gray)
+    # for face in faces:
+    #     landmarks = predictor(img1_gray, face)
+    #     landmarks_points = []
+    #     for n in range(0, 68):
+    #         x = landmarks.part(n).x
+    #         y = landmarks.part(n).y
+    #         landmarks_points.append((x, y))
+    #
+    #     points = np.array(landmarks_points, np.int32)
+    #     convexhull = cv2.convexHull(points)
+    #     # cv2.polylines(img, [convexhull], True, (255, 0, 0), 3)
+    #     cv2.fillConvexPoly(mask, convexhull, 255)
+
+    face_image_1 = cv2.bitwise_and(img1, img1, mask=mask)
+
+    # Delaunay triangulation
+    rect = cv2.boundingRect(convexhull1)
+    subdiv = cv2.Subdiv2D(rect)
+    subdiv.insert(c_obj.pix_points)
+    triangles = subdiv.getTriangleList()
+    triangles = np.array(triangles, dtype=np.int32)
+
+    indexes_triangles = []
+    for t in triangles:
+        pt1 = (t[0], t[1])
+        pt2 = (t[2], t[3])
+        pt3 = (t[4], t[5])
+
+        index_pt1 = np.where((img1_points == pt1).all(axis=1))
+        index_pt1 = extract_index_nparray(index_pt1)
+
+        index_pt2 = np.where((img1_points == pt2).all(axis=1))
+        index_pt2 = extract_index_nparray(index_pt2)
+
+        index_pt3 = np.where((img1_points == pt3).all(axis=1))
+        index_pt3 = extract_index_nparray(index_pt3)
+
+        if index_pt1 is not None and index_pt2 is not None and index_pt3 is not None:
+            triangle = [index_pt1, index_pt2, index_pt3]
+            indexes_triangles.append(triangle)
+
+    # Face 2
+    # faces2 = detector(img2_gray)
+    # for face in faces2:
+    #     landmarks = predictor(img2_gray, face)
+    #     landmarks_points2 = []
+    #     for n in range(0, 68):
+    #         x = landmarks.part(n).x
+    #         y = landmarks.part(n).y
+    #         landmarks_points2.append((x, y))
+
+    # points2 = np.array(landmarks_points2, np.int32)
+    convexhull2 = cv2.convexHull(img2_points)
+
+    # lines_space_mask = np.zeros_like(img1_gray)
+    # lines_space_new_face = np.zeros_like(img2)
+    # Triangulation of both faces
+    for triangle_index in indexes_triangles:
+        # Triangulation of the first face
+        tr1_pt1 = c_obj.pix_points[triangle_index[0]]
+        tr1_pt2 = c_obj.pix_points[triangle_index[1]]
+        tr1_pt3 = c_obj.pix_points[triangle_index[2]]
+        triangle1 = np.array([tr1_pt1, tr1_pt2, tr1_pt3], np.int32)
+
+        rect1 = cv2.boundingRect(triangle1)
+        (x, y, w, h) = rect1
+        cropped_triangle = img1[y: y + h, x: x + w]
+        cropped_tr1_mask = np.zeros((h, w), np.uint8)
+
+        img1_points = np.array([[tr1_pt1[0] - x, tr1_pt1[1] - y],
+                           [tr1_pt2[0] - x, tr1_pt2[1] - y],
+                           [tr1_pt3[0] - x, tr1_pt3[1] - y]], np.int32)
+
+        cv2.fillConvexPoly(cropped_tr1_mask, img1_points, 255)
+
+        # # Lines space
+        # cv2.line(lines_space_mask, tr1_pt1, tr1_pt2, 255)
+        # cv2.line(lines_space_mask, tr1_pt2, tr1_pt3, 255)
+        # cv2.line(lines_space_mask, tr1_pt1, tr1_pt3, 255)
+        # lines_space = cv2.bitwise_and(img1, img1, mask=lines_space_mask)
+
+        # Triangulation of second face
+        tr2_pt1 = r_obj.pix_points[triangle_index[0]]
+        tr2_pt2 = r_obj.pix_points[triangle_index[1]]
+        tr2_pt3 = r_obj.pix_points[triangle_index[2]]
+        triangle2 = np.array([tr2_pt1, tr2_pt2, tr2_pt3], np.int32)
+
+        rect2 = cv2.boundingRect(triangle2)
+        (x, y, w, h) = rect2
+
+        cropped_tr2_mask = np.zeros((h, w), np.uint8)
+
+        img2_points = np.array([[tr2_pt1[0] - x, tr2_pt1[1] - y],
+                            [tr2_pt2[0] - x, tr2_pt2[1] - y],
+                            [tr2_pt3[0] - x, tr2_pt3[1] - y]], np.int32)
+
+        cv2.fillConvexPoly(cropped_tr2_mask, img2_points, 255)
+
+        # Warp triangles
+        img1_points = np.float32(img1_points)
+        img2_points = np.float32(img2_points)
+        M = cv2.getAffineTransform(img1_points, img2_points)
+        warped_triangle = cv2.warpAffine(cropped_triangle, M, (w, h))
+        warped_triangle = cv2.bitwise_and(warped_triangle, warped_triangle, mask=cropped_tr2_mask)
+
+        # Reconstructing destination face
+        img2_new_face_rect_area = img2_new_face[y: y + h, x: x + w]
+        img2_new_face_rect_area_gray = cv2.cvtColor(img2_new_face_rect_area, cv2.COLOR_BGR2GRAY)
+        _, mask_triangles_designed = cv2.threshold(img2_new_face_rect_area_gray, 1, 255, cv2.THRESH_BINARY_INV)
+        warped_triangle = cv2.bitwise_and(warped_triangle, warped_triangle, mask=mask_triangles_designed)
+
+        img2_new_face_rect_area = cv2.add(img2_new_face_rect_area, warped_triangle)
+        img2_new_face[y: y + h, x: x + w] = img2_new_face_rect_area
+
+    # Face swapped (putting 1st face into 2nd face)
+    img2_face_mask = np.zeros_like(img2_gray)
+    img2_head_mask = cv2.fillConvexPoly(img2_face_mask, convexhull2, 255)
+    img2_face_mask = cv2.bitwise_not(img2_head_mask)
+
+    img2_head_noface = cv2.bitwise_and(img2, img2, mask=img2_face_mask)
+    result = cv2.add(img2_head_noface, img2_new_face)
+
+    (x, y, w, h) = cv2.boundingRect(convexhull2)
+    center_face2 = (int((x + x + w) / 2), int((y + y + h) / 2))
+
+    seamlessclone = cv2.seamlessClone(result, img2, img2_head_mask, center_face2, cv2.NORMAL_CLONE)
+    return seamlessclone
+
+# class MyPopupProgressBar(Widget):
+#     progress_bar = ObjectProperty()  # Kivy properties classes are used when you create an EventDispatcher.
+#
+#     def __init__(self, **kwa):
+#         super(MyPopupProgressBar, self).__init__(
+#             **kwa)  # super combines and initializes two widgets Popup and ProgressBar
+#         self.progress_bar = ProgressBar()  # instance of ProgressBar created.
+#         self.popup = Popup(title='Place Your Title Here.....',
+#                            content=self.progress_bar)  # progress bar assigned to popup
+#         self.popup.bind(on_open=self.puopen)  # Binds super widget to on_open.
+#         Clock.schedule_once(self.progress_bar_start)  # Uses clock to call progress_bar_start() (callback) one time only
+#
+#     def progress_bar_start(self, instance):  # Provides initial value of of progress bar and lanches popup
+#         self.progress_bar.value = 1  # Initial value of progress_bar
+#         self.popup.open()  # starts puopen()
+#
+#     def next(self, dt):  # Updates Project Bar
+#         if self.progress_bar.value >= 100:  # Checks to see if progress_bar.value has met 100
+#             print(self.root.children)
+#             sm.__setattr__('current', 'main')
+#         self.progress_bar.value += 1  # Updates progress_bar's progress
+#
+#     def puopen(self, instance):  # Called from bind.
+#         Clock.schedule_interval(self.next, .0005)  # Creates Clock event scheduling next() every 5-1000th of a second.
 ##############
 # INITIALIZE #
 ##############

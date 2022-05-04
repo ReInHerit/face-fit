@@ -5,6 +5,7 @@ import numpy as np
 from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle
 from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty
+from kivy.uix.progressbar import ProgressBar
 
 from pynput.keyboard import Key, Controller
 import glob
@@ -26,6 +27,7 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
+from color_transfer import color_transfer
 Window.maximize()
 
 mp_face_detection = mp.solutions.face_detection
@@ -54,6 +56,7 @@ drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 selected = -1
 raw_image = []
 labels = []
+pbars = []
 view = {}
 out = []
 curr = 0
@@ -82,7 +85,11 @@ class FacePart:
             temp_array.append(points_array[i])
         self.raw_pts = temp_array
         v = np.array(temp_array)
-        new_points = scale_numpy_array(v, 0, 1)
+        new_range = (0, 1)
+        max_range = max(new_range)
+        min_range = min(new_range)
+        scaled_unit = (max_range - min_range) / (np.max(v) - np.min(v))
+        new_points = v * scaled_unit - np.min(v) * scaled_unit + min_range
         self.pts = new_points.tolist()
 
 
@@ -207,6 +214,27 @@ class Face:
         cv2.fillConvexPoly(mask, np.int32(hull8U), (255, 255, 255))
         return mask
 
+    def draw(self, part):
+        conn = ''
+        dr_spec = ''
+        if part == 'iris':
+            conn = mp_face_mesh.FACEMESH_IRISES
+            dr_spec = mp_drawing_styles.get_default_face_mesh_iris_connections_style()
+        elif part == 'contours':
+            conn = mp_face_mesh.FACEMESH_CONTOURS
+            dr_spec = mp_drawing_styles.get_default_face_mesh_contours_style()
+        elif part == 'tessellation':
+            conn = mp_face_mesh.FACEMESH_TESSELATION
+            dr_spec = mp_drawing_styles.get_default_face_mesh_tesselation_style()
+        else:
+            print('WRONG PART DESCRIPTOR')
+        mp_drawing.draw_landmarks(
+            image=self.image,
+            landmark_list=self.f_lmrks,
+            connections=conn,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=dr_spec)
+
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
         super(MyButton, self).__init__(**kwargs)
@@ -277,9 +305,9 @@ class Camera(Image):
         if success and self.reference != -1:
             image.flags.writeable = True
             cam_obj.get_landmarks(image)
+            # load the images
+
             raw_image = cam_obj.image.copy()
-            #
-            # web_image = np.asarray(raw_image)
 
             if cam_obj.beta >= ref[self.reference].beta + delta:
                 text1 = 'left'
@@ -303,6 +331,7 @@ class Camera(Image):
             labels[3].__setattr__('text', str(int(cam_obj.beta)))
             labels[4].__setattr__('text', str(int(cam_obj.alpha)))
             labels[5].__setattr__('text', str(int(cam_obj.tilt['angle'])))
+            pbars[0].__setattr__('source', int(cam_obj.beta-ref[self.reference].beta))
             overimpressed = cut_paste(ref[self.reference], cam_obj)
 
             # Convert to Kivy Texture
@@ -344,7 +373,7 @@ class Camera(Image):
 class BoxLayoutApp(App):  # class in which we are creating the button
     def __init__(self):
         super(BoxLayoutApp, self).__init__()
-        global labels, view
+        global labels, view, pbars
         self.super_box = BoxLayout(orientation='horizontal')
         # ###LEFT PART### #
         self.l_box = BoxLayout(orientation='vertical', size=(dp(400), dp(1000)), size_hint=(0.2, 1))
@@ -390,6 +419,11 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_value_box = BoxLayout(size_hint=(.3, 1), orientation='vertical')
         self.cam_values = Label(text='valori camera', size_hint=(1, .1))
         labels = [self.r_value_x, self.r_value_y, self.r_value_z, self.c_value_x, self.c_value_y, self.c_value_z]
+        self.hints = BoxLayout(size_hint=(1,1), orientation='vertical', padding=[dp(40),self.cam_values.height*.1, dp(40), 0])
+        self.prog_x = ProgressBar(max=100,size_hint=(1, .3), pos=(dp(50),dp(65)))
+        self.prog_y = ProgressBar(size_hint=(1, .3), pos=(dp(70),dp(100)))
+        self.prog_z = ProgressBar(size_hint=(1, .3) , pos=(dp(30),dp(25)))
+        pbars = [self.prog_x, self.prog_y, self.prog_z]
         # ##RIGHT PART## #
         self.r_box = BoxLayout(orientation='vertical', size_hint=(0.2, 1))
         self.title_r = Label(text='Questo è il titolo', size_hint=(1, 0.1),
@@ -420,6 +454,10 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.riferimenti.add_widget(self.picture_box)
         self.riferimenti.add_widget(self.r_value_box)
         self.riferimenti.add_widget(self.c_value_box)
+        self.riferimenti.add_widget(self.hints)
+        self.hints.add_widget(self.prog_x)
+        self.hints.add_widget(self.prog_y)
+        self.hints.add_widget(self.prog_z)
         self.picture_box.add_widget(self.reference_title)
         self.picture_box.add_widget(self.rot_x)
         self.picture_box.add_widget(self.rot_y)
@@ -465,6 +503,9 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 ref_img = cv2.imread(file)
                 ref.append(Face('ref'))
                 ref[idx].get_landmarks(ref_img)
+                # DRAW LANDMARKS
+                # ref[idx].draw('contours')
+                # ref[idx].draw('tessellation')
             # for image in ref_files:
                 button = MyButton(size_hint_y=None,
                                   height=150,
@@ -523,17 +564,11 @@ def factor_and_center(img, landmark_a, id1, id2, id3, id4):
     p2 = (int(landmark_a[id2].x * img.shape[1]), int(landmark_a[id2].y * img.shape[0]), 0)
     p3 = (int(landmark_a[id3].x * img.shape[1]), int(landmark_a[id3].y * img.shape[0]), 0)
     p4 = (int(landmark_a[id4].x * img.shape[1]), int(landmark_a[id4].y * img.shape[0]), 0)
-    division = calc_distance(p3, p4) / calc_distance(p1, p2)
+    p4_p3 = ((p4[0] - p3[0]) ** 2 + (p4[1] - p3[1]) ** 2 + (p4[2] - p3[2]) ** 2) ** 0.5
+    p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2) ** 0.5
+    division = p4_p3 / p2_p1
     center = find_center(np.array([p1, p2, p3, p4]))
     return division, center
-
-
-def scale_numpy_array(arr, min_v, max_v):
-    new_range = (min_v, max_v)
-    max_range = max(new_range)
-    min_range = min(new_range)
-    scaled_unit = (max_range - min_range) / (np.max(arr) - np.min(arr))
-    return arr * scaled_unit - np.min(arr) * scaled_unit + min_range
 
 
 def normalize(value, bounds):
@@ -542,13 +577,7 @@ def normalize(value, bounds):
            (bounds['actual']['upper'] - bounds['actual']['lower'])
 
 
-def calc_distance(p1, p2):
-    return ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2) ** 0.5
-
-
 def apply_affine_transform(src, src_tri, dst_tri, siz):
-    # Apply affine transform calculated using srcTri and dstTri to src and output an image of size.
-    # Given a pair of triangles, find the affine transform.
     warp_mat = cv2.getAffineTransform(np.float32(src_tri), np.float32(dst_tri))
     # Apply the Affine Transform just found to the src image
     dst = cv2.warpAffine(src, warp_mat, (siz[0], siz[1]), None, flags=cv2.INTER_LINEAR,
@@ -557,8 +586,6 @@ def apply_affine_transform(src, src_tri, dst_tri, siz):
 
 
 def warp_triangle(img1, img2, t1, t2):
-    # Warps and alpha blends triangular regions from img1 and img2 to img
-    # Find bounding rectangle for each triangle
     r1 = cv2.boundingRect(np.float32([t1]))
     r2 = cv2.boundingRect(np.float32([t2]))
     # Offset points by left top corner of the respective rectangles
@@ -594,25 +621,7 @@ def find_center(points_array):
     return int(sum_x / length), int(sum_y / length)
 
 
-def rotate_hud(origin, point, _angle):
-    """
-    Rotate a point counterclockwise by a given angle around a given origin.
-    The angle should be given in radians.
-    """
-    ox, oy = origin
-    px, py = point
 
-    qx = ox + np.cos(_angle) * (px - ox) - np.sin(_angle) * (py - oy)
-    qy = oy + np.sin(_angle) * (px - ox) + np.cos(_angle) * (py - oy)
-    return int(qx), int(qy)
-
-
-def txt_multiline(img, end_point, increment, txt, color):
-    y_start = (end_point[1] - 25)
-    y_increment = increment[1]
-    for i, line in enumerate(txt.split('\n')):
-        y = y_start + i * y_increment
-        cv2.putText(img, line, ((end_point[0] + increment[0]), y), font, 1, color, 2)
 
 
 # MATCHING FUNCTION
@@ -621,7 +630,8 @@ def match():
 
     if len(cam_obj.points) != 0:
         # CHECK HEAD ORIENTATION
-        if cam_obj.where_looks == ref[selected].where_looks and \
+        if ref[selected].alpha - delta <= cam_obj.alpha <= ref[selected].alpha + delta and \
+                ref[selected].beta - delta <= cam_obj.beta <= ref[selected].beta + delta and\
                 ref[selected].tilt['angle'] - delta <= cam_obj.tilt['angle'] <= ref[selected].tilt['angle'] + delta:
             print('match_angles')
             # CHECK EXPRESSION
@@ -705,7 +715,7 @@ def where_is_looking(img, f_landmarks, what):
         # gamma = angles[2] * 360
     else:  ## 'lower': -25, 'upper': 25}, 'desired': {'lower': -35, 'upper': 48}}
         alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
-        beta = int(normalize(beta, {'actual': {'lower': -25, 'upper': 25}, 'desired': {'lower': -60, 'upper': 60}}))
+        beta = int(normalize(beta, {'actual': {'lower': -15, 'upper': 12}, 'desired': {'lower': -65, 'upper': 55}}))
 
     # See where the user's head tilting
     if beta < -5:
@@ -733,168 +743,187 @@ def where_is_looking(img, f_landmarks, what):
     return [text, beta, alpha]
 
 
-def draw_hud(img, center_point, b_box, up_down, r_l, turn_z, ref_id):
-    hud = np.zeros_like(img, np.uint8)
-    j_arrow = [int(i * 1.3) for i in b_box]
-    color = (0, 255, 0)
-    thick = 10
-    thick_tilt = 10
-    x = center_point[0]
-    y = center_point[1] - b_box[1]
-    a = 25
-    b = 35
-    sector = 0
+# def txt_multiline(img, end_point, increment, txt, color):
+#     y_start = (end_point[1] - 25)
+#     y_increment = increment[1]
+#     for i, line in enumerate(txt.split('\n')):
+#         y = y_start + i * y_increment
+#         cv2.putText(img, line, ((end_point[0] + increment[0]), y), font, 1, color, 2)
 
-    # BIG ARROW
-    if r_l == 'right':
-        if up_down == 'up':
-            angle = 45
-            sector = 1
-        elif up_down == 'down':
-            angle = 135
-            sector = 2
-        else:
-            angle= 90
-            sector = 2
-    elif r_l == 'left':
-        if up_down == 'up':
-            angle = -45
-            sector = 1
-        elif up_down == 'down':
-            angle = -135
-            sector = 2
-        else:
-            angle = -90
-            sector = 2
-    else:
-        if up_down == 'up':
-            angle = 0
-            sector = 1
-        elif up_down == 'down':
-            angle = 180
-            sector = 2
-        else:
-            sector = 1
-            angle = 0
-            x = -200
-            y = -300
-    big_arrow = np.array([(x, y), (x - a, y), (x - a, y - b), (x - 2 * a, y - b), (x, y - 2 * b), (x + 2 * a, y - b),
-                      (x + a, y - b), (x + a, y)], np.float32)
-    arrow_rotated = big_arrow.copy()
 
-    for i, p in enumerate(big_arrow):
-        arrow_rotated[i] = rotate_hud(center_point, p, np.deg2rad(angle))
-
-    cv2.polylines(hud, [np.int32(arrow_rotated)], True, color, thick)
-
-    # TILT
-    if turn_z == 'right':
-        if sector != 2:
-            alpha = 100
-            beta = 170
-            tilt_p1 = [center_point[0] - j_arrow[0], center_point[1] + 10]
-            tilt_p2 = [center_point[0] - j_arrow[0] - 10, center_point[1] + 25]
-            tilt_p3 = [center_point[0] - j_arrow[0] + 15, center_point[1] + 20]
-        else:
-            alpha = 190
-            beta = 260
-            tilt_p1 = [center_point[0] - 5, center_point[1] - j_arrow[1]-1]
-            tilt_p2 = [center_point[0] - 20, center_point[1] - j_arrow[1]-10]
-            tilt_p3 = [center_point[0] - 15, center_point[1] - j_arrow[1]+15]
-    elif turn_z == 'left':
-        if sector != 2:
-            alpha = 10
-            beta = 80
-            tilt_p1 = [center_point[0] + j_arrow[0], center_point[1] + 10]
-            tilt_p2 = [center_point[0] + j_arrow[0] + 10, center_point[1] + 25]
-            tilt_p3 = [center_point[0] + j_arrow[0] - 15, center_point[1] + 20]
-        else:
-            alpha = 280
-            beta = 350
-            tilt_p1 = [center_point[0] + 5, center_point[1] - j_arrow[1]-1]
-            tilt_p2 = [center_point[0] + 20, center_point[1] - j_arrow[1]-10]
-            tilt_p3 = [center_point[0] + 15, center_point[1] - j_arrow[1]+15]
-    else:
-        alpha = 0
-        beta = 0
-        tilt_p1 = [-300, -300]
-        tilt_p2 = [-300, -300]
-        tilt_p3 = [-300, -300]
-        thick_tilt = 0
-    cv2.ellipse(hud, center_point, j_arrow, 0, alpha, beta, color, thick_tilt)
-    pts0 = np.array([tilt_p1, tilt_p2, tilt_p3], np.int32)
-    pts0 = pts0.reshape((-1, 1, 2))
-    cv2.polylines(hud, [pts0], True, color, thick_tilt)
-
-    # L Eye
-
-    if ref[ref_id].status['l_e'] != cam_obj.status['l_e']:
-        l_e_start = cam_obj.centers['l_e']
-        l_e_end = (cam_obj.centers['l_e'][0] + j_arrow[0]//2, cam_obj.centers['l_e'][1] - j_arrow[1])
-        txt_l = "check\nleft\neye"
-    else:
-        l_e_start = (-300, -300)
-        l_e_end = (-300, -300)
-        txt_l = ""
-    cv2.line(hud, l_e_start, l_e_end, color, 2)
-    txt_multiline(hud, l_e_end, [5, 25], txt_l, color)
-
-    # R Eye
-    if ref[ref_id].status['r_e'] != cam_obj.status['r_e']:
-        r_e_start = cam_obj.centers['r_e']
-        r_e_end = (cam_obj.centers['r_e'][0] - j_arrow[0]//2, cam_obj.centers['r_e'][1] - j_arrow[1])
-        txt_r = "check\n right\n  eye"
-    else:
-        r_e_start = (-300, -300)
-        r_e_end = (-300, -300)
-        txt_r = ""
-    cv2.line(hud, r_e_start, r_e_end, color, 2)
-    txt_multiline(hud, r_e_end, [-95, 25], txt_r, color)
-
-    # Mouth
-    if ref[ref_id].status['lips'] != cam_obj.status['lips']:
-        mouth_start = cam_obj.centers['lips']
-        mouth_end = (cam_obj.centers['lips'][0] - 100), (cam_obj.centers['lips'][1] + 125)
-        txt_mouth = "check mouth"
-    else:
-        mouth_start = (-300, -300)
-        mouth_end = (-300, -300)
-        txt_mouth = ""
-    cv2.line(hud, mouth_start, mouth_end, color, 2)
-    cv2.putText(hud, txt_mouth, ((mouth_end[0] - 100), (mouth_end[1] + 20)), font, 1, color, 2)
-    d = 20
-    # ref[selected].image = cv2.cvtColor(ref[selected].image, cv2.COLOR_BGR2RGB)
-    temp_ref = ref[selected].image.copy()
-    rx = (cam_obj.delta_x + 2 * d) / (ref[selected].delta_x + 2 * d)
-    ry = (cam_obj.delta_y + 2 * d) / (ref[selected].delta_y + 2 * d)
-    media_scale = round((rx + ry) / 2, 2)
-    r_min_x, r_min_y = ref[selected].bb_p1
-    r_max_x, r_max_y = ref[selected].bb_p2
-    center_ref = ref[selected].pix_points[168]
-    center_cam = cam_obj.pix_points[168]
-    delta_r_min = [r_min_x - d, r_min_y - d]
-    delta_r_max = [r_max_x + d, r_max_y + d]
-    cropped_ref = temp_ref[delta_r_min[1]:delta_r_max[1], delta_r_min[0]:delta_r_max[0]]
-    print(center_cam, center_ref, delta_r_min, delta_r_max)
-    print(r_max_y-r_min_y+2*d, r_max_x-r_min_x+2*d, 'picture')
-    # print('rx', rx, 'ry', ry, 'media', media_scale)
-    new_min_x = center_cam[0] - int((center_ref[0] - delta_r_min[0]) )
-    new_min_y = center_cam[1] - int((center_ref[1] - delta_r_min[1]) )
-    new_max_x = center_cam[0] - int((center_ref[0] - delta_r_max[0]) )
-    new_max_y = center_cam[1] - int((center_ref[1] - delta_r_max[1]) )
-    print(new_min_x, new_max_x, new_min_y, new_max_y )
-    print(selected)
-    temp_cam = img.copy()
-    # print(exp_bb_reference.shape, exp_bb_cam.shape, img.shape)
-    print(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x].shape, cropped_ref.shape)
-    temp_cam[new_min_y:new_max_y, new_min_x:new_max_x] = \
-        cv2.addWeighted(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x], 1, cropped_ref, .9, 1)
-    mask = hud.astype(bool)
-    # print(new_max_x - new_min_x, new_max_y - new_min_y, cropped_ref.shape)
-    out_image = temp_cam.copy()
-    # out_image = cv2.addWeighted(img, 1, exp_bb_cam, 0.7, 1)
-    out_image[mask] = cv2.addWeighted(img, 1, hud, 0.9, 1)[mask]
-    return out_image
+# def rotate_hud(origin, point, _angle):
+#     """
+#     Rotate a point counterclockwise by a given angle around a given origin.
+#     The angle should be given in radians.
+#     """
+#     ox, oy = origin
+#     px, py = point
+#
+#     qx = ox + np.cos(_angle) * (px - ox) - np.sin(_angle) * (py - oy)
+#     qy = oy + np.sin(_angle) * (px - ox) + np.cos(_angle) * (py - oy)
+#     return int(qx), int(qy)
+# def draw_hud(img, center_point, b_box, up_down, r_l, turn_z, ref_id):
+#     hud = np.zeros_like(img, np.uint8)
+#     j_arrow = [int(i * 1.3) for i in b_box]
+#     color = (0, 255, 0)
+#     thick = 10
+#     thick_tilt = 10
+#     x = center_point[0]
+#     y = center_point[1] - b_box[1]
+#     a = 25
+#     b = 35
+#     sector = 0
+#
+#     # BIG ARROW
+#     if r_l == 'right':
+#         if up_down == 'up':
+#             angle = 45
+#             sector = 1
+#         elif up_down == 'down':
+#             angle = 135
+#             sector = 2
+#         else:
+#             angle= 90
+#             sector = 2
+#     elif r_l == 'left':
+#         if up_down == 'up':
+#             angle = -45
+#             sector = 1
+#         elif up_down == 'down':
+#             angle = -135
+#             sector = 2
+#         else:
+#             angle = -90
+#             sector = 2
+#     else:
+#         if up_down == 'up':
+#             angle = 0
+#             sector = 1
+#         elif up_down == 'down':
+#             angle = 180
+#             sector = 2
+#         else:
+#             sector = 1
+#             angle = 0
+#             x = -200
+#             y = -300
+#     big_arrow = np.array([(x, y), (x - a, y), (x - a, y - b), (x - 2 * a, y - b), (x, y - 2 * b), (x + 2 * a, y - b),
+#                       (x + a, y - b), (x + a, y)], np.float32)
+#     arrow_rotated = big_arrow.copy()
+#
+#     for i, p in enumerate(big_arrow):
+#         arrow_rotated[i] = rotate_hud(center_point, p, np.deg2rad(angle))
+#
+#     cv2.polylines(hud, [np.int32(arrow_rotated)], True, color, thick)
+#
+#     # TILT
+#     if turn_z == 'right':
+#         if sector != 2:
+#             alpha = 100
+#             beta = 170
+#             tilt_p1 = [center_point[0] - j_arrow[0], center_point[1] + 10]
+#             tilt_p2 = [center_point[0] - j_arrow[0] - 10, center_point[1] + 25]
+#             tilt_p3 = [center_point[0] - j_arrow[0] + 15, center_point[1] + 20]
+#         else:
+#             alpha = 190
+#             beta = 260
+#             tilt_p1 = [center_point[0] - 5, center_point[1] - j_arrow[1]-1]
+#             tilt_p2 = [center_point[0] - 20, center_point[1] - j_arrow[1]-10]
+#             tilt_p3 = [center_point[0] - 15, center_point[1] - j_arrow[1]+15]
+#     elif turn_z == 'left':
+#         if sector != 2:
+#             alpha = 10
+#             beta = 80
+#             tilt_p1 = [center_point[0] + j_arrow[0], center_point[1] + 10]
+#             tilt_p2 = [center_point[0] + j_arrow[0] + 10, center_point[1] + 25]
+#             tilt_p3 = [center_point[0] + j_arrow[0] - 15, center_point[1] + 20]
+#         else:
+#             alpha = 280
+#             beta = 350
+#             tilt_p1 = [center_point[0] + 5, center_point[1] - j_arrow[1]-1]
+#             tilt_p2 = [center_point[0] + 20, center_point[1] - j_arrow[1]-10]
+#             tilt_p3 = [center_point[0] + 15, center_point[1] - j_arrow[1]+15]
+#     else:
+#         alpha = 0
+#         beta = 0
+#         tilt_p1 = [-300, -300]
+#         tilt_p2 = [-300, -300]
+#         tilt_p3 = [-300, -300]
+#         thick_tilt = 0
+#     cv2.ellipse(hud, center_point, j_arrow, 0, alpha, beta, color, thick_tilt)
+#     pts0 = np.array([tilt_p1, tilt_p2, tilt_p3], np.int32)
+#     pts0 = pts0.reshape((-1, 1, 2))
+#     cv2.polylines(hud, [pts0], True, color, thick_tilt)
+#
+#     # L Eye
+#
+#     if ref[ref_id].status['l_e'] != cam_obj.status['l_e']:
+#         l_e_start = cam_obj.centers['l_e']
+#         l_e_end = (cam_obj.centers['l_e'][0] + j_arrow[0]//2, cam_obj.centers['l_e'][1] - j_arrow[1])
+#         txt_l = "check\nleft\neye"
+#     else:
+#         l_e_start = (-300, -300)
+#         l_e_end = (-300, -300)
+#         txt_l = ""
+#     cv2.line(hud, l_e_start, l_e_end, color, 2)
+#     txt_multiline(hud, l_e_end, [5, 25], txt_l, color)
+#
+#     # R Eye
+#     if ref[ref_id].status['r_e'] != cam_obj.status['r_e']:
+#         r_e_start = cam_obj.centers['r_e']
+#         r_e_end = (cam_obj.centers['r_e'][0] - j_arrow[0]//2, cam_obj.centers['r_e'][1] - j_arrow[1])
+#         txt_r = "check\n right\n  eye"
+#     else:
+#         r_e_start = (-300, -300)
+#         r_e_end = (-300, -300)
+#         txt_r = ""
+#     cv2.line(hud, r_e_start, r_e_end, color, 2)
+#     txt_multiline(hud, r_e_end, [-95, 25], txt_r, color)
+#
+#     # Mouth
+#     if ref[ref_id].status['lips'] != cam_obj.status['lips']:
+#         mouth_start = cam_obj.centers['lips']
+#         mouth_end = (cam_obj.centers['lips'][0] - 100), (cam_obj.centers['lips'][1] + 125)
+#         txt_mouth = "check mouth"
+#     else:
+#         mouth_start = (-300, -300)
+#         mouth_end = (-300, -300)
+#         txt_mouth = ""
+#     cv2.line(hud, mouth_start, mouth_end, color, 2)
+#     cv2.putText(hud, txt_mouth, ((mouth_end[0] - 100), (mouth_end[1] + 20)), font, 1, color, 2)
+#     d = 20
+#     # ref[selected].image = cv2.cvtColor(ref[selected].image, cv2.COLOR_BGR2RGB)
+#     temp_ref = ref[selected].image.copy()
+#     rx = (cam_obj.delta_x + 2 * d) / (ref[selected].delta_x + 2 * d)
+#     ry = (cam_obj.delta_y + 2 * d) / (ref[selected].delta_y + 2 * d)
+#     media_scale = round((rx + ry) / 2, 2)
+#     r_min_x, r_min_y = ref[selected].bb_p1
+#     r_max_x, r_max_y = ref[selected].bb_p2
+#     center_ref = ref[selected].pix_points[168]
+#     center_cam = cam_obj.pix_points[168]
+#     delta_r_min = [r_min_x - d, r_min_y - d]
+#     delta_r_max = [r_max_x + d, r_max_y + d]
+#     cropped_ref = temp_ref[delta_r_min[1]:delta_r_max[1], delta_r_min[0]:delta_r_max[0]]
+#     print(center_cam, center_ref, delta_r_min, delta_r_max)
+#     print(r_max_y-r_min_y+2*d, r_max_x-r_min_x+2*d, 'picture')
+#     # print('rx', rx, 'ry', ry, 'media', media_scale)
+#     new_min_x = center_cam[0] - int((center_ref[0] - delta_r_min[0]) )
+#     new_min_y = center_cam[1] - int((center_ref[1] - delta_r_min[1]) )
+#     new_max_x = center_cam[0] - int((center_ref[0] - delta_r_max[0]) )
+#     new_max_y = center_cam[1] - int((center_ref[1] - delta_r_max[1]) )
+#     print(new_min_x, new_max_x, new_min_y, new_max_y )
+#     print(selected)
+#     temp_cam = img.copy()
+#     # print(exp_bb_reference.shape, exp_bb_cam.shape, img.shape)
+#     print(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x].shape, cropped_ref.shape)
+#     temp_cam[new_min_y:new_max_y, new_min_x:new_max_x] = \
+#         cv2.addWeighted(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x], 1, cropped_ref, .9, 1)
+#     mask = hud.astype(bool)
+#     # print(new_max_x - new_min_x, new_max_y - new_min_y, cropped_ref.shape)
+#     out_image = temp_cam.copy()
+#     # out_image = cv2.addWeighted(img, 1, exp_bb_cam, 0.7, 1)
+#     out_image[mask] = cv2.addWeighted(img, 1, hud, 0.9, 1)[mask]
+#     return out_image
 
 
 # def draw(part, img, face_l):
@@ -1018,9 +1047,16 @@ def cut_paste(obj1, obj2):
 
 
 def morph(c_obj, r_obj):
+    source = ref[selected].image
+    target = cam_obj.image
+
+    # transfer the color distribution from the source image to the target image
+    color_transfer(source, target, clip=False, preserve_paper=False)
+
     img1_warped = np.copy(r_obj.image)
     img1_points = c_obj.pix_points
     img2_points = r_obj.pix_points
+    convexhull2 = cv2.convexHull(np.array(img2_points))
     mask = hud_mask(c_obj, r_obj)
     # Find Centroid
     mid = cv2.moments(mask[:, :, 1])
@@ -1029,6 +1065,10 @@ def morph(c_obj, r_obj):
     # triangles
     dt = media_pipes_tris
 
+    height, width, channels = r_obj.image.shape
+    img2_new_face = np.zeros((height, width, channels), np.uint8)
+    convexhull1 = cv2.convexHull(np.array(img1_points))
+    cv2.fillConvexPoly(mask, convexhull1, 255)
     # If no Delaunay Triangles were found, quit
     if len(dt) == 0:
         quit()
@@ -1045,9 +1085,22 @@ def morph(c_obj, r_obj):
         tris2.append(tri2)
     # Apply affine transformation to Delaunay triangles
     for i in range(0, len(tris1)):
-        warp_triangle(c_obj.image, img1_warped, tris1[i], tris2[i])
+        warp_triangle(c_obj.image, img2_new_face, tris1[i], tris2[i])
+
     # Clone seamlessly.
-    output = cv2.seamlessClone(np.uint8(img1_warped), r_obj.image, mask, center, cv2.NORMAL_CLONE)
+
+    gray = cv2.cvtColor(r_obj.image, cv2.COLOR_BGR2GRAY)
+    img2_face_mask = np.zeros_like(gray)
+
+    img2_head_mask = cv2.fillConvexPoly(img2_face_mask, convexhull2, 255)
+    img2_head_mask = cv2.GaussianBlur(img2_head_mask, (15, 15), sigmaX=0, sigmaY=0)
+    head_mask_3chan = cv2.cvtColor(img2_head_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
+    img2_face = img2_new_face.astype('float') / 255
+    img2_bg = r_obj.image.astype('float') / 255
+    out = img2_bg * (1 - head_mask_3chan) + img2_face * head_mask_3chan
+    out = (out * 255).astype('uint8')
+
+    output = cv2.seamlessClone(out, r_obj.image, img2_head_mask, center, cv2.NORMAL_CLONE)
     return output
 
 
@@ -1059,182 +1112,6 @@ def extract_index_nparray(nparray):
     return index
 
 
-def morph2(c_obj, r_obj):
-    img1_warped = np.copy(r_obj.image)
-    img1_points = np.array(c_obj.pix_points, np.int32)
-    img2_points = np.array(r_obj.pix_points, np.int32)
-    mask = hud_mask(c_obj, r_obj)
-
-    img1 = c_obj.image
-    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-    mask = np.zeros_like(img1_gray)
-    img2 = r_obj.image
-    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
-
-    # detector = dlib.get_frontal_face_detector()
-    # predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-    height, width, channels = img2.shape
-    img2_new_face = np.zeros((height, width, channels), np.uint8)
-    convexhull1 = cv2.convexHull(img1_points)
-    # cv2.polylines(img, [convexhull], True, (255, 0, 0), 3)
-    cv2.fillConvexPoly(mask, convexhull1, 255)
-    # Face 1
-    # faces = detector(img1_gray)
-    # for face in faces:
-    #     landmarks = predictor(img1_gray, face)
-    #     landmarks_points = []
-    #     for n in range(0, 68):
-    #         x = landmarks.part(n).x
-    #         y = landmarks.part(n).y
-    #         landmarks_points.append((x, y))
-    #
-    #     points = np.array(landmarks_points, np.int32)
-    #     convexhull = cv2.convexHull(points)
-    #     # cv2.polylines(img, [convexhull], True, (255, 0, 0), 3)
-    #     cv2.fillConvexPoly(mask, convexhull, 255)
-
-    face_image_1 = cv2.bitwise_and(img1, img1, mask=mask)
-
-    # Delaunay triangulation
-    rect = cv2.boundingRect(convexhull1)
-    subdiv = cv2.Subdiv2D(rect)
-    subdiv.insert(c_obj.pix_points)
-    triangles = subdiv.getTriangleList()
-    triangles = np.array(triangles, dtype=np.int32)
-
-    indexes_triangles = []
-    for t in triangles:
-        pt1 = (t[0], t[1])
-        pt2 = (t[2], t[3])
-        pt3 = (t[4], t[5])
-
-        index_pt1 = np.where((img1_points == pt1).all(axis=1))
-        index_pt1 = extract_index_nparray(index_pt1)
-
-        index_pt2 = np.where((img1_points == pt2).all(axis=1))
-        index_pt2 = extract_index_nparray(index_pt2)
-
-        index_pt3 = np.where((img1_points == pt3).all(axis=1))
-        index_pt3 = extract_index_nparray(index_pt3)
-
-        if index_pt1 is not None and index_pt2 is not None and index_pt3 is not None:
-            triangle = [index_pt1, index_pt2, index_pt3]
-            indexes_triangles.append(triangle)
-
-    # Face 2
-    # faces2 = detector(img2_gray)
-    # for face in faces2:
-    #     landmarks = predictor(img2_gray, face)
-    #     landmarks_points2 = []
-    #     for n in range(0, 68):
-    #         x = landmarks.part(n).x
-    #         y = landmarks.part(n).y
-    #         landmarks_points2.append((x, y))
-
-    # points2 = np.array(landmarks_points2, np.int32)
-    convexhull2 = cv2.convexHull(img2_points)
-
-    # lines_space_mask = np.zeros_like(img1_gray)
-    # lines_space_new_face = np.zeros_like(img2)
-    # Triangulation of both faces
-    for triangle_index in indexes_triangles:
-        # Triangulation of the first face
-        tr1_pt1 = c_obj.pix_points[triangle_index[0]]
-        tr1_pt2 = c_obj.pix_points[triangle_index[1]]
-        tr1_pt3 = c_obj.pix_points[triangle_index[2]]
-        triangle1 = np.array([tr1_pt1, tr1_pt2, tr1_pt3], np.int32)
-
-        rect1 = cv2.boundingRect(triangle1)
-        (x, y, w, h) = rect1
-        cropped_triangle = img1[y: y + h, x: x + w]
-        cropped_tr1_mask = np.zeros((h, w), np.uint8)
-
-        img1_points = np.array([[tr1_pt1[0] - x, tr1_pt1[1] - y],
-                           [tr1_pt2[0] - x, tr1_pt2[1] - y],
-                           [tr1_pt3[0] - x, tr1_pt3[1] - y]], np.int32)
-
-        cv2.fillConvexPoly(cropped_tr1_mask, img1_points, 255)
-
-        # # Lines space
-        # cv2.line(lines_space_mask, tr1_pt1, tr1_pt2, 255)
-        # cv2.line(lines_space_mask, tr1_pt2, tr1_pt3, 255)
-        # cv2.line(lines_space_mask, tr1_pt1, tr1_pt3, 255)
-        # lines_space = cv2.bitwise_and(img1, img1, mask=lines_space_mask)
-
-        # Triangulation of second face
-        tr2_pt1 = r_obj.pix_points[triangle_index[0]]
-        tr2_pt2 = r_obj.pix_points[triangle_index[1]]
-        tr2_pt3 = r_obj.pix_points[triangle_index[2]]
-        triangle2 = np.array([tr2_pt1, tr2_pt2, tr2_pt3], np.int32)
-
-        rect2 = cv2.boundingRect(triangle2)
-        (x, y, w, h) = rect2
-
-        cropped_tr2_mask = np.zeros((h, w), np.uint8)
-
-        img2_points = np.array([[tr2_pt1[0] - x, tr2_pt1[1] - y],
-                            [tr2_pt2[0] - x, tr2_pt2[1] - y],
-                            [tr2_pt3[0] - x, tr2_pt3[1] - y]], np.int32)
-
-        cv2.fillConvexPoly(cropped_tr2_mask, img2_points, 255)
-
-        # Warp triangles
-        img1_points = np.float32(img1_points)
-        img2_points = np.float32(img2_points)
-        M = cv2.getAffineTransform(img1_points, img2_points)
-        warped_triangle = cv2.warpAffine(cropped_triangle, M, (w, h))
-        warped_triangle = cv2.bitwise_and(warped_triangle, warped_triangle, mask=cropped_tr2_mask)
-
-        # Reconstructing destination face
-        img2_new_face_rect_area = img2_new_face[y: y + h, x: x + w]
-        img2_new_face_rect_area_gray = cv2.cvtColor(img2_new_face_rect_area, cv2.COLOR_BGR2GRAY)
-        _, mask_triangles_designed = cv2.threshold(img2_new_face_rect_area_gray, 1, 255, cv2.THRESH_BINARY_INV)
-        warped_triangle = cv2.bitwise_and(warped_triangle, warped_triangle, mask=mask_triangles_designed)
-
-        img2_new_face_rect_area = cv2.add(img2_new_face_rect_area, warped_triangle)
-        img2_new_face[y: y + h, x: x + w] = img2_new_face_rect_area
-
-    # Face swapped (putting 1st face into 2nd face)
-    img2_face_mask = np.zeros_like(img2_gray)
-    img2_head_mask = cv2.fillConvexPoly(img2_face_mask, convexhull2, 255)
-    img2_face_mask = cv2.bitwise_not(img2_head_mask)
-
-    img2_head_noface = cv2.bitwise_and(img2, img2, mask=img2_face_mask)
-    result = cv2.add(img2_head_noface, img2_new_face)
-
-    (x, y, w, h) = cv2.boundingRect(convexhull2)
-    center_face2 = (int((x + x + w) / 2), int((y + y + h) / 2))
-
-    seamlessclone = cv2.seamlessClone(result, img2, img2_head_mask, center_face2, cv2.NORMAL_CLONE)
-    return seamlessclone
-
-# class MyPopupProgressBar(Widget):
-#     progress_bar = ObjectProperty()  # Kivy properties classes are used when you create an EventDispatcher.
-#
-#     def __init__(self, **kwa):
-#         super(MyPopupProgressBar, self).__init__(
-#             **kwa)  # super combines and initializes two widgets Popup and ProgressBar
-#         self.progress_bar = ProgressBar()  # instance of ProgressBar created.
-#         self.popup = Popup(title='Place Your Title Here.....',
-#                            content=self.progress_bar)  # progress bar assigned to popup
-#         self.popup.bind(on_open=self.puopen)  # Binds super widget to on_open.
-#         Clock.schedule_once(self.progress_bar_start)  # Uses clock to call progress_bar_start() (callback) one time only
-#
-#     def progress_bar_start(self, instance):  # Provides initial value of of progress bar and lanches popup
-#         self.progress_bar.value = 1  # Initial value of progress_bar
-#         self.popup.open()  # starts puopen()
-#
-#     def next(self, dt):  # Updates Project Bar
-#         if self.progress_bar.value >= 100:  # Checks to see if progress_bar.value has met 100
-#             print(self.root.children)
-#             sm.__setattr__('current', 'main')
-#         self.progress_bar.value += 1  # Updates progress_bar's progress
-#
-#     def puopen(self, instance):  # Called from bind.
-#         Clock.schedule_interval(self.next, .0005)  # Creates Clock event scheduling next() every 5-1000th of a second.
-##############
-# INITIALIZE #
-##############
 for filename in glob.iglob(f'{ref_path}*'):
     if 'FACE_' in filename:
         ref_files.append(filename)

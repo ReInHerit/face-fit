@@ -1,5 +1,6 @@
 import math
-
+import scipy.spatial as spatial
+import logging
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -334,6 +335,7 @@ def morph2(c_obj, r_obj):
     img2 = r_obj.image
     img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
+
     # detector = dlib.get_frontal_face_detector()
     # predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
     height, width, channels = img2.shape
@@ -439,7 +441,7 @@ def morph2(c_obj, r_obj):
 
     img2_head_mask = cv2.fillConvexPoly(img2_face_mask, convexhull2, 255)
     img2_head_mask = cv2.GaussianBlur(img2_head_mask, (35, 35), sigmaX=0, sigmaY=0)
-    print(img2_head_mask.shape)
+
     img2_face_mask = cv2.bitwise_not(img2_head_mask)  ##inversa
     head_mask_3chan = cv2.cvtColor(img2_head_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     face_mask_3chan = cv2.cvtColor(img2_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
@@ -450,23 +452,22 @@ def morph2(c_obj, r_obj):
     cv2.imshow('-', out)
     # img2_new_face = cv2.bitwise_and(img2_new_face, img2_new_face, mask=img2_head_mask)
 
-    # img2_head_noface = cv2.bitwise_and(img2, img2, mask=img2_face_mask)
+    img2_head_noface = cv2.bitwise_and(img2, img2, mask=img2_face_mask)
 
-    # result = cv2.add(img2_head_noface, img2_new_face)
+    result = cv2.add(img2_head_noface, img2_new_face)
     (x, y, w, h) = cv2.boundingRect(convexhull2)
     center_face2 = (int((x + x + w) / 2), int((y + y + h) / 2))
-    # seamlessclone = cv2.seamlessClone(result, img2, img2_head_mask, center_face2, cv2.NORMAL_CLONE)
+    seamlessclone = cv2.seamlessClone(out, img2, img2_head_mask, center_face2, cv2.NORMAL_CLONE)
 
-    cv2.imshow('0', img2_new_face)
-    cv2.imshow('1', head_mask_3chan)
+    cv2.imshow('0', head_mask_3chan)
+    cv2.imshow('1', result)
     cv2.imshow('2', img2_bg)
     cv2.imshow('3', img2_face)
 
-    # cv2.imshow('4', seamlessclone)
+    cv2.imshow('4', seamlessclone)
     cv2.waitKey(0)
 
     # return seamlessclone
-
 
 im1 = Face('ref')
 im2 = Face('ref')

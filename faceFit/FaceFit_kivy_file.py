@@ -12,8 +12,8 @@ from kivy.app import App
 from kivy.metrics import dp
 kivy.require("1.9.1")
 from kivy.core.window import Window
-from kivy.graphics import Color, Rectangle, Canvas
-from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty, StringProperty
+from kivy.graphics import Color, Rectangle
+from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.label import Label
 from kivy.uix.image import Image
@@ -50,6 +50,7 @@ buttons = []
 result_buttons = []
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 selected = -1
+raw_image = []
 labels = []
 pbars = []
 view = {}
@@ -57,7 +58,7 @@ out = []
 curr = 0
 delta = 5
 sm = {}
-view_default = 'images/Thumbs/view_default.jpg'
+
 # OBJECTS
 class FacePart:
     def __init__(self, part_group):
@@ -233,27 +234,23 @@ class Face:
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
         super(MyButton, self).__init__(**kwargs)
-        self.source = kwargs["source"]  # Stores the image name of the image button
-        self.texture = self.button_texture(self.source)  # Treat the image as a texture so you can edit it
+        #Stores the image name of the image button
+        self.source = kwargs["source"]
+        #Treat the image as a texture so you can edit it
+        self.texture = self.button_texture(self.source)
 
     #The image changes depending on the state of the toggle button and the state.
     def on_state(self, widget, value):
-        global view
         if value == 'down':
             self.texture = self.button_texture(self.source, off=True)
-            self.__setattr__('height', 200)
         else:
             self.texture = self.button_texture(self.source)
-            self.__setattr__('height', 150)
 
     #Change the image, rectangular when pressed+Darken the color
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
-        # im = self.square_image(im)
         if off:
-            # im = self.adjust(im)
             im = cv2.rectangle(im, (1, 1), (im.shape[1]-1, im.shape[0]-1), (255, 255, 255), 10)
-
         #flip upside down
         buf = cv2.flip(im, 0)
         image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
@@ -266,14 +263,13 @@ class Camera(Image):
         super(Camera, self).__init__(**kwargs)
         # Connect to 0th camera
         self.capture = cv2.VideoCapture(0)
-        # self.reference = selected
-        # self.texture = Image()
+        self.reference = selected
         # Set drawing interval
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     # Drawing method to execute at intervals
     def update(self, dt):
-        global selected, view
+        global raw_image, selected, view
         self.reference = selected
         success, self.frame = self.capture.read()
         image = cv2.flip(self.frame, 1)
@@ -281,24 +277,39 @@ class Camera(Image):
         if success and self.reference != -1:
             image.flags.writeable = True
             cam_obj.get_landmarks(image)
+            # load the images
+
+            raw_image = cam_obj.image.copy()
+
+            # if cam_obj.beta >= ref[self.reference].beta + delta:
+            #     text1 = 'left'
+            # elif cam_obj.beta <= ref[self.reference].beta - delta:
+            #     text1 = 'right'
+            # else:
+            #     text1 = 'ok'
+            #
+            # if cam_obj.alpha >= ref[self.reference].alpha + delta:
+            #     text2 = 'down'
+            # elif cam_obj.alpha <= ref[self.reference].alpha - delta:
+            #     text2 = 'up'
+            # else:
+            #     text2 = 'ok'
+            # if ref[self.reference].tilt['angle'] >= cam_obj.tilt['angle'] + delta:
+            #     text3 = 'left'
+            # elif ref[self.reference].tilt['angle'] <= cam_obj.tilt['angle'] - delta:
+            #     text3 = 'right'
+            # else:
+            #     text3 = 'ok'
             labels[3].__setattr__('text', str(int(cam_obj.beta)))
             labels[4].__setattr__('text', str(int(cam_obj.alpha)))
             labels[5].__setattr__('text', str(int(cam_obj.tilt['angle'])))
-            perc_x = 100 - abs(ref[self.reference].beta - cam_obj.beta)
-            perc_y = 100 - abs(ref[self.reference].alpha - cam_obj.alpha)
-            perc_z = 100 - abs(ref[self.reference].tilt['angle'] - cam_obj.tilt['angle'])
-            pbars[0].__setattr__('value', perc_x)
-            pbars[1].__setattr__('value', perc_y)
-            pbars[2].__setattr__('value', perc_z)
-            pbars[0].__setattr__('bar_color', (.3,.5,.8,.5))
+            pbars[0].__setattr__('source', int(cam_obj.beta-ref[self.reference].beta))
             overimpressed = cut_paste(ref[self.reference], cam_obj)
 
             # Convert to Kivy Texture
-
             buf = cv2.flip(overimpressed, 0).tobytes()
             texture = Texture.create(size=(overimpressed.shape[1], overimpressed.shape[0]), colorfmt='bgr')
             texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-
             view.__setattr__('texture', texture)
 
             self.texture = texture
@@ -318,7 +329,6 @@ class Camera(Image):
             buf = cv2.flip(image, 0).tobytes()
             texture = Texture.create(size=(self.frame.shape[1], self.frame.shape[0]), colorfmt='bgr')
             texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-
             self.texture = texture
 
     def on_play(self, instance, value):
@@ -346,10 +356,10 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_box = BoxLayout(orientation='vertical', size=(dp(800), dp(1000)), size_hint=(.6, 1), padding=[5,5,5,5])
         self.my_camera = Camera(allow_stretch=True, keep_ratio=True, size_hint=(1, 1), width=self.c_box.size[0],
                                 height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
-        self.view = Image(source='images/Thumbs/view_default.jpg', allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
+        self.view = Image(source='', allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
                           width=self.c_box.size[0], height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
-
         view = self.view
+
         self.title2 = Label(text='Statistiche', size_hint=(1, .1))
         self.val1 = '-'
         self.riferimenti = BoxLayout(size_hint=(1, .3), orientation='horizontal')
@@ -395,7 +405,13 @@ class BoxLayoutApp(App):  # class in which we are creating the button
 
         image_dir = "images/"  # Directory to read
 
-        # # ##LEFT PART## # #
+        # ###LEFT PART### #
+        self.c_box.bind(size=self._update_rect, pos=self._update_rect)
+        with self.c_box.canvas.before:
+            Color(.1, .2, .2, 1)  # green; colors range from 0-1 not 0-255
+            self.rect = Rectangle(size=self.c_box.size, pos=self.c_box.pos)
+
+        # self.title_l = Label(text='Seleziona un quadro', size_hint=(1, 0.1), bold=True , pos_hint={'center_x': 0.5, 'center_y': 0.5})
         self.box.bind(minimum_height=self.box.setter('height'))
         self.box = self.image_load(image_dir, self.box)  # Batch definition of image buttons, arranged in grid layout
 
@@ -403,11 +419,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.l_box.add_widget(self.title_l)
         self.l_box.add_widget(self.sc_view)
 
-        # # ##CENTRAL PART## # #
-        self.c_box.bind(size=self._update_rect, pos=self._update_rect)
-        with self.c_box.canvas.before:
-            Color(.2, .2, .2, 1)  # green; colors range from 0-1 not 0-255
-            self.rect = Rectangle(size=self.c_box.size, pos=self.c_box.pos)
+        # ###CENTRAL PART### #
         title = Label(text='FACE FIT', bold=True , size_hint=(1, .2))
         self.riferimenti.add_widget(self.picture_box)
         self.riferimenti.add_widget(self.r_value_box)
@@ -432,6 +444,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_box.add_widget(self.view)
         self.c_box.add_widget(self.title2)
         self.c_box.add_widget(self.riferimenti)
+
         # # ##RIGHT PART## #
         self.box_results.bind(minimum_height=self.box_results.setter('height'))
         self.box_results = self.image_load("results_images/", self.box_results)
@@ -458,6 +471,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 # DRAW LANDMARKS
                 # ref[idx].draw('contours')
                 # ref[idx].draw('tessellation')
+
                 button = MyButton(size_hint_y=None,
                                   height=150,
                                   source=os.path.join(im_dir, file),
@@ -468,6 +482,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 grid.add_widget(button)
 
         elif im_dir == "results_images/":
+            # images = final_morphs  # sorted(os.listdir(im_dir))
             for idx, file in enumerate(ref_files):
                 im_dir = 'images/Thumbs/'
                 thumb = 'morph_thumb.jpg'
@@ -479,25 +494,32 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 result_buttons.append(button)
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
-
         return grid
 
     def select(self, btn):
         global selected
+
         for b in range(0, len(buttons)):
-            if buttons[b] == btn and btn.state == 'down':
+            if buttons[b] == btn and btn.state == 'down' :
+                self.view.source = ref_images[b]
+                btn.__setattr__('height', 200)
+                if selected > -1 and selected != b:
+                    buttons[selected].__setattr__('height', 150)
                 labels[0].__setattr__('text', str(int(ref[b].beta)))
                 labels[1].__setattr__('text', str(int(ref[b].alpha)))
                 labels[2].__setattr__('text', str(int(ref[b].tilt['angle'])))
+
                 selected = b
             elif buttons[b] == btn and btn.state == 'normal':
-                # buttons[b].__setattr__('height', 150)
+                buttons[b].__setattr__('height', 150)
                 self.view.source = ''
                 for i in range(0, 6):
                     labels[i].__setattr__('text', '-')
                 selected = -1
-                self.view.source = 'images/Thumbs/view_default.jpg'
+
+
         return btn
+
 
 
 # CALCULATORS
@@ -1022,10 +1044,7 @@ def morph(c_obj, r_obj):
         warp_triangle(c_obj.image, img2_new_face, tris1[i], tris2[i])
 
     # Clone seamlessly.
-    # kernel = np.array([[0, -1, 0],
-    #                    [-1, 5, -1],
-    #                    [0, -1, 0]])
-    # img2_sharp = cv2.filter2D(src=img2_new_face, ddepth=-1, kernel=kernel)
+
     gray = cv2.cvtColor(r_obj.image, cv2.COLOR_BGR2GRAY)
     img2_face_mask = np.zeros_like(gray)
 
@@ -1038,7 +1057,6 @@ def morph(c_obj, r_obj):
     out = (out * 255).astype('uint8')
 
     output = cv2.seamlessClone(out, r_obj.image, img2_head_mask, center, cv2.NORMAL_CLONE)
-
     return output
 
 

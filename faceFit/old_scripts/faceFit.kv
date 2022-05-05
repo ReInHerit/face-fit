@@ -25,9 +25,7 @@ mainLayout:
             text: 'B'
             size: self.width, '25dp'
             size_hint: None, None
-        WebCamera:
-            id: qrcam
-            #source: root.source
+
 
 
         Image:
@@ -47,9 +45,13 @@ mainLayout:
             cols: 1
 
 
-<WebCamera@Image>:
-
-<MyButton>:
+<MyButton@Image>:
     Button:
+        source: None
+
         size_hint_y: None
         height: 150
+        Image:
+            source: root.source
+            pos: root.pos
+            size: root.size

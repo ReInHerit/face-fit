@@ -4,7 +4,7 @@ from kivy.lang import Builder
 
 import os
 
-project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
+project_path = '/faceFit'
 path = project_path + '/images/'
 lst = []
 buttons = []

@@ -41,8 +41,8 @@ def str2bool(v):
 # args = vars(ap.parse_args())
 
 # load the images
-source = cv2.imread('images/FACE_02_thumb.jpg')
-target = cv2.imread('images/FACE_0000_thumb.jpg')
+source = cv2.imread('../images/FACE_02_thumb.jpg')
+target = cv2.imread('../images/FACE_0000_thumb.jpg')
 
 # transfer the color distribution from the source image
 # to the target image

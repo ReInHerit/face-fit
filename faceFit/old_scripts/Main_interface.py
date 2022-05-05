@@ -10,7 +10,7 @@ from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.widget import Widget
 import os
-project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
+project_path = '/faceFit'
 path = project_path + '/images/'
 lst = []
 buttons = []
@@ -95,7 +95,7 @@ class mainLayout(Widget):
     def __init__(self, **kwargs):
         super(mainLayout, self).__init__(**kwargs)
         print(self.ids)
-        image_dir = "images/"
+        image_dir = "../images/"
         for image in lst:
             print(image)
             button = MyButton(source=os.path.join(image_dir, image))

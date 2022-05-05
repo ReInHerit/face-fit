@@ -13,7 +13,7 @@ from kivy.graphics.texture import Texture
 from kivy.config import Config
 Config.set('graphics', 'width', '200')
 Config.set('graphics', 'height', '600')
-project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
+project_path = '/faceFit'
 path = project_path + '/images/'
 lst = []
 buttons = []
@@ -74,7 +74,7 @@ class Test(BoxLayout):
     def __init__(self, **kwargs):
         super(Test, self).__init__(**kwargs)
         # Directory to read
-        image_dir = "images/"
+        image_dir = "../images/"
         #
         #Vertical arrangement
         self.orientation = 'vertical'

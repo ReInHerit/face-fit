@@ -1,24 +1,20 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-
-from kivy.core.window import Window
-from kivy.graphics import Color, Rectangle
-from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty
-from kivy.uix.progressbar import ProgressBar
-
-from pynput.keyboard import Key, Controller
 import glob
 from operator import itemgetter
 import math
 import json
-
+import os
 # import kivy module
 import kivy
+from kivy.app import App
 from kivy.metrics import dp
 kivy.require("1.9.1")
-import os
-from kivy.app import App
+from kivy.core.window import Window
+from kivy.graphics import Color, Rectangle
+from kivy.properties import Clock, BooleanProperty, NumericProperty, ListProperty, ObjectProperty
+from kivy.uix.progressbar import ProgressBar
 from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.uix.boxlayout import BoxLayout
@@ -28,8 +24,9 @@ from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from color_transfer import color_transfer
-Window.maximize()
 
+Window.maximize()
+# Mediapipe
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -42,10 +39,9 @@ RIGHT_EYEBROW = mp_face_mesh.FACEMESH_RIGHT_EYEBROW
 RIGHT_IRIS = mp_face_mesh.FACEMESH_RIGHT_IRIS
 LIPS = mp_face_mesh.FACEMESH_LIPS
 FACE_OVAL = mp_face_mesh.FACEMESH_FACE_OVAL
-keyboard = Controller()
+
 font = cv2.FONT_HERSHEY_SIMPLEX
 final_morphs = {}
-# For static images:
 ref_files = []
 ref_images = []
 project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
@@ -485,10 +481,6 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.super_box.add_widget(self.l_box)
         self.super_box.add_widget(self.c_box)
         self.super_box.add_widget(self.r_box)
-        # self.first_screen.add_widget(self.progressbar)
-        # self.sm.add_widget(self.first_screen)
-        # self.main.add_widget(self.super_box)
-        # self.sm.add_widget(self.main)
 
         return self.super_box
 
@@ -497,8 +489,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.rect.size = instance.size
 
     def image_load(self, im_dir, grid):
-        if im_dir == "images/" :
-            # images = ref_files  # sorted(os.listdir(im_dir))
+        if im_dir == "images/":
             for idx, file in enumerate(ref_files):
                 ref_img = cv2.imread(file)
                 ref.append(Face('ref'))
@@ -506,7 +497,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 # DRAW LANDMARKS
                 # ref[idx].draw('contours')
                 # ref[idx].draw('tessellation')
-            # for image in ref_files:
+
                 button = MyButton(size_hint_y=None,
                                   height=150,
                                   source=os.path.join(im_dir, file),
@@ -529,7 +520,6 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 result_buttons.append(button)
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
-
         return grid
 
     def select(self, btn):
@@ -976,20 +966,19 @@ def hud_mask(mask_obj, masked_obj):
 
 
 def cut_paste(obj1, obj2):
-    d = 10
+    offset = 10
     img1 = obj1.image
     img2 = obj2.image
     # mask1 = obj1.self_hud_mask()
     mask2 = obj2.self_hud_mask()
     mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
     # cut roi face from cam
-    temp_1 = obj1.image.copy()
-    temp_2 = obj2.image.copy()
+    temp_1 = img1.copy()
+    temp_2 = img2.copy()
     masked_2 = cv2.bitwise_and(temp_2, temp_2, mask=mask2gray)
 
-
-    rx = (obj1.delta_x + 2 * d) / (obj2.delta_x + 2 * d)
-    ry = (obj1.delta_y + 2 * d) / (obj2.delta_y + 2 * d)
+    rx = (obj1.delta_x + 2 * offset) / (obj2.delta_x + 2 * offset)
+    ry = (obj1.delta_y + 2 * offset) / (obj2.delta_y + 2 * offset)
     media_scale = round((rx + ry) / 2, 2)
     min_x_2, min_y_2 = obj2.bb_p1
     max_x_2, max_y_2 = obj2.bb_p2
@@ -997,8 +986,8 @@ def cut_paste(obj1, obj2):
     center_2 = obj2.pix_points[168]
     center_1 = obj1.pix_points[168]
 
-    delta_2_min = [min_x_2 - d, min_y_2 - d]
-    delta_2_max = [max_x_2 + d, max_y_2 + d]
+    delta_2_min = [min_x_2 - offset, min_y_2 - offset]
+    delta_2_max = [max_x_2 + offset, max_y_2 + offset]
     if delta_2_min[0] < 0:
         delta_2_min[0] = 0
     elif delta_2_max[0] > img2.shape[1]:
@@ -1007,13 +996,6 @@ def cut_paste(obj1, obj2):
         delta_2_min[1] = 0
     elif delta_2_max[1] > img2.shape[0]:
         delta_2_max[1] = img2.shape[0]
-
-    # # cut roi face from ref
-    # min_x_1, min_y_1 = obj1.bb_p1
-    # max_x_1, max_y_1 = obj1.bb_p2
-    # delta_1_min = [min_x_1 - d, min_y_1 - d]
-    # delta_1_max = [max_x_1 + d, max_y_1 + d]
-    # cropped_1 = temp_1[delta_1_min[1]:delta_1_max[1], delta_1_min[0]:delta_1_max[0]]
 
     new_min_x = center_1[0] - int((center_2[0] - delta_2_min[0])*media_scale)
     new_min_y = center_1[1] - int((center_2[1] - delta_2_min[1])*media_scale)
@@ -1033,16 +1015,16 @@ def cut_paste(obj1, obj2):
     blurred_2 = cv2.GaussianBlur(cropped_2, (3,3), sigmaX=0, sigmaY=0)
     # Sobel Edge Detection
     print(blurred_2.shape, blurred_2.dtype, cropped_2.shape, cropped_2.dtype)
-    sobelx = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=3)  # Sobel Edge Detection on the X axis
-    sobely = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=3)  # Sobel Edge Detection on the Y axis
+    sobel_x = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=3)  # Sobel Edge Detection on the X axis
+    sobel_y = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=3)  # Sobel Edge Detection on the Y axis
     # sobelxy = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=5)  # Combined X and Y Sobel Edge Detection
-    abs_grad_x = cv2.convertScaleAbs(sobelx)
-    abs_grad_y = cv2.convertScaleAbs(sobely)
+    abs_grad_x = cv2.convertScaleAbs(sobel_x)
+    abs_grad_y = cv2.convertScaleAbs(sobel_y)
     edged_2 = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
-    temp_1 = img1.copy()
+
     copied = temp_1[new_min_y:new_max_y, new_min_x:new_max_x]
-    copied = cv2.addWeighted(temp_1[new_min_y:new_max_y, new_min_x:new_max_x], 1, edged_2, .9, 1)
-    temp_1 [new_min_y:new_max_y, new_min_x:new_max_x] = copied
+    copied = cv2.addWeighted(copied, 1, edged_2, .99, 1)
+    temp_1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
     return temp_1
 
 

@@ -24,7 +24,9 @@ from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from color_transfer import color_transfer
+import blend_modes
 
+from skimage import filters as filters, exposure
 Window.maximize()
 # Mediapipe
 mp_face_detection = mp.solutions.face_detection
@@ -685,187 +687,6 @@ def where_is_looking(img, f_landmarks, what):
     return [text, beta, alpha]
 
 
-# def txt_multiline(img, end_point, increment, txt, color):
-#     y_start = (end_point[1] - 25)
-#     y_increment = increment[1]
-#     for i, line in enumerate(txt.split('\n')):
-#         y = y_start + i * y_increment
-#         cv2.putText(img, line, ((end_point[0] + increment[0]), y), font, 1, color, 2)
-
-
-# def rotate_hud(origin, point, _angle):
-#     """
-#     Rotate a point counterclockwise by a given angle around a given origin.
-#     The angle should be given in radians.
-#     """
-#     ox, oy = origin
-#     px, py = point
-#
-#     qx = ox + np.cos(_angle) * (px - ox) - np.sin(_angle) * (py - oy)
-#     qy = oy + np.sin(_angle) * (px - ox) + np.cos(_angle) * (py - oy)
-#     return int(qx), int(qy)
-# def draw_hud(img, center_point, b_box, up_down, r_l, turn_z, ref_id):
-#     hud = np.zeros_like(img, np.uint8)
-#     j_arrow = [int(i * 1.3) for i in b_box]
-#     color = (0, 255, 0)
-#     thick = 10
-#     thick_tilt = 10
-#     x = center_point[0]
-#     y = center_point[1] - b_box[1]
-#     a = 25
-#     b = 35
-#     sector = 0
-#
-#     # BIG ARROW
-#     if r_l == 'right':
-#         if up_down == 'up':
-#             angle = 45
-#             sector = 1
-#         elif up_down == 'down':
-#             angle = 135
-#             sector = 2
-#         else:
-#             angle= 90
-#             sector = 2
-#     elif r_l == 'left':
-#         if up_down == 'up':
-#             angle = -45
-#             sector = 1
-#         elif up_down == 'down':
-#             angle = -135
-#             sector = 2
-#         else:
-#             angle = -90
-#             sector = 2
-#     else:
-#         if up_down == 'up':
-#             angle = 0
-#             sector = 1
-#         elif up_down == 'down':
-#             angle = 180
-#             sector = 2
-#         else:
-#             sector = 1
-#             angle = 0
-#             x = -200
-#             y = -300
-#     big_arrow = np.array([(x, y), (x - a, y), (x - a, y - b), (x - 2 * a, y - b), (x, y - 2 * b), (x + 2 * a, y - b),
-#                       (x + a, y - b), (x + a, y)], np.float32)
-#     arrow_rotated = big_arrow.copy()
-#
-#     for i, p in enumerate(big_arrow):
-#         arrow_rotated[i] = rotate_hud(center_point, p, np.deg2rad(angle))
-#
-#     cv2.polylines(hud, [np.int32(arrow_rotated)], True, color, thick)
-#
-#     # TILT
-#     if turn_z == 'right':
-#         if sector != 2:
-#             alpha = 100
-#             beta = 170
-#             tilt_p1 = [center_point[0] - j_arrow[0], center_point[1] + 10]
-#             tilt_p2 = [center_point[0] - j_arrow[0] - 10, center_point[1] + 25]
-#             tilt_p3 = [center_point[0] - j_arrow[0] + 15, center_point[1] + 20]
-#         else:
-#             alpha = 190
-#             beta = 260
-#             tilt_p1 = [center_point[0] - 5, center_point[1] - j_arrow[1]-1]
-#             tilt_p2 = [center_point[0] - 20, center_point[1] - j_arrow[1]-10]
-#             tilt_p3 = [center_point[0] - 15, center_point[1] - j_arrow[1]+15]
-#     elif turn_z == 'left':
-#         if sector != 2:
-#             alpha = 10
-#             beta = 80
-#             tilt_p1 = [center_point[0] + j_arrow[0], center_point[1] + 10]
-#             tilt_p2 = [center_point[0] + j_arrow[0] + 10, center_point[1] + 25]
-#             tilt_p3 = [center_point[0] + j_arrow[0] - 15, center_point[1] + 20]
-#         else:
-#             alpha = 280
-#             beta = 350
-#             tilt_p1 = [center_point[0] + 5, center_point[1] - j_arrow[1]-1]
-#             tilt_p2 = [center_point[0] + 20, center_point[1] - j_arrow[1]-10]
-#             tilt_p3 = [center_point[0] + 15, center_point[1] - j_arrow[1]+15]
-#     else:
-#         alpha = 0
-#         beta = 0
-#         tilt_p1 = [-300, -300]
-#         tilt_p2 = [-300, -300]
-#         tilt_p3 = [-300, -300]
-#         thick_tilt = 0
-#     cv2.ellipse(hud, center_point, j_arrow, 0, alpha, beta, color, thick_tilt)
-#     pts0 = np.array([tilt_p1, tilt_p2, tilt_p3], np.int32)
-#     pts0 = pts0.reshape((-1, 1, 2))
-#     cv2.polylines(hud, [pts0], True, color, thick_tilt)
-#
-#     # L Eye
-#
-#     if ref[ref_id].status['l_e'] != cam_obj.status['l_e']:
-#         l_e_start = cam_obj.centers['l_e']
-#         l_e_end = (cam_obj.centers['l_e'][0] + j_arrow[0]//2, cam_obj.centers['l_e'][1] - j_arrow[1])
-#         txt_l = "check\nleft\neye"
-#     else:
-#         l_e_start = (-300, -300)
-#         l_e_end = (-300, -300)
-#         txt_l = ""
-#     cv2.line(hud, l_e_start, l_e_end, color, 2)
-#     txt_multiline(hud, l_e_end, [5, 25], txt_l, color)
-#
-#     # R Eye
-#     if ref[ref_id].status['r_e'] != cam_obj.status['r_e']:
-#         r_e_start = cam_obj.centers['r_e']
-#         r_e_end = (cam_obj.centers['r_e'][0] - j_arrow[0]//2, cam_obj.centers['r_e'][1] - j_arrow[1])
-#         txt_r = "check\n right\n  eye"
-#     else:
-#         r_e_start = (-300, -300)
-#         r_e_end = (-300, -300)
-#         txt_r = ""
-#     cv2.line(hud, r_e_start, r_e_end, color, 2)
-#     txt_multiline(hud, r_e_end, [-95, 25], txt_r, color)
-#
-#     # Mouth
-#     if ref[ref_id].status['lips'] != cam_obj.status['lips']:
-#         mouth_start = cam_obj.centers['lips']
-#         mouth_end = (cam_obj.centers['lips'][0] - 100), (cam_obj.centers['lips'][1] + 125)
-#         txt_mouth = "check mouth"
-#     else:
-#         mouth_start = (-300, -300)
-#         mouth_end = (-300, -300)
-#         txt_mouth = ""
-#     cv2.line(hud, mouth_start, mouth_end, color, 2)
-#     cv2.putText(hud, txt_mouth, ((mouth_end[0] - 100), (mouth_end[1] + 20)), font, 1, color, 2)
-#     d = 20
-#     # ref[selected].image = cv2.cvtColor(ref[selected].image, cv2.COLOR_BGR2RGB)
-#     temp_ref = ref[selected].image.copy()
-#     rx = (cam_obj.delta_x + 2 * d) / (ref[selected].delta_x + 2 * d)
-#     ry = (cam_obj.delta_y + 2 * d) / (ref[selected].delta_y + 2 * d)
-#     media_scale = round((rx + ry) / 2, 2)
-#     r_min_x, r_min_y = ref[selected].bb_p1
-#     r_max_x, r_max_y = ref[selected].bb_p2
-#     center_ref = ref[selected].pix_points[168]
-#     center_cam = cam_obj.pix_points[168]
-#     delta_r_min = [r_min_x - d, r_min_y - d]
-#     delta_r_max = [r_max_x + d, r_max_y + d]
-#     cropped_ref = temp_ref[delta_r_min[1]:delta_r_max[1], delta_r_min[0]:delta_r_max[0]]
-#     print(center_cam, center_ref, delta_r_min, delta_r_max)
-#     print(r_max_y-r_min_y+2*d, r_max_x-r_min_x+2*d, 'picture')
-#     # print('rx', rx, 'ry', ry, 'media', media_scale)
-#     new_min_x = center_cam[0] - int((center_ref[0] - delta_r_min[0]) )
-#     new_min_y = center_cam[1] - int((center_ref[1] - delta_r_min[1]) )
-#     new_max_x = center_cam[0] - int((center_ref[0] - delta_r_max[0]) )
-#     new_max_y = center_cam[1] - int((center_ref[1] - delta_r_max[1]) )
-#     print(new_min_x, new_max_x, new_min_y, new_max_y )
-#     print(selected)
-#     temp_cam = img.copy()
-#     # print(exp_bb_reference.shape, exp_bb_cam.shape, img.shape)
-#     print(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x].shape, cropped_ref.shape)
-#     temp_cam[new_min_y:new_max_y, new_min_x:new_max_x] = \
-#         cv2.addWeighted(temp_cam[new_min_y:new_max_y, new_min_x:new_max_x], 1, cropped_ref, .9, 1)
-#     mask = hud.astype(bool)
-#     # print(new_max_x - new_min_x, new_max_y - new_min_y, cropped_ref.shape)
-#     out_image = temp_cam.copy()
-#     # out_image = cv2.addWeighted(img, 1, exp_bb_cam, 0.7, 1)
-#     out_image[mask] = cv2.addWeighted(img, 1, hud, 0.9, 1)[mask]
-#     return out_image
 
 
 # def draw(part, img, face_l):
@@ -911,9 +732,6 @@ def hud_mask(mask_obj, masked_obj):
 
     mask = np.zeros(masked_obj.image.shape, dtype=masked_obj.image.dtype)
     cv2.fillConvexPoly(mask, np.int32(hull8U), (255, 255, 255))
-    # print('qua')
-    # cv2.imshow('',mask)
-    # cv2.waitKey(1)
     return mask
 
 
@@ -964,15 +782,8 @@ def cut_paste(obj1, obj2):
     cropped_2 = masked_2[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
 
     cropped_2 = cv2.resize(cropped_2,((new_max_x - new_min_x),(new_max_y - new_min_y)),interpolation=cv2.INTER_LINEAR)
-    blurred_2 = cv2.GaussianBlur(cropped_2, (3,3), sigmaX=0, sigmaY=0)
-    # Sobel Edge Detection
-    print(blurred_2.shape, blurred_2.dtype, cropped_2.shape, cropped_2.dtype)
-    sobel_x = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=0, ksize=3)  # Sobel Edge Detection on the X axis
-    sobel_y = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=0, dy=1, ksize=3)  # Sobel Edge Detection on the Y axis
-    # sobelxy = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=5)  # Combined X and Y Sobel Edge Detection
-    abs_grad_x = cv2.convertScaleAbs(sobel_x)
-    abs_grad_y = cv2.convertScaleAbs(sobel_y)
-    edged_2 = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+
+    edged_2 = find_edges(cropped_2, 3, 1, 1, 3)
 
     copied = temp_1[new_min_y:new_max_y, new_min_x:new_max_x]
     copied = cv2.addWeighted(copied, 1, edged_2, .99, 1)
@@ -984,17 +795,24 @@ def morph(c_obj, r_obj):
     source = ref[selected].image
     target = cam_obj.image
 
-    # transfer the color distribution from the source image to the target image
-    color_transfer(source, target, clip=False, preserve_paper=False)
-
     img1_warped = np.copy(r_obj.image)
     img1_points = c_obj.pix_points
     img2_points = r_obj.pix_points
-    convexhull2 = cv2.convexHull(np.array(img2_points))
+
     mask = hud_mask(c_obj, r_obj)
     # Find Centroid
     mid = cv2.moments(mask[:, :, 1])
     center = (int(mid['m10']/mid['m00']), int(mid['m01']/mid['m00']))
+
+    cc_image = cv2.cvtColor(color_correct(target, source), cv2.COLOR_BGRA2BGR)
+
+    cv2.imshow('match3', cc_image)
+    print(cc_image.shape, cc_image.dtype)
+    c_obj.image[c_obj.bb_p1[1]:c_obj.bb_p2[1], c_obj.bb_p1[0]:c_obj.bb_p2[0]] = cc_image
+    cv2.imshow('match4', c_obj.image)
+    # # find edges
+    # edged = find_edges(c_obj.image, 3, 1, 1, 3)
+    # c_obj.image = cv2.addWeighted(c_obj.image, 1, edged, 0.5, 0)
 
     # triangles
     dt = media_pipes_tris
@@ -1003,7 +821,9 @@ def morph(c_obj, r_obj):
     img2_new_face = np.zeros((height, width, channels), np.uint8)
     convexhull1 = cv2.convexHull(np.array(img1_points))
     cv2.fillConvexPoly(mask, convexhull1, 255)
+    convexhull2 = cv2.convexHull(np.array(img2_points))
     # If no Delaunay Triangles were found, quit
+
     if len(dt) == 0:
         quit()
 
@@ -1022,10 +842,18 @@ def morph(c_obj, r_obj):
         warp_triangle(c_obj.image, img2_new_face, tris1[i], tris2[i])
 
     # Clone seamlessly.
-    # kernel = np.array([[0, -1, 0],
-    #                    [-1, 5, -1],
-    #                    [0, -1, 0]])
+    # find edges
+    # edged = find_edges(img2_new_face, 3, 1, 1, 3)
+
+    # # add_sharpness
+    # kernel = np.array([[-1, -1, -1],
+    #                    [-1, 9, -1],
+    #                    [-1, -1, -1]])
     # img2_sharp = cv2.filter2D(src=img2_new_face, ddepth=-1, kernel=kernel)
+    # img2_new_face = cv2.addWeighted(img2_new_face, 1, img2_sharp, 0.1, 1)
+    # cv2.imshow('0', edged)
+    # cv2.imshow('1', img2_sharp)
+    # cv2.waitKey(0)
     gray = cv2.cvtColor(r_obj.image, cv2.COLOR_BGR2GRAY)
     img2_face_mask = np.zeros_like(gray)
 
@@ -1048,6 +876,70 @@ def extract_index_nparray(nparray):
         index = num
         break
     return index
+
+
+def find_edges(img, blur_size, dx , dy, ksize):
+    blurred = cv2.GaussianBlur(img, (blur_size, blur_size), sigmaX=0, sigmaY=0)
+    grayed = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    # Laspacian Edge Detection
+    laplacian = cv2.Laplacian(grayed, cv2.CV_64F)
+    abs_laplacian = cv2.convertScaleAbs(laplacian)
+    # Sobel Edge Detection
+    sobel_x = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=dx, dy=0, ksize=ksize)  # Sobel Edge Detection on the X axis
+    sobel_y = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=0, dy=dy, ksize=ksize)  # Sobel Edge Detection on the Y axis
+    # sobelxy = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=5)  # Combined X and Y Sobel Edge Detection
+    abs_grad_x = cv2.convertScaleAbs(sobel_x)
+    abs_grad_y = cv2.convertScaleAbs(sobel_y)
+
+    edged = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+    edged = cv2.addWeighted(edged, 1, abs_laplacian, 0.5, 1)
+    edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2BGR)
+    return edged
+
+def sharpen(img):
+    # convert to gray
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # blur
+    smooth = cv2.GaussianBlur(gray, (99, 99), 0)
+
+    # divide gray by morphology image
+    division = cv2.divide(gray, smooth, scale=255)
+
+    # sharpen using unsharp masking
+    sharp = filters.unsharp_mask(division, radius=2, amount=15, multichannel=False, preserve_range=False)
+    sharp = (255 * sharp).clip(0, 255).astype(np.uint8)
+
+    # threshold
+    thresh = cv2.threshold(sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+
+    return sharp
+
+
+def color_correct(cam_img, ref_img):
+    roi1 = cam_img[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
+    roi2 = ref_img[ref[selected].bb_p1[1]:ref[selected].bb_p2[1], ref[selected].bb_p1[0]:ref[selected].bb_p2[0]]
+    sharp = sharpen(cam_obj.image)
+    sharp_roi1 = sharp[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
+    sharp_roi1 = cv2.GaussianBlur(sharp_roi1, (9, 9), 0)
+    cv2.imshow('sharpen', sharp)
+
+    # transfer the color distribution from the source image to the target image
+    roi1 = color_transfer(roi2, roi1, clip=True, preserve_paper=False)
+
+    b_channel, g_channel, r_channel = cv2.split(roi1)
+    alpha_channel = np.ones(b_channel.shape, dtype=b_channel.dtype)  # creating a dummy alpha channel image.
+    roi1_4ch = cv2.merge((b_channel, g_channel, r_channel, alpha_channel))
+    sharp_channel, = cv2.split(sharp_roi1)
+    sharp_roi_4ch = cv2.merge((sharp_channel, sharp_channel, sharp_channel, alpha_channel))
+    info_roi1 = np.iinfo(roi1_4ch.dtype)
+    info_sharp = np.iinfo(sharp_roi_4ch.dtype)
+    roi1_norm_float = roi1_4ch.astype(np.float64) / info_roi1.max
+    sharp_norm_float = sharp_roi_4ch.astype(np.float64) / info_sharp.max
+    blended = blend_modes.darken_only(roi1_norm_float, sharp_norm_float, .5)
+    out = (blended * 255).astype('uint8')
+    return out
+
 
 
 for filename in glob.iglob(f'{ref_path}*'):

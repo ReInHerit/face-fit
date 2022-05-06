@@ -76,7 +76,6 @@ def color_transfer(source, target, clip=True, preserve_paper=True):
     # type
     transfer = cv2.merge([l, a, b])
     transfer = cv2.cvtColor(transfer.astype("uint8"), cv2.COLOR_LAB2BGR)
-
     # return the color transferred image
     return transfer
 

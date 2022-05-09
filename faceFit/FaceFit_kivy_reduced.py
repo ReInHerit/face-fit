@@ -3,7 +3,7 @@ import numpy as np
 import glob
 import json
 import os
-from skimage import filters as filters, exposure
+from skimage import filters as filters
 # import kivy module
 import kivy
 from kivy.app import App
@@ -331,7 +331,6 @@ class FitFaceApp(App):
                                   source=os.path.join(im_dir, file),
                                   group="g1")
                 buttons.append(button)
-                # ref_images.append(file)
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
 

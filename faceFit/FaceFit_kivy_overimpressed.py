@@ -30,6 +30,7 @@ import blend_modes
 from skimage import filters as filters, exposure
 Window.maximize()
 # Mediapipe
+
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles

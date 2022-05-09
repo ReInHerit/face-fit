@@ -6,6 +6,7 @@ from operator import itemgetter
 import math
 import json
 import os
+from pathlib import Path
 # import kivy module
 import kivy
 from kivy.app import App
@@ -41,16 +42,14 @@ RIGHT_EYEBROW = mp_face_mesh.FACEMESH_RIGHT_EYEBROW
 RIGHT_IRIS = mp_face_mesh.FACEMESH_RIGHT_IRIS
 LIPS = mp_face_mesh.FACEMESH_LIPS
 FACE_OVAL = mp_face_mesh.FACEMESH_FACE_OVAL
+drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 font = cv2.FONT_HERSHEY_SIMPLEX
 final_morphs = {}
 ref_files = []
 ref_images = []
-project_path = 'C:/Users/arkfil/Desktop/FITFace/faceFit'
-ref_path = project_path + '/images/'
 buttons = []
 result_buttons = []
-drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 selected = -1
 labels = []
 pbars = []
@@ -59,7 +58,20 @@ out = []
 curr = 0
 delta = 5
 sm = {}
-view_default = 'images/Thumbs/view_default.jpg'
+
+try:
+    root = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    import sys
+
+    root = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+print(root)
+project_path = root
+ref_path = project_path + '/images/'
+morph_path = ref_path + 'final_morphs/'
+view_default = ref_path + 'Thumbs/view_default.jpg'
+
 # OBJECTS
 class FacePart:
     def __init__(self, part_group):
@@ -251,13 +263,11 @@ class MyButton(ToggleButtonBehavior, Image):
     #Change the image, rectangular when pressed+Darken the color
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
-        # im = self.square_image(im)
         if off:
             # im = self.adjust(im)
             im = cv2.rectangle(im, (1, 1), (im.shape[1]-1, im.shape[0]-1), (255, 255, 255), 10)
 
-        #flip upside down
-        buf = cv2.flip(im, 0)
+        buf = cv2.flip(im, 0)  # flip upside down
         image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
         image_texture.blit_buffer(buf.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
         return image_texture
@@ -266,14 +276,10 @@ class MyButton(ToggleButtonBehavior, Image):
 class Camera(Image):
     def __init__(self, **kwargs):
         super(Camera, self).__init__(**kwargs)
-        # Connect to 0th camera
-        self.capture = cv2.VideoCapture(0)
-        # self.reference = selected
-        # self.texture = Image()
-        # Set drawing interval
-        Clock.schedule_interval(self.update, 1.0 / 30)
+        self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
+        self.reference = selected
+        Clock.schedule_interval(self.update, 1.0 / 30)  # Set drawing interval
 
-    # Drawing method to execute at intervals
     def update(self, dt):
         global selected, view
         self.reference = selected
@@ -305,7 +311,7 @@ class Camera(Image):
 
             self.texture = texture
             if match():
-                path = 'images/final_morphs/morph_' + str(self.reference) + '.png'
+                path = morph_path + 'morph_' + str(self.reference) + '.png'
                 cv2.imwrite(path, final_morphs[self.reference])
                 result_buttons[self.reference].source = path
                 buttons[self.reference].state = 'normal'
@@ -348,7 +354,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_box = BoxLayout(orientation='vertical', size=(dp(800), dp(1000)), size_hint=(.6, 1), padding=[5,5,5,5])
         self.my_camera = Camera(allow_stretch=True, keep_ratio=True, size_hint=(1, 1), width=self.c_box.size[0],
                                 height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
-        self.view = Image(source='images/Thumbs/view_default.jpg', allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
+        self.view = Image(source=view_default, allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
                           width=self.c_box.size[0], height=self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1]))
 
         view = self.view
@@ -436,7 +442,7 @@ class BoxLayoutApp(App):  # class in which we are creating the button
         self.c_box.add_widget(self.riferimenti)
         # # ##RIGHT PART## #
         self.box_results.bind(minimum_height=self.box_results.setter('height'))
-        self.box_results = self.image_load("results_images/", self.box_results)
+        self.box_results = self.image_load('images/Thumbs/', self.box_results)
         self.sc_view_results.add_widget(self.box_results)
         self.r_box.add_widget(self.title_r)
         self.r_box.add_widget(self.sc_view_results)
@@ -469,9 +475,8 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
 
-        elif im_dir == "results_images/":
+        elif im_dir == 'images/Thumbs/':
             for idx, file in enumerate(ref_files):
-                im_dir = 'images/Thumbs/'
                 thumb = 'morph_thumb.jpg'
                 button = MyButton(size_hint_y=None,
                                   height=150,
@@ -493,12 +498,11 @@ class BoxLayoutApp(App):  # class in which we are creating the button
                 labels[2].__setattr__('text', str(int(ref[b].tilt['angle'])))
                 selected = b
             elif buttons[b] == btn and btn.state == 'normal':
-                # buttons[b].__setattr__('height', 150)
                 self.view.source = ''
                 for i in range(0, 6):
                     labels[i].__setattr__('text', '-')
                 selected = -1
-                self.view.source = 'images/Thumbs/view_default.jpg'
+                self.view.source = view_default
         return btn
 
 
@@ -544,7 +548,6 @@ def warp_triangle(img1, img2, t1, t2):
     # Get mask by filling triangle
     mask = np.zeros((r2[3], r2[2], 3), dtype=np.float32)
     cv2.fillConvexPoly(mask, np.int32(t2_rect_int), (1.0, 1.0, 1.0), 16, 0)
-    # mask = cv2.GaussianBlur(mask, (3,3), sigmaX=0, sigmaY=0)
 
     # Apply warpImage to small rectangular patches
     img1_rect = img1[r1[1]:r1[1] + r1[3], r1[0]:r1[0] + r1[2]]
@@ -565,10 +568,7 @@ def find_center(points_array):
     return int(sum_x / length), int(sum_y / length)
 
 
-
-
-
-# MATCHING FUNCTION
+# MATCHING FUNCTIONS
 def match():
     global cam_obj
 
@@ -615,8 +615,6 @@ def check_expression(img, landmarks):
     else:
         lips = 'full opened'
 
-    # lips_center = (int(landmarks[13].x * img.shape[1]), int(landmarks[13].y * img.shape[0]))
-
     return l_e, r_e, lips, l_center, r_center, lips_center
 
 
@@ -656,8 +654,7 @@ def where_is_looking(img, f_landmarks, what):
     if what == 'ref':  # if reference
         alpha = angles[0] * 360
         beta = angles[1] * 360
-        # gamma = angles[2] * 360
-    else:  ## 'lower': -25, 'upper': 25}, 'desired': {'lower': -35, 'upper': 48}}
+    else:
         alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
         beta = int(normalize(beta, {'actual': {'lower': -15, 'upper': 12}, 'desired': {'lower': -65, 'upper': 55}}))
 
@@ -685,30 +682,6 @@ def where_is_looking(img, f_landmarks, what):
             text = "Looking Forward"
 
     return [text, beta, alpha]
-
-
-
-
-# def draw(part, img, face_l):
-#     conn = ''
-#     dr_spec = ''
-#     if part == 'iris':
-#         conn = mp_face_mesh.FACEMESH_IRISES
-#         dr_spec = mp_drawing_styles.get_default_face_mesh_iris_connections_style()
-#     elif part == 'contours':
-#         conn = mp_face_mesh.FACEMESH_CONTOURS
-#         dr_spec = mp_drawing_styles.get_default_face_mesh_contours_style()
-#     elif part == 'tessellation':
-#         conn = mp_face_mesh.FACEMESH_TESSELATION
-#         dr_spec = mp_drawing_styles.get_default_face_mesh_tesselation_style()
-#     else:
-#         print('WRONG PART DESCRIPTOR')
-#     mp_drawing.draw_landmarks(
-#         image=img,
-#         landmark_list=face_l,
-#         connections=conn,
-#         landmark_drawing_spec=None,
-#         connection_drawing_spec=dr_spec)
 
 
 def hud_mask(mask_obj, masked_obj):
@@ -739,7 +712,6 @@ def cut_paste(obj1, obj2):
     offset = 10
     img1 = obj1.image
     img2 = obj2.image
-    # mask1 = obj1.self_hud_mask()
     mask2 = obj2.self_hud_mask()
     mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
     # cut roi face from cam
@@ -767,10 +739,10 @@ def cut_paste(obj1, obj2):
     elif delta_2_max[1] > img2.shape[0]:
         delta_2_max[1] = img2.shape[0]
 
-    new_min_x = center_1[0] - int((center_2[0] - delta_2_min[0])*media_scale)
-    new_min_y = center_1[1] - int((center_2[1] - delta_2_min[1])*media_scale)
-    new_max_x = center_1[0] + int((delta_2_max[0] - center_2[0])*media_scale)
-    new_max_y = center_1[1] + int((delta_2_max[1] - center_2[1])*media_scale)
+    new_min_x = center_1[0] - int((center_2[0] - delta_2_min[0]) * media_scale)
+    new_min_y = center_1[1] - int((center_2[1] - delta_2_min[1]) * media_scale)
+    new_max_x = center_1[0] + int((delta_2_max[0] - center_2[0]) * media_scale)
+    new_max_y = center_1[1] + int((delta_2_max[1] - center_2[1]) * media_scale)
     if new_min_x < 0:
         new_min_x = 0
     elif new_min_y < 0:
@@ -795,7 +767,6 @@ def morph(c_obj, r_obj):
     source = ref[selected].image
     target = cam_obj.image
 
-    img1_warped = np.copy(r_obj.image)
     img1_points = c_obj.pix_points
     img2_points = r_obj.pix_points
 
@@ -805,23 +776,17 @@ def morph(c_obj, r_obj):
     center = (int(mid['m10']/mid['m00']), int(mid['m01']/mid['m00']))
 
     cc_image = cv2.cvtColor(color_correct(target, source), cv2.COLOR_BGRA2BGR)
-
-    cv2.imshow('match3', cc_image)
-    print(cc_image.shape, cc_image.dtype)
     c_obj.image[c_obj.bb_p1[1]:c_obj.bb_p2[1], c_obj.bb_p1[0]:c_obj.bb_p2[0]] = cc_image
-    cv2.imshow('match4', c_obj.image)
-    # # find edges
-    # edged = find_edges(c_obj.image, 3, 1, 1, 3)
-    # c_obj.image = cv2.addWeighted(c_obj.image, 1, edged, 0.5, 0)
-
-    # triangles
-    dt = media_pipes_tris
 
     height, width, channels = r_obj.image.shape
     img2_new_face = np.zeros((height, width, channels), np.uint8)
     convexhull1 = cv2.convexHull(np.array(img1_points))
     cv2.fillConvexPoly(mask, convexhull1, 255)
     convexhull2 = cv2.convexHull(np.array(img2_points))
+
+    # triangles
+    dt = media_pipes_tris
+
     # If no Delaunay Triangles were found, quit
 
     if len(dt) == 0:
@@ -841,19 +806,6 @@ def morph(c_obj, r_obj):
     for i in range(0, len(tris1)):
         warp_triangle(c_obj.image, img2_new_face, tris1[i], tris2[i])
 
-    # Clone seamlessly.
-    # find edges
-    # edged = find_edges(img2_new_face, 3, 1, 1, 3)
-
-    # # add_sharpness
-    # kernel = np.array([[-1, -1, -1],
-    #                    [-1, 9, -1],
-    #                    [-1, -1, -1]])
-    # img2_sharp = cv2.filter2D(src=img2_new_face, ddepth=-1, kernel=kernel)
-    # img2_new_face = cv2.addWeighted(img2_new_face, 1, img2_sharp, 0.1, 1)
-    # cv2.imshow('0', edged)
-    # cv2.imshow('1', img2_sharp)
-    # cv2.waitKey(0)
     gray = cv2.cvtColor(r_obj.image, cv2.COLOR_BGR2GRAY)
     img2_face_mask = np.zeros_like(gray)
 
@@ -868,14 +820,6 @@ def morph(c_obj, r_obj):
     output = cv2.seamlessClone(out, r_obj.image, img2_head_mask, center, cv2.NORMAL_CLONE)
 
     return output
-
-
-def extract_index_nparray(nparray):
-    index = None
-    for num in nparray[0]:
-        index = num
-        break
-    return index
 
 
 def find_edges(img, blur_size, dx , dy, ksize):
@@ -896,6 +840,7 @@ def find_edges(img, blur_size, dx , dy, ksize):
     edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2BGR)
     return edged
 
+
 def sharpen(img):
     # convert to gray
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -907,13 +852,13 @@ def sharpen(img):
     division = cv2.divide(gray, smooth, scale=255)
 
     # sharpen using unsharp masking
-    sharp = filters.unsharp_mask(division, radius=2, amount=15, multichannel=False, preserve_range=False)
+    sharp = filters.unsharp_mask(division, radius=20, amount=2, preserve_range=False)
     sharp = (255 * sharp).clip(0, 255).astype(np.uint8)
 
     # threshold
     thresh = cv2.threshold(sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-    return sharp
+    return thresh
 
 
 def color_correct(cam_img, ref_img):
@@ -921,7 +866,7 @@ def color_correct(cam_img, ref_img):
     roi2 = ref_img[ref[selected].bb_p1[1]:ref[selected].bb_p2[1], ref[selected].bb_p1[0]:ref[selected].bb_p2[0]]
     sharp = sharpen(cam_obj.image)
     sharp_roi1 = sharp[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
-    sharp_roi1 = cv2.GaussianBlur(sharp_roi1, (9, 9), 0)
+    sharp_roi1 = cv2.GaussianBlur(sharp_roi1, (11, 11), 0)
     cv2.imshow('sharpen', sharp)
 
     # transfer the color distribution from the source image to the target image
@@ -939,7 +884,6 @@ def color_correct(cam_img, ref_img):
     blended = blend_modes.darken_only(roi1_norm_float, sharp_norm_float, .5)
     out = (blended * 255).astype('uint8')
     return out
-
 
 
 for filename in glob.iglob(f'{ref_path}*'):

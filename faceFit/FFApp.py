@@ -3,14 +3,18 @@ import numpy as np
 import glob
 import json
 import os
+
+from kivy.lang import builder
+from kivy.properties import ObjectProperty, StringProperty, NumericProperty
+from kivy.uix.button import Button
+from kivy.uix.widget import Widget
 from skimage import filters as filters
-import blend_modes
 # import kivy module
 import kivy
 from kivy.app import App
 from kivy.metrics import dp
 import Face as F_obj
-
+from CustomModules import CustomGraphics
 from kivy.core.window import Window
 from kivy.graphics import Color, Rectangle
 from kivy.uix.progressbar import ProgressBar
@@ -23,22 +27,23 @@ from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from color_transfer import color_transfer
+import blend_modes
 
 kivy.require("1.9.1")
-
-
-Window.maximize()
-
-# font = cv2.FONT_HERSHEY_SIMPLEX
-final_morphs = {}
 ref_files = []
 buttons = []
 result_buttons = []
-selected = -1
-labels = []
-pbars = []
+ids = {}
 view = {}
+view_source = ''
+selected = -1
+last_match = -1
+r_rot = []
+c_rot = []
+prog_bars = []
+pb_rots = []
 delta = 5
+final_morphs = {}
 
 try:
     root = os.path.dirname(os.path.abspath(__file__))
@@ -48,9 +53,14 @@ except NameError:
 
 project_path = root
 ref_path = project_path + '/images/'
+img_path = 'images/'
+thumbs_path = img_path + 'Thumbs/'
 morph_path = ref_path + 'final_morphs/'
-view_default = ref_path + 'Thumbs/view_default.jpg'
-
+view_default = thumbs_path + 'view_default.jpg'
+view_base_image = cv2.imread(view_default)
+r_ch, g_ch, b_ch = cv2.split(view_base_image)
+with open('triangles_reduced2.json', 'r') as f:
+    media_pipes_tris = json.load(f)
 
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
@@ -79,44 +89,47 @@ class MyButton(ToggleButtonBehavior, Image):
         return image_texture
 
 
-class Camera(Image):
+class MyCamera(Image):
     def __init__(self, **kwargs):
-        super(Camera, self).__init__(**kwargs)
+        super(MyCamera, self).__init__(**kwargs)
         self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
         self.reference = selected
+        self.texture = None
+        self.source = view_default
+
         Clock.schedule_interval(self.update, 1.0 / 30)  # Set drawing interval
 
     def update(self, dt):
-        global selected, view
+        global selected, view, pb_rots, view_source, last_match
         self.reference = selected
         success, frame = self.capture.read()
-        print(success)
         image = cv2.flip(frame, 1)
-        self.texture = view
+
+        view_source = view_default
+        self.texture=view.texture
+        # view.texture
         if success and self.reference != -1:
+            # self.texture = view.texture
             image.flags.writeable = True
             cam_obj.get_landmarks(image)
             # # DRAW LANDMARKS
             # cam_obj.draw('contours')
             # cam_obj.draw('tessellation')
-            labels[3].__setattr__('text', str(int(cam_obj.beta)))
-            labels[4].__setattr__('text', str(int(cam_obj.alpha)))
-            labels[5].__setattr__('text', str(int(cam_obj.tilt['angle'])))
+            c_rot[0] = str(int(cam_obj.beta))
+            c_rot[1] = str(int(cam_obj.alpha))
+            c_rot[2] = str(int(cam_obj.tilt['angle']))
+
             perc_x = 100 - abs(ref[self.reference].beta - cam_obj.beta)
             perc_y = 100 - abs(ref[self.reference].alpha - cam_obj.alpha)
             perc_z = 100 - abs(ref[self.reference].tilt['angle'] - cam_obj.tilt['angle'])
-            pbars[0].__setattr__('value', perc_x)
-            pbars[1].__setattr__('value', perc_y)
-            pbars[2].__setattr__('value', perc_z)
-            pbars[0].__setattr__('bar_color', (.3, .5, .8, .5))
+            pb_rots = [perc_x, perc_y, perc_z]
 
             overlaid = self.cut_paste(ref[self.reference], cam_obj)
-            # Convert to Kivy Texture
             buf = cv2.flip(overlaid, 0).tobytes()
             texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
             texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
 
-            view.__setattr__('texture', texture)
+            # view.texture = texture
 
             self.texture = texture
             if match():
@@ -125,17 +138,26 @@ class Camera(Image):
                 result_buttons[self.reference].source = path
                 buttons[self.reference].state = 'normal'
                 buttons[self.reference].height = 150
-                for i in range(0, 6):
-                    labels[i].__setattr__('text', '-')
-                view.__setattr__('source', path)
+                for i in range(0, 3):
+                    c_rot[i] = '-'
+                    r_rot[i] = '-'
+                    pb_rots[i] = 0
+                self.texture = None
+                self.source = path
+                last_match = selected
+                # view.source = path
                 selected = -1
 
         elif success and self.reference == -1:
-            buf = cv2.flip(image, 0).tobytes()
-            texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-            texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-            self.texture = texture
-
+            self.texture = None
+            if last_match != -1:
+                path = morph_path + 'morph_' + str(last_match) + '.png'
+                view_source = path
+            else: view_source = view_default
+            # buf = cv2.flip(image, 0).tobytes()
+            # texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
+            # texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+            # self.texture = texture
     def on_play(self, instance, value):
         if not self._camera:
             return
@@ -143,7 +165,6 @@ class Camera(Image):
             self._camera.start()
         else:
             self._camera.stop()
-
     def cut_paste(self, obj1, obj2):
         offset = 10
         img1 = obj1.image
@@ -200,135 +221,45 @@ class Camera(Image):
         return temp_1
 
 
-class FitFaceApp(App):
-    def __init__(self):
-        super(FitFaceApp, self).__init__()
-        global labels, view, pbars
-        self.super_box = BoxLayout(orientation='horizontal')
-        # ###LEFT PART### #
-        self.l_box = BoxLayout(orientation='vertical', size=(dp(400), dp(1000)), size_hint=(0.2, 1))
-        self.title_l = Label(text='Seleziona un quadro', size_hint=(1, 0.1),
-                             pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        self.sc_view = ScrollView(size_hint=(1, 0.9))  # Definition of scroll view to place image buttons
-        self.box = GridLayout(padding=[0, 25, 0, 0], cols=1, spacing=20, size_hint_y=None)
 
-        # ###CENTRAL PART### #
-        self.c_box = BoxLayout(orientation='vertical', size=(dp(800), dp(1000)), size_hint=(.6, 1),
-                               padding=[5, 5, 5, 5])
-        self.rect = Rectangle(size=self.c_box.size, pos=self.c_box.pos)
-        height_c_box = self.c_box.size[1] / (self.c_box.size[0] / self.c_box.size[1])
-        self.my_camera = Camera(allow_stretch=True, keep_ratio=True, size_hint=(1, 1), width=self.c_box.size[0],
-                                height=height_c_box)
-        self.view = Image(source=view_default, allow_stretch=True, keep_ratio=True, size_hint=(1, 1),
-                          width=self.c_box.size[0], height=height_c_box)
-        view = self.view
-        self.title2 = Label(text='Statistiche', size_hint=(1, .1))
-        self.val1 = '-'
-        self.riferimenti = BoxLayout(size_hint=(1, .3), orientation='horizontal')
-        self.picture_box = BoxLayout(size_hint=(.3, 1), orientation='vertical')
-        self.reference_title = Label(text='', size_hint=(1, .1))
-        self.rot_x = Label(text='rot x = ', text_size=(dp(50), dp(20)),
-                           size_hint=(1, .3), halign='left', valign='middle')
-        self.rot_y = Label(text='rot y = ', text_size=(dp(50), dp(20)),
-                           size_hint=(1, .3), halign='left', valign='middle')
-        self.rot_z = Label(text='rot z = ', text_size=(dp(50), dp(20)),
-                           size_hint=(1, .3), halign='left', valign='middle')
-        self.c_value_x = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.c_value_y = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.c_value_z = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.r_value_box = BoxLayout(size_hint=(.3, 1), orientation='vertical')
-        self.reference_values = Label(text='valori quadro', size_hint=(1, .1))
-        self.r_value_x = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.r_value_y = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.r_value_z = Label(text=self.val1, text_size=(dp(50), dp(20)),
-                               size_hint=(1, .3), halign='left', valign='middle')
-        self.c_value_box = BoxLayout(size_hint=(.3, 1), orientation='vertical')
-        self.cam_values = Label(text='valori camera', size_hint=(1, .1))
-        labels = [self.r_value_x, self.r_value_y, self.r_value_z, self.c_value_x, self.c_value_y, self.c_value_z]
-        self.hints = BoxLayout(size_hint=(1, 1), orientation='vertical',
-                               padding=[dp(40), self.cam_values.height*.1, dp(40), 0])
-        self.prog_x = ProgressBar(max=100, size_hint=(1, .3), pos=(dp(50), dp(65)))
-        self.prog_y = ProgressBar(size_hint=(1, .3), pos=(dp(70), dp(100)))
-        self.prog_z = ProgressBar(size_hint=(1, .3), pos=(dp(30), dp(25)))
-        pbars = [self.prog_x, self.prog_y, self.prog_z]
+class MainLayout(Widget):
+    source = StringProperty('')
+    ref_x = StringProperty('-')
+    ref_y = StringProperty('-')
+    ref_z = StringProperty('-')
+    cam_x = StringProperty('-')
+    cam_y = StringProperty('-')
+    cam_z = StringProperty('-')
+    pb_x = NumericProperty(0)
+    pb_y = NumericProperty(0)
+    pb_z = NumericProperty(0)
+    def __init__(self, **kwargs):
+        super(MainLayout, self).__init__(**kwargs)
+        #
+        self.source = view_default
+        Clock.schedule_once(self.verify_ids, 0)
+        self.event = Clock.schedule_interval(self.update, 0.1)
 
-        # ##RIGHT PART## #
-        self.r_box = BoxLayout(orientation='vertical', size_hint=(0.2, 1))
-        self.title_r = Label(text='Questo è il titolo', size_hint=(1, 0.1),
-                             bold=True, pos_hint={'center_x': 0.5, 'center_y': 0.5})
-        self.sc_view_results = ScrollView(size_hint=(1, 0.9), bar_width=5, bar_margin=10)  # Definition of scroll view to place image buttons
-        # self.sc_view.bind(scroll_y=self.my_y_callback1)
-        self.sc_view_results.bind(scroll_y=self.my_y_callback2)
-        self.box_results = GridLayout(padding=[0, 25, 0, 0], cols=1, spacing=20, size_hint_y=None)
-
-    def my_y_callback1(self, value, x):
-        self.sc_view.scroll_y = self.sc_view_results.scroll_y
-
-    def my_y_callback2(self, value, x):
-        self.sc_view_results.scroll_y = self.sc_view.scroll_y
+    def verify_ids(self, widget):
+        global ids
+        ids = self.ids
+        self.build()
 
     def build(self):
+        global view, r_rot, c_rot, prog_bars, pb_rots, view_source
+        grid1 = ids['l_scroll']
+        grid1.bind(minimum_height=grid1.setter('height'))
+        grid1 = self.image_load(img_path, grid1)
+        grid2 = ids['r_box_grid']
+        grid2.bind(minimum_height=grid2.setter('height'))
+        grid2 = self.image_load(thumbs_path, grid2)
+        view = ids['view']
+        r_rot = [ids['ref_x'].text, ids['ref_y'].text, ids['ref_z'].text]
+        c_rot = [ids['cam_x'].text, ids['cam_y'].text, ids['cam_z'].text]
+        prog_bars = [ids['pb_x'], ids['pb_y'], ids['pb_z']]
+        pb_rots = [self.pb_x, self.pb_y, self.pb_z]
+        view_source = self.source
 
-        image_dir = "images/"  # Directory to read
-
-        # # ##LEFT PART## # #
-        self.box.bind(minimum_height=self.box.setter('height'))
-        self.box = self.image_load(image_dir, self.box)  # Batch definition of image buttons, arranged in grid layout
-
-        self.sc_view.add_widget(self.box)
-        self.l_box.add_widget(self.title_l)
-        self.l_box.add_widget(self.sc_view)
-
-        # # ##CENTRAL PART## # #
-        self.c_box.bind(size=self._update_rect, pos=self._update_rect)
-        with self.c_box.canvas.before:
-            Color(.2, .2, .2, 1)  # green; colors range from 0-1 not 0-255
-            self.rect = Rectangle(size=self.c_box.size, pos=self.c_box.pos)
-        title = Label(text='FACE FIT', bold=True, size_hint=(1, .2))
-        self.riferimenti.add_widget(self.picture_box)
-        self.riferimenti.add_widget(self.r_value_box)
-        self.riferimenti.add_widget(self.c_value_box)
-        self.riferimenti.add_widget(self.hints)
-        self.hints.add_widget(self.prog_x)
-        self.hints.add_widget(self.prog_y)
-        self.hints.add_widget(self.prog_z)
-        self.picture_box.add_widget(self.reference_title)
-        self.picture_box.add_widget(self.rot_x)
-        self.picture_box.add_widget(self.rot_y)
-        self.picture_box.add_widget(self.rot_z)
-        self.r_value_box.add_widget(self.reference_values)
-        self.r_value_box.add_widget(self.r_value_x)
-        self.r_value_box.add_widget(self.r_value_y)
-        self.r_value_box.add_widget(self.r_value_z)
-        self.c_value_box.add_widget(self.cam_values)
-        self.c_value_box.add_widget(self.c_value_x)
-        self.c_value_box.add_widget(self.c_value_y)
-        self.c_value_box.add_widget(self.c_value_z)
-        self.c_box.add_widget(title)
-        self.c_box.add_widget(self.view)
-        self.c_box.add_widget(self.title2)
-        self.c_box.add_widget(self.riferimenti)
-        # # ##RIGHT PART## #
-        self.box_results.bind(minimum_height=self.box_results.setter('height'))
-        self.box_results = self.image_load('images/Thumbs/', self.box_results)
-        self.sc_view_results.add_widget(self.box_results)
-        self.r_box.add_widget(self.title_r)
-        self.r_box.add_widget(self.sc_view_results)
-
-        self.super_box.add_widget(self.l_box)
-        self.super_box.add_widget(self.c_box)
-        self.super_box.add_widget(self.r_box)
-
-        return self.super_box
-
-    def _update_rect(self, instance, value):
-        self.rect.pos = instance.pos
-        self.rect.size = instance.size
 
     def image_load(self, im_dir, grid):
         if im_dir == "images/":
@@ -365,18 +296,36 @@ class FitFaceApp(App):
         global selected
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
-                labels[0].__setattr__('text', str(int(ref[b].beta)))
-                labels[1].__setattr__('text', str(int(ref[b].alpha)))
-                labels[2].__setattr__('text', str(int(ref[b].tilt['angle'])))
+                r_rot[0] = str(int(ref[b].beta))
+                r_rot[1] = str(int(ref[b].alpha))
+                r_rot[2] = str(int(ref[b].tilt['angle']))
                 selected = b
             elif buttons[b] == btn and btn.state == 'normal':
-                self.view.source = ''
-                for i in range(0, 6):
-                    labels[i].__setattr__('text', '-')
+                view.source = ''
+                for i in range(0, 3):
+                    c_rot[i] = '-'
+                    r_rot[i] = '-'
+                    pb_rots[i] = 0
                 selected = -1
-                self.view.source = view_default
+                view.source = view_default
         return btn
+    def update(self, dt):
+        self.source = view_source
+        self.pb_x = pb_rots[0]
+        self.pb_y = pb_rots[1]
+        self.pb_z = pb_rots[2]
+        self.ref_x = r_rot[0]
+        self.ref_y = r_rot[1]
+        self.ref_z = r_rot[2]
+        self.cam_x = c_rot[0]
+        self.cam_y = c_rot[1]
+        self.cam_z = c_rot[2]
 
+class MainApp(App):
+
+    def on_start(self, **kwargs):
+
+        return MainLayout()
 
 # Match functions
 def match():
@@ -578,15 +527,10 @@ def color_correct(cam_img, ref_img):
     cc_out = (blended * 255).astype('uint8')
     return cc_out
 
-
 for filename in glob.iglob(f'{ref_path}*'):
     if 'FACE_' in filename:
         ref_files.append(filename)
-
-with open('triangles_reduced2.json', 'r') as f:
-    media_pipes_tris = json.load(f)
-
 ref = []
 cam_obj = F_obj.Face('cam')
-app = FitFaceApp()
-app.run()
+MainApp().run()
+

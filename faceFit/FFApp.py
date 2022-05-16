@@ -4,6 +4,7 @@ import glob
 import json
 import os
 
+from kivy.base import EventLoop
 from kivy.lang import builder
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 from kivy.uix.button import Button
@@ -44,6 +45,9 @@ prog_bars = []
 pb_rots = []
 delta = 5
 final_morphs = {}
+default_texture = []
+morph_texture = []
+capture = None
 
 try:
     root = os.path.dirname(os.path.abspath(__file__))
@@ -58,6 +62,10 @@ thumbs_path = img_path + 'Thumbs/'
 morph_path = ref_path + 'final_morphs/'
 view_default = thumbs_path + 'view_default.jpg'
 view_base_image = cv2.imread(view_default)
+buf = cv2.flip(view_base_image, 0).tobytes()
+default_texture = Texture.create(size=(view_base_image.shape[1], view_base_image.shape[0]), colorfmt='bgr')
+default_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+
 r_ch, g_ch, b_ch = cv2.split(view_base_image)
 with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
@@ -83,9 +91,9 @@ class MyButton(ToggleButtonBehavior, Image):
         if off:
             im = cv2.rectangle(im, (1, 1), (im.shape[1]-1, im.shape[0]-1), (255, 255, 255), 10)
 
-        buf = cv2.flip(im, 0)  # flip upside down
+        buf_butt = cv2.flip(im, 0)  # flip upside down
         image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
-        image_texture.blit_buffer(buf.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
+        image_texture.blit_buffer(buf_butt.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
         return image_texture
 
 
@@ -94,70 +102,64 @@ class MyCamera(Image):
         super(MyCamera, self).__init__(**kwargs)
         self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
         self.reference = selected
-        self.texture = None
+        self.texture = default_texture
         self.source = view_default
-
         Clock.schedule_interval(self.update, 1.0 / 30)  # Set drawing interval
 
     def update(self, dt):
-        global selected, view, pb_rots, view_source, last_match
+        global selected, view, pb_rots, view_source, last_match, morph_texture
         self.reference = selected
-        success, frame = self.capture.read()
-        image = cv2.flip(frame, 1)
+        if self.reference != -1:
+            success, frame = self.capture.read()
+            image = cv2.flip(frame, 1)
+            self.texture = view.texture
+            if success:
+                image.flags.writeable = True
+                cam_obj.get_landmarks(image)
+                # # DRAW LANDMARKS
+                # cam_obj.draw('contours')
+                # cam_obj.draw('tessellation')
+                c_rot[0] = str(int(cam_obj.beta))
+                c_rot[1] = str(int(cam_obj.alpha))
+                c_rot[2] = str(int(cam_obj.tilt['angle']))
 
-        view_source = view_default
-        self.texture=view.texture
-        # view.texture
-        if success and self.reference != -1:
-            # self.texture = view.texture
-            image.flags.writeable = True
-            cam_obj.get_landmarks(image)
-            # # DRAW LANDMARKS
-            # cam_obj.draw('contours')
-            # cam_obj.draw('tessellation')
-            c_rot[0] = str(int(cam_obj.beta))
-            c_rot[1] = str(int(cam_obj.alpha))
-            c_rot[2] = str(int(cam_obj.tilt['angle']))
+                perc_x = 100 - abs(ref[self.reference].beta - cam_obj.beta)
+                perc_y = 100 - abs(ref[self.reference].alpha - cam_obj.alpha)
+                perc_z = 100 - abs(ref[self.reference].tilt['angle'] - cam_obj.tilt['angle'])
+                pb_rots = [perc_x, perc_y, perc_z]
 
-            perc_x = 100 - abs(ref[self.reference].beta - cam_obj.beta)
-            perc_y = 100 - abs(ref[self.reference].alpha - cam_obj.alpha)
-            perc_z = 100 - abs(ref[self.reference].tilt['angle'] - cam_obj.tilt['angle'])
-            pb_rots = [perc_x, perc_y, perc_z]
+                overlaid = self.cut_paste(ref[self.reference], cam_obj)
+                buf_overlaid = cv2.flip(overlaid, 0).tobytes()
+                texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
+                texture.blit_buffer(buf_overlaid, colorfmt='bgr', bufferfmt='ubyte')
 
-            overlaid = self.cut_paste(ref[self.reference], cam_obj)
-            buf = cv2.flip(overlaid, 0).tobytes()
-            texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
-            texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+                self.texture = texture
+                if match():
+                    path = morph_path + 'morph_' + str(self.reference) + '.png'
+                    cv2.imwrite(path, final_morphs[self.reference])
+                    result_buttons[self.reference].source = path
+                    buttons[self.reference].state = 'normal'
+                    buttons[self.reference].height = 150
+                    last_morphed = cv2.imread(path)
+                    buf_morph = cv2.flip(last_morphed, 0).tobytes()
+                    morph_texture = Texture.create(size=(last_morphed.shape[1], last_morphed.shape[0]), colorfmt='bgr')
+                    morph_texture.blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
+                    for i in range(0, 3):
+                        c_rot[i] = '-'
+                        r_rot[i] = '-'
+                        pb_rots[i] = 0
+                    self.texture = morph_texture
+                    last_match = selected
+                    selected = -1
 
-            # view.texture = texture
-
-            self.texture = texture
-            if match():
-                path = morph_path + 'morph_' + str(self.reference) + '.png'
-                cv2.imwrite(path, final_morphs[self.reference])
-                result_buttons[self.reference].source = path
-                buttons[self.reference].state = 'normal'
-                buttons[self.reference].height = 150
-                for i in range(0, 3):
-                    c_rot[i] = '-'
-                    r_rot[i] = '-'
-                    pb_rots[i] = 0
-                self.texture = None
-                self.source = path
-                last_match = selected
-                # view.source = path
-                selected = -1
-
-        elif success and self.reference == -1:
+        else:
             self.texture = None
-            if last_match != -1:
-                path = morph_path + 'morph_' + str(last_match) + '.png'
-                view_source = path
-            else: view_source = view_default
-            # buf = cv2.flip(image, 0).tobytes()
-            # texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-            # texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-            # self.texture = texture
+            print('qui')
+            if last_match != -1 and morph_texture:
+                self.texture = morph_texture
+            else:
+                self.texture = default_texture
+
     def on_play(self, instance, value):
         if not self._camera:
             return
@@ -165,6 +167,7 @@ class MyCamera(Image):
             self._camera.start()
         else:
             self._camera.stop()
+
     def cut_paste(self, obj1, obj2):
         offset = 10
         img1 = obj1.image
@@ -221,7 +224,6 @@ class MyCamera(Image):
         return temp_1
 
 
-
 class MainLayout(Widget):
     source = StringProperty('')
     ref_x = StringProperty('-')
@@ -233,6 +235,7 @@ class MainLayout(Widget):
     pb_x = NumericProperty(0)
     pb_y = NumericProperty(0)
     pb_z = NumericProperty(0)
+
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
         #
@@ -310,7 +313,7 @@ class MainLayout(Widget):
                 view.source = view_default
         return btn
     def update(self, dt):
-        self.source = view_source
+        view.texture = ids.view.texture
         self.pb_x = pb_rots[0]
         self.pb_y = pb_rots[1]
         self.pb_z = pb_rots[2]
@@ -321,11 +324,12 @@ class MainLayout(Widget):
         self.cam_y = c_rot[1]
         self.cam_z = c_rot[2]
 
-class MainApp(App):
 
+class MainApp(App):
     def on_start(self, **kwargs):
 
         return MainLayout()
+
 
 # Match functions
 def match():
@@ -357,7 +361,6 @@ def find_edges(img, blur_size, dx, dy, ksize):
     # Sobel Edge Detection
     sobel_x = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=dx, dy=0, ksize=ksize)  # Sobel Edge Detection on the X axis
     sobel_y = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=0, dy=dy, ksize=ksize)  # Sobel Edge Detection on the Y axis
-    # sobelxy = cv2.Sobel(src=blurred_2, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=5)  # Combined X and Y Sobel Edge Det
     abs_grad_x = cv2.convertScaleAbs(sobel_x)
     abs_grad_y = cv2.convertScaleAbs(sobel_y)
 
@@ -373,14 +376,12 @@ def hud_mask(mask_obj, masked_obj):
     img2_points = masked_obj.pix_points
     # Find convex hull
     hull_index = cv2.convexHull(np.array(img1_points), returnPoints=False)
-
     # Create convex hull lists
     hull1 = []
     hull2 = []
     for i in range(0, len(hull_index)):
         hull1.append(img1_points[hull_index[i][0]])
         hull2.append(img2_points[hull_index[i][0]])
-
     # Calculate Mask for Seamless cloning
     hull_8u = []
     for i in range(0, len(hull2)):

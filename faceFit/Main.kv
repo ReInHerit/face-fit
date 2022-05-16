@@ -13,7 +13,7 @@ MainLayout:
 <ColorBox@BoxLayout+BackgroundColor>
     background_color: 0, 0, 1, 0
 <StatsLabel@Label+BackgroundColor>
-    text_size: self.size[0], dp(15)
+    text_size: self.size[0], dp(25)
     halign: 'center'
     valign: 'middle'
     background_color: .1,.1,.1,1
@@ -29,7 +29,7 @@ MainLayout:
         size: root.width*0.2, root.height
         orientation: 'vertical'
         Label:
-            text: 'select a picture'
+            text: ''
             height: '20dp'
             text_size: self.width, self.height
             padding: 5,5
@@ -73,9 +73,10 @@ MainLayout:
                 allow_stretch: True
 
 
-            BoxLayout:
+            ColorBox:
                 size_hint: 1, .3
                 orientation: 'horizontal'
+                background_color: .05,.05,.05,1
                 padding: 0, 5, 0, 0
 
                 BoxLayout:
@@ -136,8 +137,9 @@ MainLayout:
                         id: cam_z
                         text: root.cam_z
                 BoxLayout:
-                    size_hint: .4, 1
+                    size_hint: .35, 1
                     orientation: 'vertical'
+
                     StatsLabel:
                         text: 'Match Up'
                         background_color: .05,.05,.05,1
@@ -153,6 +155,18 @@ MainLayout:
                     ColorPB:
                         id: pb_z
                         value: root.pb_z
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint: .05, 1
+                    StatsLabel:
+                        text: ''
+                        background_color: .05,.05,.05,1
+                    StatsLabel:
+                        text: ''
+                    StatsLabel:
+                        text: ''
+                    StatsLabel:
+                        text: ''
 
 
     BoxLayout:
@@ -162,13 +176,19 @@ MainLayout:
         pos: root.width*0.8, 0
         Label:
             text: ''
-            size: self.width, '25dp'
-            size_hint: None, None
+            height: '20dp'
+            text_size: self.width, self.height
+            padding: 5,5
+            size_hint: 1, .1
+            halign: 'center'
+            valign: 'bottom'
         ScrollView:
             id: r_sv
+            size_hint: 1, .9
+            padding: 5,5,5,5
             GridLayout:
                 id: r_box_grid
                 cols: 1
                 spacing:20
                 size_hint_y:None
-                #padding=[0,25,0,0]
+

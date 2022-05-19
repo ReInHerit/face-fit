@@ -38,6 +38,7 @@ ids = {}
 view = {}
 view_source = ''
 selected = -1
+morph_selected = -1
 last_match = -1
 r_rot = []
 c_rot = []
@@ -46,8 +47,9 @@ pb_rots = []
 delta = 5
 final_morphs = {}
 default_texture = []
-morph_texture = []
+morph_texture = {}
 capture = None
+filled=[]
 
 try:
     root = os.path.dirname(os.path.abspath(__file__))
@@ -137,28 +139,33 @@ class MyCamera(Image):
                 if match():
                     path = morph_path + 'morph_' + str(self.reference) + '.png'
                     cv2.imwrite(path, final_morphs[self.reference])
-                    result_buttons[self.reference].source = path
                     buttons[self.reference].state = 'normal'
                     buttons[self.reference].height = 150
                     last_morphed = cv2.imread(path)
                     buf_morph = cv2.flip(last_morphed, 0).tobytes()
-                    morph_texture = Texture.create(size=(last_morphed.shape[1], last_morphed.shape[0]), colorfmt='bgr')
-                    morph_texture.blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
+                    morph_texture[self.reference] = Texture.create(size=(last_morphed.shape[1], last_morphed.shape[0]), colorfmt='bgr')
+                    morph_texture[self.reference].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
                     for i in range(0, 3):
                         c_rot[i] = '-'
                         r_rot[i] = '-'
                         pb_rots[i] = 0
-                    self.texture = morph_texture
+
+                    self.texture = morph_texture[self.reference]
+                    # ids.view.texture = self.texture
+                    result_buttons[self.reference].texture = morph_texture[self.reference]
                     last_match = selected
+                    filled.append(last_match)
                     selected = -1
 
         else:
             self.texture = None
-            print('qui')
-            if last_match != -1 and morph_texture:
-                self.texture = morph_texture
+            if last_match != -1 and morph_texture[last_match]:
+                self.texture = morph_texture[last_match]
+                if morph_selected != -1:
+                    self.texture = morph_texture[morph_selected]
             else:
                 self.texture = default_texture
+
 
     def on_play(self, instance, value):
         if not self._camera:
@@ -235,10 +242,9 @@ class MainLayout(Widget):
     pb_x = NumericProperty(0)
     pb_y = NumericProperty(0)
     pb_z = NumericProperty(0)
-
+    scroll = ObjectProperty(None)
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
-        #
         self.source = view_default
         Clock.schedule_once(self.verify_ids, 0)
         self.event = Clock.schedule_interval(self.update, 0.1)
@@ -286,23 +292,27 @@ class MainLayout(Widget):
                 thumb = 'morph_thumb.jpg'
                 button = MyButton(size_hint_y=None,
                                   height=150,
-                                  disabled=True,
+                                  disabled=False,
                                   source=os.path.join(im_dir, thumb),
                                   group="g2")
                 result_buttons.append(button)
-                button.bind(on_press=self.select)
+                button.bind(on_press=self.select_morph_button)
                 grid.add_widget(button)
 
         return grid
 
     def select(self, btn):
-        global selected
+        global selected, morph_selected
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
                 r_rot[0] = str(int(ref[b].beta))
                 r_rot[1] = str(int(ref[b].alpha))
                 r_rot[2] = str(int(ref[b].tilt['angle']))
                 selected = b
+                if morph_selected != -1:
+                    result_buttons[morph_selected].height = 150
+                    result_buttons[morph_selected].state = 'normal'
+                    morph_selected = -1
             elif buttons[b] == btn and btn.state == 'normal':
                 view.source = ''
                 for i in range(0, 3):
@@ -312,8 +322,31 @@ class MainLayout(Widget):
                 selected = -1
                 view.source = view_default
         return btn
+
+    def select_morph_button(self, btn):
+        global selected, morph_selected
+        id = result_buttons.index(btn)
+        if selected == -1 and id in filled:
+            print(btn.texture, type(btn.texture))
+            for b in range(0, len(result_buttons)):
+                if result_buttons[b] == btn and btn.state == 'down':
+                    morph_selected = b
+                    ids.view.texture = morph_texture[morph_selected]
+                    result_buttons[b].texture = morph_texture[morph_selected]
+
+                elif result_buttons[b] == btn and btn.state == 'normal':
+                    result_buttons[b].texture = morph_texture[morph_selected]
+                    morph_selected = -1
+                    ids.view.texture = default_texture
+        else:
+            btn.height = 150
+            btn.state == 'normal'
+
     def update(self, dt):
         view.texture = ids.view.texture
+        if len(morph_texture) >> 0:
+            for m_tex in morph_texture.keys():
+                result_buttons[m_tex].texture = morph_texture[m_tex]
         self.pb_x = pb_rots[0]
         self.pb_y = pb_rots[1]
         self.pb_z = pb_rots[2]

@@ -29,6 +29,7 @@ from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from color_transfer import color_transfer
 import blend_modes
+import neural_style_transfer as st
 
 kivy.require("1.9.1")
 ref_files = []
@@ -539,6 +540,31 @@ def sharpen(img):
 
 
 def color_correct(cam_img, ref_img):
+    roi1 = cam_img[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
+    roi2 = ref_img[ref[selected].bb_p1[1]:ref[selected].bb_p2[1], ref[selected].bb_p1[0]:ref[selected].bb_p2[0]]
+    sharp = sharpen(cam_img)
+    sharp_roi1 = sharp[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
+    sharp_roi1 = cv2.GaussianBlur(sharp_roi1, (11, 11), 0)
+
+    # transfer the color distribution from the source image to the target image
+    roi1 = st.print_style_transfer(cv2.cvtColor(roi1, cv2.COLOR_BGR2RGB), cv2.cvtColor(roi2, cv2.COLOR_BGR2RGB))
+    # roi1 = color_transfer(roi2, roi1, clip=True, preserve_paper=False)
+    roi1 = cv2.normalize(roi1, None, 0 , 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    cv2.imshow('1', roi1)
+    b_channel, g_channel, r_channel = cv2.split(roi1)
+    alpha_channel = np.ones(b_channel.shape, dtype='uint8')  # b_channel.dtype)  # creating a dummy alpha channel image.
+    roi1_4ch = cv2.merge((b_channel, g_channel, r_channel, alpha_channel))
+    sharp_channel, = cv2.split(sharp_roi1)
+    sharp_roi_4ch = cv2.merge((sharp_channel, sharp_channel, sharp_channel, alpha_channel))
+    info_roi1 = np.iinfo(roi1_4ch.dtype)
+    info_sharp = np.iinfo(sharp_roi_4ch.dtype)
+    roi1_norm_float = roi1_4ch.astype(np.float64) / info_roi1.max
+    sharp_norm_float = sharp_roi_4ch.astype(np.float64) / info_sharp.max
+    blended = blend_modes.darken_only(roi1_norm_float, sharp_norm_float, .5)
+    cc_out = (blended * 255).astype('uint8')
+    return cc_out
+
+def color_correct2(cam_img, ref_img):
     roi1 = cam_img[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
     roi2 = ref_img[ref[selected].bb_p1[1]:ref[selected].bb_p2[1], ref[selected].bb_p1[0]:ref[selected].bb_p2[0]]
     sharp = sharpen(cam_img)

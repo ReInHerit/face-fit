@@ -38,6 +38,9 @@ MainLayout:
             valign: 'bottom'
         ScrollView:
             id: l_sv
+            do_scroll_y: True
+            scroll_y: r_sv.scroll_y
+            pos_hint: {'top': 1}
             size_hint: 1, .9
             padding: 5,5,5,5
             GridLayout:
@@ -184,10 +187,16 @@ MainLayout:
             valign: 'bottom'
         ScrollView:
             id: r_sv
+            pos_hint: {'top': 1}
+            scroll_b: root.scroll
+            do_scroll_y:True
+            scroll_y: l_sv.scroll_y
+
             size_hint: 1, .9
             padding: 5,5,5,5
             GridLayout:
                 id: r_box_grid
+                padding:0, 25, 0, 0
                 cols: 1
                 spacing:20
                 size_hint_y:None

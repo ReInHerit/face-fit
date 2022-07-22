@@ -1,0 +1,136 @@
+:root {
+    --black: #000000;
+    --white: #FFFFFF
+}
+
+
+body, html {
+    margin: 0px;
+    padding: 0px;
+    background-color: var(--black);
+    font-family: 'Trebuchet MS';
+}
+.container {
+    width: 100%;
+    height: 100%;
+    min-width: 500px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: 20% 60% 20%;
+    overflow: hidden;
+}
+.ref_btn, .morph_btn{
+    padding: 0;
+    border: 0;
+    background: transparent;
+    display: block;
+    margin: 10px auto;
+}
+.img_ref, .img_morph{
+    position: initial;
+    width: 100%;
+    max-width:  150px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+/*#canvas-container {*/
+/*     display:flow-root;*/
+/*     height: 100%;*/
+/*     width: 100%;*/
+/*     justify-content: center;*/
+/*     align-items:center;*/
+/*}*/
+/*#canvas {*/
+/*    !*width: 100%;*!*/
+/*    !*height:90%;*!*/
+/*    max-width: 100%;*/
+/*    display: block;*/
+/*    position: relative;*/
+/*    left: 0;*/
+/*    top: 0;*/
+/*    background-color: dimgrey;*/
+/*}*/
+#img_ref{
+    width: 100%;
+    min-width: 320px;
+    max-width: 640px;
+    height: auto;
+    display: block;
+    margin: auto;
+}
+#webcam {
+    width: 100%;
+    min-width: 320px;
+    max-width: 640px;
+    height: auto;
+    visibility: hidden;
+    display: block;
+    margin: auto;
+    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1);
+
+}
+#output {
+    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1);
+}
+/*#canvas {*/
+/*    !*width: 100%;*!*/
+/*    !*min-width: 320px;*!*/
+/*    !*max-width: 640px;*!*/
+/*    !*height: min-content;*!*/
+/*    display: block;*/
+/*    margin: 0;*/
+/*    !*-webkit-transform: scaleX(-1);*!*/
+/*    !*transform: scaleX(-1);*!*/
+/*}*/
+header {
+    width: 100%;
+    /*height: 80px;*/
+    /*!*line-height: 40px;*!*/
+    /*background-color: #313131;*/
+}
+h1 {
+    margin: auto;
+    text-align: center;
+    color: var(--white);
+    border-bottom: 2px solid var(--white);
+    padding: 10px;
+}
+
+/*.container > div {*/
+/*    flex: 1*/
+/*}*/
+.removed {
+    display: none;
+}
+
+.invisible {
+    opacity: 1;
+}
+
+.camView {
+    position: relative;
+    float: left;
+    width: calc(100% - 20px);
+    margin: 10px;
+    cursor: pointer;
+}
+
+/*.camView p {*/
+/*    position: absolute;*/
+/*    padding: 5px;*/
+/*    background-color: rgba(255, 111, 0, 0.85);*/
+/*    color: #FFF;*/
+/*    border: 1px dashed rgba(255, 255, 255, 0.7);*/
+/*    z-index: 2;*/
+/*    font-size: 12px;*/
+/*}*/
+
+.highlighter {
+    background: rgba(0, 255, 0, 0.25);
+    border: 1px dashed #fff;
+    z-index: 1;
+    position: absolute;
+}

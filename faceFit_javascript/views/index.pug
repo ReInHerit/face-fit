@@ -1,0 +1,36 @@
+extends layout
+
+block layout-content
+    // - let new_img = 'images/FACE_16_thumb.jpg'
+
+    main.container
+        #left.asnav2Class
+            each file in data
+                .select_ch
+                    button.ref_btn(type='button')
+                        img.img_ref(src=file, crossorigin="anonymous")
+
+        section#demos
+            #middle.camView
+                canvas#canvas
+                    image#ref_img(src='')
+                canvas#output()
+
+                video#webcam.invisible(autoplay="true" muted width="640" height="480")
+                //canvas#canvas
+
+        #right.asnav1Class
+            each n in data
+                .show_morph
+                    button.morph_btn(type='button')
+                        img.img_morph(src='images/Thumbs/morph_thumb.jpg')
+            canvas
+
+
+    script(type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js')
+    script(src='https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js')
+    script(src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh')
+    script(src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core')
+    script(src='https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.1/dist/face-landmarks-detection.min.js')
+
+    script(src="./js/main.js")

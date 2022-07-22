@@ -1,0 +1,36 @@
+{
+  "name": "nodejs_port",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon ./index.js",
+    "ui": "browser-sync start --config bs-config.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "browser-sync": "^2.27.10",
+    "nodemon": "^2.0.16"
+  },
+  "dependencies": {
+    "@mediapipe/face_detection": "^0.4.1646425229",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.1",
+    "@tensorflow/tfjs": "^3.18.0",
+    "@tensorflow/tfjs-node": "^3.18.0",
+    "express": "^4.18.1",
+    "facemesh": "^0.6.6",
+    "jimp": "^0.16.0",
+    "jquery": "^3.6.0",
+    "jquery-migrate": "^3.4.0",
+    "jsdom": "^19.0.0",
+    "node-webcam": "^0.8.0",
+    "opencv.js": "^1.2.1",
+    "pug": "^3.0.2",
+    "robust-orientation": "^1.2.1",
+    "stats-js": "^1.0.1",
+    "stats.js": "^0.17.0"
+  }
+}

@@ -1,16 +1,17 @@
 
 const ref_img = document.getElementById("ref_img");
 const video = document.getElementById("webcam");
+let video_bb;
 const middle = document.getElementById("middle");
 const canvas = document.getElementById("canvas");
-const output = document.getElementById('output')
+// const output = document.getElementById('output')
 let context, RAF_timerID, flip_canvas, canvas_camera, facemesh_drawn, cw, ch;
 context = canvas.getContext("2d");
-ctx = output.getContext("2d");
+// ctx = output.getContext("2d");
 canvas.width = middle.offsetWidth ;
 canvas.height = middle.offsetWidth;
-output.width = middle.offsetWidth ;
-output.height = middle.offsetWidth;
+// output.width = middle.offsetWidth ;
+// output.height = middle.offsetWidth;
 let cam_landmarks = [], cam_box = [], btns=[], faces_arr=[], all_btns = [], all_btns_indices = []
 const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
 const detectorConfig = {
@@ -106,8 +107,6 @@ async function init() {
             slide_id = all_btns_indices[j]
             // console.log(_this.firstChild + ' ' + j )
             faces_arr.forEach(function (item, index, arr){
-                // console.log('index')
-
                 if (_this.firstChild.src === arr[index].src){
                     // console.log(index+' '+j)
                     selected = index
@@ -142,6 +141,7 @@ function Face(which, image) {
     this.bb = [];
     this.hull = [];
     this.n_points = []
+
     this.normalize_array= function (pix_points) {
         let n_array = [...pix_points];
         for (let p in n_array){
@@ -151,38 +151,7 @@ function Face(which, image) {
     }
 
 }
-function drawHull(image, idx){
-    const w = canvas.width
-    const h = canvas.width
-    const this_picture = faces_arr[idx]
-    // console.log(idx +' '+ this_picture.which )
-    // console.log(this_picture.n_points )
 
-    const points_indices = this_picture.hull;
-    let hull_points = [];
-    for (let el in points_indices){
-        let id = points_indices[el];
-        let new_point = new cv.Point(this_picture.n_points[id][0]*w,this_picture.n_points[id][1]*h)
-        // console.log(new_point)
-        hull_points.push(new_point)
-    }
-    const mat = cv.imread(image)
-    let larger_mat = new cv.Mat()
-    const dsize = new cv.Size(w, h)
-    cv.resize(mat, larger_mat, dsize, 0, 0, cv.INTER_LINEAR);
-    // const mat2 = cv.imread(this_picture.src)
-    // console.log(hull_points)
-    for (let lin = 0;lin < hull_points.length-1; lin++){
-        let p1  = hull_points[lin];
-        let p2  = hull_points[lin+1];
-        cv.line(larger_mat, p1, p2, [0, 255, 0, 255], 1)
-    }
-
-    cv.imshow(canvas, larger_mat);
-    // cv.imshow(output, mat2)
-    mat.delete()
-    larger_mat.delete()
-}
 function calcHull(points, which) {
     if (points.length <= 1)
         return points.slice();
@@ -366,19 +335,28 @@ async function calc_lmrks(image, which) {
     // console.log('calcolo FACE '+ which)
     let landmarks = []
     let points_2d = []
-    let bb, angles
+    let bb ={}
+    let angles
     let faces = await detector.estimateFaces(image);
     if (faces.length>>0){
         // console.log(which)
         const keypoints = faces[0].keypoints;
         for (let land=0; land< keypoints.length; land++){
-            let x = keypoints[land].x;
-            let y = keypoints[land].y;
-            let z = keypoints[land].z;
+            let x = Math.round(keypoints[land].x);
+            let y = Math.round(keypoints[land].y);
+            let z = Math.round(keypoints[land].z);
             landmarks.push([x, y, z])
             points_2d.push([x,y])
         }
-        bb = faces[0].box
+        bb.xMin = Math.round(faces[0].box.xMin)
+        bb.xMax = Math.round(faces[0].box.xMax)
+        bb.yMin = Math.round(faces[0].box.yMin)
+        bb.yMax = Math.round(faces[0].box.yMax)
+        bb.width = Math.round(faces[0].box.width)
+        bb.height = Math.round(faces[0].box.height)
+        bb.center = [bb.xMin + Math.round(bb.width/2),bb.yMin + Math.round(bb.height/2)]
+
+
         if (landmarks !== []) {
             // console.log('not none')
             angles = await getHeadAngles(landmarks)
@@ -497,28 +475,49 @@ function drawPath(ctx, points, closePath) {
     }
     ctx.stroke(region);
 }
-function cv_draw(webcam, bb, lmrks){
+function drawHull(image, idx){
+    const w = canvas.width
+    const h = canvas.width
+    const this_picture = faces_arr[idx]
+    // console.log(idx +' '+ this_picture.which )
+    // console.log(this_picture.n_points )
+
+    const points_indices = this_picture.hull;
+    let hull_points = [];
+    for (let el in points_indices){
+        let id = points_indices[el];
+        let new_point = new cv.Point(this_picture.n_points[id][0]*w,this_picture.n_points[id][1]*h)
+        // console.log(new_point)
+        hull_points.push(new_point)
+    }
+    const mat = cv.imread(image)
+    let larger_mat = new cv.Mat()
+    const dsize = new cv.Size(w, h)
+    cv.resize(mat, larger_mat, dsize, 0, 0, cv.INTER_LINEAR);
+    // const mat2 = cv.imread(this_picture.src)
+    // console.log(hull_points)
+    for (let lin = 0;lin < hull_points.length-1; lin++){
+        let p1  = hull_points[lin];
+        let p2  = hull_points[lin+1];
+        cv.line(larger_mat, p1, p2, [0, 255, 0, 255], 1)
+    }
+
+    cv.imshow(canvas, larger_mat);
+    // cv.imshow(output, mat2)
+    mat.delete()
+    larger_mat.delete()
+}
+function cv_draw(webcam, bb){
     // console.log(bb.xMin+ ' ' + bb.yMin+ ' ' + bb.width+ ' ' + bb.height)
     // let rect1,rect2,rect3,rect4
     // let rect
+    let rect, dst
+    // output.width =  middle.offsetWidth ;
+    // output.height = middle.offsetWidth ;
 
-    output.width =  middle.offsetWidth ;
-    output.height = middle.offsetWidth ;
-    console.log(webcam.width+ ' ' + webcam.height+ ' ' + webcam.offsetWidth+ ' ' + webcam.offsetHeight)
-    ctx.drawImage(webcam,0,0);
-    let data = ctx.getImageData(0,0,webcam.offsetWidth,webcam.offsetHeight)
-    // let src = cv.imread(output)
-    let src2 = new cv.Mat(video.height, video.width,  cv.CV_8UC4)//cv.matFromImageData(data);
-    let cap = new cv.VideoCapture(webcam);
-    cap.read(src2)
-    // let dst = new cv.Mat();
-    // let gray = new cv.Mat();
-
-    // rect1=((webcam.width-(bb.xMin + bb.width))/src2.cols)*webcam.offsetWidth;
-    // rect2=(bb.yMin/src2.rows)*webcam.offsetHeight
-    // rect3=(bb.width/src2.cols)*webcam.offsetWidth;
-    // rect4=(bb.height/src2.rows)*webcam.offsetHeight
-
+    let src2 = new cv.Mat(webcam.height, webcam.width,  cv.CV_8UC4)
+    // let ref = new cv.Mat(ref_img.offsetWidth,ref_img.offsetHeight)
+    rect = new cv.Rect(bb.xMin,bb.yMin,bb.width,bb.height)
     // if (bb){
     //     console.log('yes')
     //     rect= new cv.Rect(rect1,rect2,rect3,rect4)
@@ -528,45 +527,165 @@ function cv_draw(webcam, bb, lmrks){
     //     rect = new cv.Rect(0, 0, 50, 50)
     // }
     // let nuevo = cv.flip(src2,dst, 1)
-
-
+    // let p01, p02, p03, p04, p05, p06, p07, p08
+    // p01 =new cv.Point(bb.xMin, bb.yMin)
+    // p02 =new cv.Point(bb.xMin,bb.yMax)
+    // p03 =new cv.Point(bb.xMax,bb.yMax)
+    // p04 =new cv.Point(bb.xMax,bb.yMin)
+    // p05=new cv.Point(webcam.width, webcam.height)
+    // p06=new cv.Point(webcam.width,0 )
+    // p07=new cv.Point(0, 0)
+    // p08=new cv.Point(0, webcam.height)
     // src2=data
     // console.log(dst.cols)
     // dst = src2;
-    let p1, p2, p3, p4, new_bb_xMin, new_bb_yMin, new_bb_xMax, new_bb_yMax
 
-    // let bbpoints = [p1,p2,p3,p4]
-    let passage = src2//new cv.Mat()
+    let cap = new cv.VideoCapture(webcam);
+    cap.read(src2)
+    dst= src2.roi(rect)
+    // cv.line(passage, p01, p02, [255, 0, 0, 255], 1)
+    // cv.line(passage, p05, p06, [255, 0, 0, 255], 2)
+    // cv.line(passage, p06, p07, [255, 255, 0, 255], 2)
+    // cv.line(passage, p07, p08, [0, 255, 0, 255], 2)
+    // cv.line(passage, p08, p05, [0, 255, 255, 255], 2)
+    // passage = passage.roi(rect)
 
-    p1=new cv.Point(bb.xMin*output.offsetHeight/webcam.height, bb.yMin*output.offsetHeight/webcam.height)
-    p2=new cv.Point(bb.xMin*output.offsetHeight/webcam.height, bb.yMax*output.offsetHeight/webcam.height)
-    p3=new cv.Point(bb.xMax*output.offsetHeight/webcam.height, bb.yMax*output.offsetHeight/webcam.height)
-    p4=new cv.Point(bb.xMax*output.offsetHeight/webcam.height, bb.yMin*output.offsetHeight/webcam.height)
-    const dsize = new cv.Size(webcam.offsetWidth, webcam.offsetHeight)
-    cv.resize(passage, passage, dsize, 0, 0, cv.INTER_LINEAR);
-    cv.line(passage, p1, p2, [255, 0, 0, 255], 1)
-    cv.line(passage, p2, p3, [255, 0, 0, 255], 1)
-    cv.line(passage, p3, p4, [255, 0, 0, 255], 1)
-    cv.line(passage, p4, p1, [255, 0, 0, 255], 1)
+    // const dsize = new cv.Size(webcam.offsetWidth, webcam.offsetHeight)
+    // cv.resize(passage, passage, dsize, 0, 0, cv.INTER_LINEAR);
+    // let p1, p2, p3, p4, p5,p6,p7,p8,new_bb_xMin, new_bb_yMin, new_bb_xMax, new_bb_yMax
+    // p1=new cv.Point(bb.xMin*webcam.offsetHeight/webcam.height, bb.yMin*webcam.offsetWidth/webcam.width)
+    // p2=new cv.Point(bb.xMin*webcam.offsetHeight/webcam.height, bb.yMax*webcam.offsetWidth/webcam.width)
+    // p3=new cv.Point(bb.xMax*webcam.offsetHeight/webcam.height, bb.yMax*webcam.offsetWidth/webcam.width)
+    // p4=new cv.Point(bb.xMax*webcam.offsetHeight/webcam.height, bb.yMin*webcam.offsetWidth/webcam.width)
+    //
+    //
+    //
+    // cv.line(passage, p1, p2, [255, 0, 0, 255], 1)
+    // cv.line(passage, p2, p3, [255, 0, 0, 255], 1)
+    // cv.line(passage, p3, p4, [255, 0, 0, 255], 1)
+    // cv.line(passage, p4, p1, [255, 0, 0, 255], 1)
 
-    // dst = src2.roi(rect);
-    console.log('image width: ' + src2.cols + '\n' +
-        'image height: ' + output.width + '\n' +
-        'image size: ' + video.width + '*' + video.offsetWidth + '\n' +
-        'image depth: ' + webcam.width + '\n' +
-        'image channels ' + video.clientWidth + '\n' +
-        'image type: ' + src2.type() + '\n');
 
+    // console.log(cap)
     // let crop=new cv.Mat(webcam.height, webcam.width, cv.CV_8UC1);
     // let dsize = new cv.Size(48, 48);
     // cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY, 0);
-    cv.imshow(output, passage);
+    // cv.imshow(output, dst);
+    src.delete();
+    dst.delete();
 
+}
+function draw_mask_on_ref(webcam, cam_obj){
+    const ref_bb = faces_arr[selected].bb
+    let bb_cam_rect, cam_roi, bb_ref_rect, mask, ref_roi, cam_mask, dst
+    let maskInv = new cv.Mat();
+    let new_mask = new  cv.Mat()
+    let color_new_mask = new cv.Mat()
+    let sum = new cv.Mat();
+    let cam_source = new cv.Mat(webcam.height, webcam.width,  cv.CV_8UC4)
+    let cam_mask_inv = new cv.Mat()
+    let ref = cv.imread(ref_img)
+    const points_indices = cam_obj.hull;
+    let cap = new cv.VideoCapture(webcam);
+
+    cap.read(cam_source)
+
+    bb_cam_rect = new cv.Rect(cam_obj.bb.xMin,cam_obj.bb.yMin,cam_obj.bb.width,cam_obj.bb.height)
+    bb_ref_rect = new cv.Rect(ref_bb.xMin,ref_bb.yMin,ref_bb.width,ref_bb.height);
+
+    ///// calcolo convex hull mak
+    let hull_points = [];
+    for (let el in points_indices){
+        let id = points_indices[el];
+        let new_point = [cam_obj.n_points[id][0]*cam_source.cols,cam_obj.n_points[id][1]*cam_source.rows]
+        // console.log(new_point +' '+ cam_obj.n_points[id]+ ' ' + cam_source.cols)
+        hull_points.push(new_point)
+    }
+    let mainMat = cv.Mat.zeros(cam_obj.w, cam_obj.h, cv.CV_8UC3);
+    let hull = nestedPointsArrayToMat(hull_points);
+    // make a fake hulls vector
+    let hulls = new cv.MatVector();
+    // add the recently created hull
+    hulls.push_back(hull);
+    // test drawing it
+    cv.drawContours(mainMat, hulls, 0, [255,255,255,0], -1, 8);
+
+    // ROIs
+    cam_mask = mainMat.roi(bb_cam_rect)
+    cam_roi= cam_source.roi(bb_cam_rect)
+    ref_roi = ref.roi(bb_ref_rect);
+
+    const dsize = new cv.Size(cam_roi.cols, cam_roi.rows)
+    const dsize_back = new cv.Size(ref_roi.cols, ref_roi.rows)
+
+    cv.cvtColor(cam_mask,cam_mask, cv.COLOR_RGBA2GRAY, 0)
+    cv.bitwise_not(cam_mask, cam_mask_inv);
+    // Create a mask of cam_roi and create its inverse mask also
+    // cv.cvtColor(cam_roi, mask, cv.COLOR_RGBA2GRAY, 0);
+    mask = laplacian(cam_roi, cam_roi.cols, cam_roi.rows)
+    cv.bitwise_and(mask,mask, new_mask, cam_mask)
+    cv.flip(new_mask, new_mask,1)
+    cv.bitwise_not(new_mask, maskInv);
+
+    cv.resize(ref_roi, ref_roi, dsize, 0, 0, cv.INTER_LINEAR )
+
+    cv.cvtColor(new_mask, color_new_mask, cv.COLOR_GRAY2RGBA, 0)
+    cv.add(ref_roi,color_new_mask,sum)
+
+    cv.resize(sum, sum, dsize_back, 0, 0, cv.INTER_LINEAR )
+    cv.resize(cam_roi, cam_roi, dsize_back, 0, 0, cv.INTER_LINEAR )
+
+    // const dsize = new cv.Size(canvas.offsetWidth, canvas.offsetHeight)
+    // cv.resize(mask, mask, dsize, 0, 0, cv.INTER_LINEAR);
+    //
+
+    dst = ref.clone();
+    for (let i = 0; i < cam_roi.rows; i++) {
+        for (let j = 0; j < cam_roi.cols; j++) {
+            dst.ucharPtr(i+ref_bb.yMin, j+ref_bb.xMin)[0] = sum.ucharPtr(i, j)[0];
+            dst.ucharPtr(i+ref_bb.yMin, j+ref_bb.xMin)[1] = sum.ucharPtr(i, j)[1];
+            dst.ucharPtr(i+ref_bb.yMin, j+ref_bb.xMin)[2] = sum.ucharPtr(i, j)[2]
+        }
+    }
+    let canvas_size =  new cv.Size(middle.offsetWidth, middle.offsetWidth)
+
+    console.log('Ref ' +dst.cols+ ' x ' +dst.rows + '/n'
+                +'minmax bb '+ ref_bb.xMin + ', '+ ref_bb.yMin)
+    cv.resize(dst, dst, canvas_size, 0, 0, cv.INTER_LINEAR )
+    cv.imshow(canvas, dst);
+    ref.delete(); dst.delete(); cam_roi.delete(); ref_roi.delete(); mask.delete();
+    maskInv.delete(); sum.delete(); hull.delete(); mainMat.delete()
+}
+function nestedPointsArrayToMat(points){
+    return cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat());
+}
+function mask_img(masked, img, mask, mask_inv){
+    let imgBg = new cv.Mat(masked.cols,masked.rows,  cv.CV_8UC4);
+    let imgFg = new cv.Mat(masked.cols,masked.rows,  cv.CV_8UC4);
+    let sum = new cv.Mat();
+        // Black-out the area of logo in ROI
+    cv.bitwise_and(masked, masked, imgBg, mask_inv);
+
+// Take only region of logo from logo image
+    cv.bitwise_and(img, img, imgFg, mask_inv);
+
+// Put logo in ROI and modify the main image
+    cv.add(imgBg, imgFg, sum);
+    imgBg.delete(); imgFg.delete()
+    return sum
+}
+function laplacian(src, width, height) {
+    const dstC1 = new cv.Mat(height, width, cv.CV_8UC1)
+    const mat = new cv.Mat(height, width, cv.CV_8UC1);
+    cv.cvtColor(src, mat, cv.COLOR_RGB2GRAY);
+    cv.Laplacian(mat, dstC1, cv.CV_8U, 5, 1, 0, cv.BORDER_DEFAULT);
+    mat.delete();
+    return dstC1;
 }
 const accessCamera = () => {
     navigator.mediaDevices
         .getUserMedia({
-            video: {width: 500, height: 400},
+            video: {width: 640, height: 480},
             audio: false,
         })
         .then((stream) => {
@@ -597,26 +716,35 @@ function match(angles_cam, angles_ref){
 
 
 }
-
+let cam_face;
 async  function detectFaces(){
     let lmrks = [];
     let points = []
-    let bb, angles
+    let angles, hull, video_bb
     let frame_roi;
+    cam_face = new Face('cam', video)
+    cam_face.w=video.width;
+    cam_face.h=video.height;
+
     const cam_promise = calc_lmrks(video, 'cam')
     cam_promise
         .then((value) => {
             // console.log('value');
             // console.log(value);
-            lmrks = value[0]//This is a fulfilled promise  👈
-            points = value[1]
-            bb = value[2]
-            angles = value[3]
+            cam_face.lmrks = value[0];//This is a fulfilled promise  👈
+            cam_face.points = value[1];
+            cam_face.bb = value[2];
+            cam_face.angles = value[3];
+            cam_face.hull = convex_hull(value[1], value[2], 'cam');
+            cam_face.n_points = cam_face.normalize_array(value[1])
+            
             // console.log(bb)
             if (selected) {
-                match(angles, faces_arr[selected].angles)
+                draw_mask_on_ref(video, cam_face)
+                match(cam_face.angles, faces_arr[selected].angles)
             }
-            cv_draw(video, bb, lmrks)
+            // cv_draw(video, video_bb)
+
             // console.log(angles)
         })
         .catch((err) => {
@@ -630,8 +758,8 @@ async  function detectFaces(){
 function resizeCanvas() {
     canvas.width =  middle.offsetWidth ;
     canvas.height = middle.offsetWidth ;
-    output.width =  middle.offsetWidth ;
-    output.height = middle.offsetWidth ;
+    // output.width =  middle.offsetWidth ;
+    // output.height = middle.offsetWidth ;
     /**
      * Your drawings need to be inside this function otherwise they will be reset when
      * you resize the browser window and the canvas goes will be cleared.
@@ -652,7 +780,7 @@ accessCamera();
 // });
 window.addEventListener('resize', resizeCanvas, false);
 video.addEventListener("loadeddata", async () => {
-    setInterval(detectFaces, 1000
+    setInterval(detectFaces, 100
     );
 });
 

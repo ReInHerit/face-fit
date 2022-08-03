@@ -3,7 +3,8 @@ const ref_img = document.getElementById("ref_img");
 const video = document.getElementById("webcam");
 const middle = document.getElementById("middle");
 const canvas = document.getElementById("canvas");
-let context, RAF_timerID, facemesh_drawn, cam_face, faces, container, detector, selected;
+const body = document.body
+let context, RAF_timerID, facemesh_drawn, cam_face, faces, container, detector, selected, cam_mat, ref_mat;
 let cam_landmarks = [], cam_box = [], btns=[], faces_arr=[], all_btns = [], all_btns_indices = []
 const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
 const detectorConfig = {
@@ -77,7 +78,7 @@ function path_adjusted(url) {
 
 async function init() {
     detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-    fetch(path_adjusted('../TRIANGULATION.json')).then(response => response.json()).then(data => {TRIANGULATION=data});
+    fetch(path_adjusted('../TRIANGULATION2.json')).then(response => response.json()).then(data => {TRIANGULATION=data});
     container = document.querySelector("#left");
     btns = container.querySelectorAll("div.select_ch.slick-slide:not(.slick-cloned) >button");
     all_btns = container.querySelectorAll("div.slick-slide >button");
@@ -97,6 +98,7 @@ async function init() {
         f.bb = values[2];
         f.angles = values[3];
         f.hull = convex_hull(values[1], values[2]);
+        f.expression = check_expression(values[1])
         faces_arr.push(f)
     }
     for (let j = 0; j<all_btns.length; j++) {
@@ -130,6 +132,7 @@ function Face(which, image) {
     this.bb = [];
     this.hull = [];
     this.n_points = []
+    this.expression = []
 
     this.normalize_array= function (pix_points) {
         let n_array = [...pix_points];
@@ -477,6 +480,36 @@ function cv_draw(webcam, bb){
     dst.delete();
 
 }
+function hull_mask(face_obj){
+    let hull_points = [];
+    for (let el in face_obj.hull){
+        let id = face_obj.hull[el];
+        let new_point = [face_obj.n_points[id][0]*face_obj.w,face_obj.n_points[id][1]*face_obj.h]
+        hull_points.push(new_point)
+    }
+    let convexHullMat = cv.Mat.zeros(face_obj.w, face_obj.h, cv.CV_8UC3);
+    let hull = cv.matFromArray(hull_points.length, 1, cv.CV_32SC2, hull_points.flat());
+    // make a fake hulls vector
+    let hulls = new cv.MatVector();
+    // add the recently created hull
+    hulls.push_back(hull);
+    // test drawing it
+    cv.drawContours(convexHullMat, hulls, 0, [255,255,255,0], -1, 8);
+    hull.delete(); hulls.delete()
+    return convexHullMat
+}
+function mask_from_array(points, w, h){
+    console.log(points + ' ' + w +' '+ h)
+    let mask_from_array_mat = cv.Mat.zeros(w, h, cv.CV_8UC3);
+    let points_to_mat = cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat())
+    let fake_vector = new cv.MatVector();
+    fake_vector.push_back(points_to_mat)
+    cv.drawContours(mask_from_array_mat, fake_vector, 0, [255,255,255,0], -1, 8)
+    fake_vector.delete(); points_to_mat.delete()
+    // cv.imshow(canvas,mask_from_array_mat)
+    return mask_from_array_mat
+}
+
 function draw_mask_on_ref(webcam, cam_obj){
     const ref_bb = faces_arr[selected].bb
     let bb_cam_rect, cam_roi, bb_ref_rect, ref_roi, cam_mask, dst
@@ -491,38 +524,26 @@ function draw_mask_on_ref(webcam, cam_obj){
     let cam_laplacian = new cv.Mat()
     let cam_sobel = new cv.Mat()
     let ref = cv.imread(ref_img)
-    const points_indices = cam_obj.hull;
     let cap = new cv.VideoCapture(webcam);
 
     cap.read(cam_source)
-
+    console.log(cam_source.cols)
+    cam_mat = cam_source.clone()
+    // cv.flip(cam_mat, cam_mat, 1)
     bb_cam_rect = new cv.Rect(cam_obj.bb.xMin,cam_obj.bb.yMin,cam_obj.bb.width,cam_obj.bb.height)
     bb_ref_rect = new cv.Rect(ref_bb.xMin,ref_bb.yMin,ref_bb.width,ref_bb.height);
 
     ///// calcolo convex hull mak
-    let hull_points = [];
-    for (let el in points_indices){
-        let id = points_indices[el];
-        let new_point = [cam_obj.n_points[id][0]*cam_source.cols,cam_obj.n_points[id][1]*cam_source.rows]
-        hull_points.push(new_point)
-    }
-    let convexHullMat = cv.Mat.zeros(cam_obj.w, cam_obj.h, cv.CV_8UC3);
-    let hull = nestedPointsArrayToMat(hull_points);
-    // make a fake hulls vector
-    let hulls = new cv.MatVector();
-    // add the recently created hull
-    hulls.push_back(hull);
-    // test drawing it
-    cv.drawContours(convexHullMat, hulls, 0, [255,255,255,0], -1, 8);
+    let convexHullMat = hull_mask(cam_obj)
 
     // ROIs
     cam_mask = convexHullMat.roi(bb_cam_rect)
     cam_roi= cam_source.roi(bb_cam_rect)
     ref_roi = ref.roi(bb_ref_rect);
-
+    // sizes
     const dsize = new cv.Size(cam_roi.cols, cam_roi.rows)
     const dsize_back = new cv.Size(ref_roi.cols, ref_roi.rows)
-
+    // create inverse cam mask
     cv.cvtColor(cam_mask,cam_mask, cv.COLOR_RGBA2GRAY, 0)
     cv.bitwise_not(cam_mask, cam_mask_inv);
 
@@ -562,7 +583,9 @@ function draw_mask_on_ref(webcam, cam_obj){
     cv.resize(dst, dst, last_size, 0, 0, cv.INTER_LINEAR )
     cv.imshow(canvas, dst);
     ref.delete(); dst.delete(); cam_roi.delete(); ref_roi.delete(); mask.delete();
-    maskInv.delete(); sum.delete(); hull.delete(); convexHullMat.delete()
+    maskInv.delete(); sum.delete(); convexHullMat.delete(); cam_mask.delete();
+    new_mask.delete(); color_new_mask.delete(); cam_source.delete(); cam_mask_inv .delete(); cam_roi_gray.delete();
+    cam_laplacian.delete(); cam_sobel.delete(); pass.delete();
 }
 function nestedPointsArrayToMat(points){
     return cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat());
@@ -593,7 +616,7 @@ function laplacian(src, width, height) {
 const accessCamera = () => {
     navigator.mediaDevices
         .getUserMedia({
-            video: {width: 640, height: 480},
+            video: {width: 1280, height: 960},
             audio: false,
         })
         .then((stream) => {
@@ -605,23 +628,166 @@ const accessCamera = () => {
         });
 };
 
+function check_expression(landmarks){
+    function calc_division(land_id1, land_id2, land_id3, land_id4) {
+        const p1 = [land_id1[0], land_id1[1], 0]
+        const p2 = [land_id2[0], land_id2[1], 0]
+        const p3 = [land_id3[0], land_id3[1], 0]
+        const p4 = [land_id4[0], land_id4[1], 0]
+        const p4_p3 = ((p4[0] - p3[0]) ** 2 + (p4[1] - p3[1]) ** 2 + (p4[2] - p3[2]) ** 2) ** 0.5
+        const p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2) ** 0.5
+        // const division = p4_p3 / p2_p1
+        // center = find_center(np.array([p1, p2, p3, p4]))
+        return p4_p3 / p2_p1//, center
+    }
+// l_eye
+    let l_e, r_e, lips
+    const l_division = calc_division(landmarks[362], landmarks[263], landmarks[386], landmarks[374])
+
+    l_division <= 0.1 ? l_e = 'closed' : l_e = 'opened';
+// r_eye
+    const r_division = calc_division(landmarks[33], landmarks[133], landmarks[159], landmarks[145])
+    r_division <= 0.1 ? r_e = 'closed' : r_e = 'opened';
+
+// Mouth
+    const lips_division= calc_division(landmarks[78], landmarks[308], landmarks[13], landmarks[14])
+    lips_division < 0.15 ? lips = 'closed' : 0.15 <= lips_division < 0.4 ? lips = 'opened' : lips = 'full opened';
+
+    return [l_e, r_e, lips]
+}
 function match(angles_cam, angles_ref){
-    // console.log(angles_cam)
-    // console.log(angles_ref)
-    const delta = 5;
-    if (angles_cam[0]>= angles_ref[0] - delta && angles_cam[0]<= angles_ref[0] + delta){
-        // console.log('matched 1')
+    const delta = 10;
+    if ((angles_cam[0]>= angles_ref[0] - delta && angles_cam[0] <= angles_ref[0] + delta) &&
+    (angles_cam[1]>= 180- angles_ref[1] - delta && angles_cam[1]<= 180-angles_ref[1] + delta) &&
+    (angles_cam[2]>= -angles_ref[2] - delta/2 && angles_cam[2]<= -angles_ref[2] + delta/2)){
+        console.log('match1')
+        if (cam_face.expression.toString() === faces_arr[selected].expression.toString()) {
+            console.log('match2')
+            swap_face(cam_face,faces_arr[selected])
+            selected = -1
+        }
     }
-    if (angles_cam[1]>= angles_ref[1] - delta && angles_cam[1]<= angles_ref[1] + delta){
-        // console.log('matched 2')
-    }
-    if (angles_cam[2]>= angles_ref[2] - delta && angles_cam[2]<= angles_ref[2] + delta){
-        // console.log('matched 3')
-    }
+}
+function swap_face(source_obj, target_obj) {
+    const source = source_obj.image
+    const target = target_obj.image
+    const source_points = source_obj.points
+    const target_points = target_obj.points
+    let mask = hull_mask(source_obj)
+    cv.cvtColor(mask, mask, cv.COLOR_RGB2GRAY)
+    const mid = cv.moments(mask, false)
+    const center = (Math.round(mid['m10'] / mid['m00']), Math.round(mid['m01'] / mid['m00']))
+    let new_target_face = cv.Mat.zeros(target_obj.w, target_obj.h, cv.CV_8UC3);
+    let tris1 = [], tris2 = [];
+    for (let i in TRIANGULATION){
+        // console.log(i+ ' '+ TRIANGULATION[i])
+        let tri1 = [], tri2 = [];
+        const tris_indices = TRIANGULATION[i]
+        for (let j = 0; j < 3; j++) {
+            tri1.push([source_points[tris_indices[j]][0],source_points[tris_indices[j]][1]])
+            tri2.push([target_points[tris_indices[j]][0],target_points[tris_indices[j]][1]])
 
+            // tri1.push(new cv.Point(source_points[tris_indices[j]][0],source_points[tris_indices[j]][1]))
+            // tri2.push(new cv.Point(target_points[tris_indices[j]][0],target_points[tris_indices[j]][1]))
+        }
+        tris1.push(tri1)
+        tris2.push(tri2)
+    }
+    console.log(tris1[45])
+    console.log(tris2[68])
+    warp_triangle(cam_mat, faces_arr[selected].image, tris1[68], tris2[68])
+    for (let i in tris1) {
+        // console.log(tris1[i])
 
+        // warp_triangle(cam_mat, new_target_face, tris1[i], tris2[i])
+    }
 }
 
+function warp_triangle(img1, img2, t1, t2 ){
+    console.log(img1.cols + ' ' + img1.rows)
+    let target=cv.imread(ref_img)
+    let bb1={
+        // minX: Math.min(t1[0].x, t1[1].x, t1[2].x),
+        // minY: Math.min(t1[0].y, t1[1].y, t1[2].y),
+        // maxX: Math.max(t1[0].x, t1[1].x, t1[2].x),
+        // maxY: Math.max(t1[0].y, t1[1].y, t1[2].y),
+        minX: Math.min(t1[0][0], t1[1][0], t1[2][0]),
+        minY: Math.min(t1[0][1], t1[1][1], t1[2][1]),
+        maxX: Math.max(t1[0][0], t1[1][0], t1[2][0]),
+        maxY: Math.max(t1[0][1], t1[1][1], t1[2][1]),
+    }
+    bb1.w= bb1.maxX - bb1.minX
+    bb1.h= bb1.maxY - bb1.minY
+
+    let bb2={
+        // minX: Math.min(t2[0].x, t2[1].x, t2[2].x),
+        // minY: Math.min(t2[0].y, t2[1].y, t2[2].y),
+        // maxX: Math.max(t2[0].x, t2[1].x, t2[2].x),
+        // maxY: Math.max(t2[0].y, t2[1].y, t2[2].y),
+        minX: Math.min(t2[0][0], t2[1][0], t2[2][0]),
+        minY: Math.min(t2[0][1], t2[1][1], t2[2][1]),
+        maxX: Math.max(t2[0][0], t2[1][0], t2[2][0]),
+        maxY: Math.max(t2[0][1], t2[1][1], t2[2][1]),
+    }
+    bb2.w= bb2.maxX - bb2.minX
+    bb2.h= bb2.maxY - bb2.minY
+    if ( bb1.w>> 0 || bb1.h >>0 || bb2.w>> 0 || bb2.h >>0){
+        const r1 = new cv.Rect(bb1.minX,bb1.minY,bb1.w,bb1.h);
+        const r2 = new cv.Rect(bb2.minX,bb2.minY,bb2.w,bb2.h);
+        let roi_t1 = img1.roi(r1)
+        // console.log(roi_t1)
+        let roi_t2 = target.roi(r2)
+        // let zero_roi = cv.Mat.zeros(bb1.w, bb1.h, cv.CV_8UC3);
+        let mask_t1 = mask_from_array(t1, cam_face.w,cam_face.h)
+        let mask_t2 = mask_from_array(t2, target.cols, target.rows)
+        let roi_mask_t2_inv = new cv.Mat()
+        // cv.bitwise_not(mask_t2,mask_t2_inv)
+        let roi_mask_t1 = mask_t1.roi(r1)
+        let roi_mask_t2 = mask_t2.roi(r2)
+        cv.cvtColor(roi_mask_t1,roi_mask_t1, cv.COLOR_RGBA2GRAY, 0)
+        cv.cvtColor(roi_mask_t2,roi_mask_t2, cv.COLOR_RGBA2GRAY, 0)
+        cv.bitwise_not(roi_mask_t2,roi_mask_t2_inv)
+        let masked_t1 = new cv.Mat()
+        // console.log(roi_t1.type() + ' '+ masked_t1.type() + ' '+ mask_t1.type()+roi_t1.cols + ' '+ masked_t1.cols + ' '+ mask_t1.cols)
+        cv.bitwise_and(roi_t1, roi_t1, masked_t1, roi_mask_t1)
+        //normalize points , inverting x values in t1
+        let n_t1 = [], n_t2 = []
+        for (let i=0; i<3; i++){
+            let new_point1 = [((t1[i][1]- bb1.minY)/(bb1.maxY-bb1.minY)),1-(t1[i][0]- bb1.minX)/(bb1.maxX-bb1.minX) ]
+            n_t1.push(new_point1)
+            let new_point2 = [(t2[i][0]- bb2.minX)/(bb2.maxX-bb2.minX), (t2[i][1]- bb2.minY)/(bb2.maxY-bb2.minY)]
+            n_t2.push(new_point2)
+        }
+        // for (let i = 0; i<3; i++) {
+        // }
+
+        // cv.flip(masked_t1, masked_t1, 1)
+        let srcTri = cv.matFromArray(3, 1, cv.CV_32FC2, n_t1.flat());
+        let dstTri = cv.matFromArray(3, 1, cv.CV_32FC2, n_t2.flat());
+        console.log( srcTri)
+        console.log( dstTri)
+        let dsize = new cv.Size(bb2.w, bb2.h);
+        let M = cv.getAffineTransform(srcTri, dstTri);
+        let warped = roi_t2.clone()//roi_t2.clone()
+        ////WARPED not working
+        cv.resize(masked_t1, masked_t1, dsize, 0, 0, cv.INTER_LINEAR )
+        cv.warpAffine(masked_t1, warped, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+        let mix = mask_img( roi_t2, warped, roi_mask_t2,roi_mask_t2_inv)
+        let dst = target.clone();
+        for (let i = 0; i < roi_t2.rows; i++) {
+            for (let j = 0; j < roi_t2.cols; j++) {
+                dst.ucharPtr(i+bb2.minY, j+bb2.minX)[0] = roi_t2.ucharPtr(i, j)[0];
+                dst.ucharPtr(i+bb2.minY, j+bb2.minX)[1] = roi_t2.ucharPtr(i, j)[1];
+                dst.ucharPtr(i+bb2.minY, j+bb2.minX)[2] = roi_t2.ucharPtr(i, j)[2]
+            }
+        }
+        cv.imshow(canvas, warped)
+        mask_t1.delete(); masked_t1.delete(); roi_t1.delete();//srcTri.delete();dstTri.delete();roi_t2.delete();
+        roi_mask_t1.delete();M.delete();dst.delete()
+    }
+
+    // cv.fillConvexPoly(mask, new_triangle,t2,3, new cv.Scalar(1,1,1,1) )
+}
 async  function detectFaces(){
     cam_face = new Face('cam', video)
     cam_face.w=video.width;
@@ -638,7 +804,7 @@ async  function detectFaces(){
             cam_face.angles = value[3];
             cam_face.hull = convex_hull(value[1], value[2]);
             cam_face.n_points = cam_face.normalize_array(value[1])
-            
+            cam_face.expression = check_expression(value[1])
             // console.log(bb)
             if (selected>=0) {
                 draw_mask_on_ref(video, cam_face)
@@ -677,10 +843,12 @@ accessCamera();
 //
 // });
 window.addEventListener('resize', resizeCanvas, false);
-video.addEventListener("loadeddata", async () => {
-    setInterval(detectFaces, 100
-    );
-});
+video.addEventListener('loadeddata',function() {
+    body.classList.add('loaded')
+    setInterval(detectFaces, 100);})
+// video.addEventListener("loadeddata", async () => {
+//     setInterval(detectFaces, 100);
+// });
 
 ////////////////////////////////////////
 

@@ -35,7 +35,7 @@ fs.readdir(directoryPath, function (err, files) {
     }
     files.forEach(function (file) {
         const stats = fs.statSync(directoryPath +'/'+ file);
-        if (stats.isFile() == true) {
+        if (stats.isFile() === true) {
             ref_images.push('images/' + file);
         }
     });

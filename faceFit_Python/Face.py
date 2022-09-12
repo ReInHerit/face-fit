@@ -125,13 +125,13 @@ class Face:
                 self.np_image = np.asarray(self.np_image)
 
     def self_hud_mask(self):
-        img1_points = self.pix_points
         # Find convex hull
-        hull_index = cv2.convexHull(np.array(img1_points), returnPoints=False)
+        # print(np.array(self.pix_points))
+        hull_index = cv2.convexHull(np.array(self.pix_points), returnPoints=False)
         # Create convex hull lists
         hull = []
         for i in range(0, len(hull_index)):
-            hull.append(img1_points[hull_index[i][0]])
+            hull.append(self.pix_points[hull_index[i][0]])
         # Calculate Mask for Seamless cloning
         hull_8u = []
         for i in range(0, len(hull)):

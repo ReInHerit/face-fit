@@ -7,7 +7,6 @@ import os
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 
 from kivy.uix.widget import Widget
-from skimage import filters as filters
 
 import kivy
 from kivy.app import App
@@ -18,22 +17,6 @@ from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 
 import Face as F_obj
-# from CustomModules import CustomGraphics
-# from kivy.metrics import dp
-# from kivy.graphics import Color, Rectangle
-# from kivy.uix.progressbar import ProgressBar
-# from kivy.uix.label import Label
-
-# from kivy.uix.boxlayout import BoxLayout
-# from kivy.uix.gridlayout import GridLayout
-# from kivy.uix.scrollview import ScrollView
-# from skimage import exposure
-# from skimage.exposure import match_histograms as mh
-# from kivy.base import EventLoop
-# # from kivy.lang import builder
-# from kivy.uix.button import Button
-from color_transfer import color_transfer
-import blend_modes
 
 kivy.require("1.9.1")
 ref_files = []
@@ -53,8 +36,10 @@ pb_rots = []
 delta = 7
 final_morphs = {}
 morph_texture = {}
-capture = None
+# capture = None
 filled = []
+valid_images = [".jpg", ".gif", ".png", ".tga"]
+cam_obj = F_obj.Face('cam')
 
 try:
     project_path = os.path.dirname(os.path.abspath(__file__))
@@ -101,7 +86,8 @@ class MyButton(ToggleButtonBehavior, Image):
         buf_butt = cv2.flip(im, 0)  # flip upside down
         image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
         image_texture.blit_buffer(buf_butt.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
-        return image_texture
+        if self:
+            return image_texture
 
 
 class MyCamera(Image):
@@ -116,7 +102,7 @@ class MyCamera(Image):
         Clock.schedule_interval(self.update, 1.0/ 30)  # Set drawing interval
 
     def update(self, dt):
-        global selected, view, pb_rots, view_source, last_match, morph_texture
+        global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj
         self.selected = selected
         if self.selected != -1:
 
@@ -125,51 +111,50 @@ class MyCamera(Image):
 
             self.texture = view.texture
             if success:
+
                 image.flags.writeable = True
                 cam_obj.get_landmarks(image)
                 # # DRAW LANDMARKS
                 # cam_obj.draw('contours')
                 # cam_obj.draw('tessellation')
-                c_rot[0] = str(int(cam_obj.beta))
-                c_rot[1] = str(int(cam_obj.alpha))
-                c_rot[2] = str(int(cam_obj.tilt['angle']))
+                if cam_obj.pix_points:
+                    c_rot[0] = str(int(cam_obj.beta))
+                    c_rot[1] = str(int(cam_obj.alpha))
+                    c_rot[2] = str(int(cam_obj.tilt['angle']))
 
-                perc_x = 100 - abs(ref[self.selected].beta - cam_obj.beta)
-                perc_y = 100 - abs(ref[self.selected].alpha - cam_obj.alpha)
-                perc_z = 100 - abs(ref[self.selected].tilt['angle'] - cam_obj.tilt['angle'])
-                pb_rots = [perc_x, perc_y, perc_z]
-                # print(cam_obj.pix_points)
-                overlaid = self.cut_paste(ref[self.selected], cam_obj)
+                    perc_x = 100 - abs(ref[self.selected].beta - cam_obj.beta)
+                    perc_y = 100 - abs(ref[self.selected].alpha - cam_obj.alpha)
+                    perc_z = 100 - abs(ref[self.selected].tilt['angle'] - cam_obj.tilt['angle'])
+                    pb_rots = [perc_x, perc_y, perc_z]
+                    overlaid = self.cut_paste(ref[self.selected], cam_obj)
 
-                buf_overlaid = cv2.flip(overlaid, 0).tobytes()
-                texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
-                texture.blit_buffer(buf_overlaid, colorfmt='bgr', bufferfmt='ubyte')
+                    buf_overlaid = cv2.flip(overlaid, 0).tobytes()
+                    texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
+                    texture.blit_buffer(buf_overlaid, colorfmt='bgr', bufferfmt='ubyte')
 
-                self.texture = texture
-                if match():
-                    path = morph_path + 'morph_' + str(self.selected) + '.png'
-                    cv2.imwrite(path, final_morphs[self.selected])
+                    self.texture = texture
+                    if match():
+                        path = morph_path + 'morph_' + str(self.selected) + '.png'
+                        cv2.imwrite(path, final_morphs[self.selected])
+                        cam_obj = F_obj.Face('cam')
+                        buttons[self.selected].state = 'normal'
+                        buttons[self.selected].height = 150
+                        last_morphed = cv2.imread(path)
+                        print(last_morphed.dtype)
+                        buf_morph = cv2.flip(last_morphed, 0).tobytes()
+                        morph_texture[self.selected] = Texture.create(size=(last_morphed.shape[0],last_morphed.shape[1]), colorfmt='bgr')
+                        morph_texture[self.selected].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
+                        for i in range(0, 3):
+                            c_rot[i] = '-'
+                            r_rot[i] = '-'
+                            pb_rots[i] = 0
 
-                    buttons[self.selected].state = 'normal'
-                    buttons[self.selected].height = 150
-                    last_morphed = cv2.imread(path)
-                    print(last_morphed.dtype)
-                    buf_morph = cv2.flip(last_morphed, 0).tobytes()
-                    # cv2.imshow('morph', last_morphed)
-                    # cv2.waitKey(0)
-                    morph_texture[self.selected] = Texture.create(size=(last_morphed.shape[0],last_morphed.shape[1]), colorfmt='bgr')
-                    morph_texture[self.selected].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
-                    for i in range(0, 3):
-                        c_rot[i] = '-'
-                        r_rot[i] = '-'
-                        pb_rots[i] = 0
-
-                    self.texture = morph_texture[self.selected]
-                    # ids.view.texture = self.texture
-                    result_buttons[self.selected].texture = morph_texture[self.selected]
-                    last_match = selected
-                    filled.append(last_match)
-                    selected = -1
+                        self.texture = morph_texture[self.selected]
+                        # ids.view.texture = self.texture
+                        result_buttons[self.selected].texture = morph_texture[self.selected]
+                        last_match = selected
+                        filled.append(last_match)
+                        selected = -1
             else:
                 print('camera not ready')
         else:
@@ -195,7 +180,7 @@ class MyCamera(Image):
         img2 = c_obj.image
         mask2 = c_obj.self_hud_mask()
         mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
-        # cut roi face from cam
+
         temp1 = img1.copy()
         temp2 = img2.copy()
         masked2 = cv2.bitwise_and(temp2, temp2, mask=mask2gray)
@@ -236,10 +221,12 @@ class MyCamera(Image):
         cropped2 = cv2.resize(cropped2, ((new_max_x - new_min_x), (new_max_y - new_min_y)),
                               interpolation=cv2.INTER_LINEAR)
 
-        edged_2 = find_edges(cropped2, 3, 1, 1, 3)
+        edged = find_edges(cropped2, 3, 1, 1, 3)
 
         copied = temp1[new_min_y:new_max_y, new_min_x:new_max_x]
-        copied = cv2.addWeighted(copied, 1, edged_2, .99, 1)
+        print(copied.shape, edged.shape)
+        if copied.shape == edged.shape:
+            copied = cv2.addWeighted(copied, 1, edged, .99, 1)
         temp1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
         return temp1
 
@@ -471,9 +458,6 @@ def match_histograms(src_image, ref_image):
     blue_after_transform = cv2.LUT(src_b, blue_lookup_table)
     green_after_transform = cv2.LUT(src_g, green_lookup_table)
     red_after_transform = cv2.LUT(src_r, red_lookup_table)
-    # cv2.imshow('b', blue_after_transform)
-    # cv2.imshow('g', green_after_transform)
-    # cv2.imshow('r', red_after_transform)
     # Put the image back together
     image_after_matching = cv2.merge([blue_after_transform, green_after_transform, red_after_transform])
     image_after_matching = cv2.convertScaleAbs(image_after_matching)
@@ -501,27 +485,6 @@ def find_edges(img, blur_size, dx, dy, ksize):
 
 # Morph Functions
 
-# def hud_mask(mask_obj, masked_obj):
-#     cam_points = mask_obj.pix_points
-#     ref_points = masked_obj.pix_points
-#     # Find convex hull
-#     hull_index = cv2.convexHull(np.array(cam_points), returnPoints=False)
-#     # Create convex hull lists
-#     # hull1 = []
-#     hull2 = []
-#     for i in range(0, len(hull_index)):
-#         # hull1.append(cam_points[hull_index[i][0]])
-#         hull2.append(ref_points[hull_index[i][0]])
-#     # Calculate Mask for Seamless cloning
-#     hull_8u = []
-#     for i in range(0, len(hull2)):
-#         hull_8u.append((hull2[i][0], hull2[i][1]))
-#
-#     mask = np.zeros(masked_obj.image.shape, dtype=masked_obj.image.dtype)
-#     cv2.fillConvexPoly(mask, np.int32(hull_8u), (255, 255, 255))
-#     return mask
-
-
 def apply_affine_transform(src, src_tri, dst_tri, siz):
     warp_mat = cv2.getAffineTransform(np.float32(src_tri), np.float32(dst_tri))
     # Apply the Affine Transform just found to the src image
@@ -548,7 +511,7 @@ def warp_triangle(img1, img2, t1, t2):
 
     # Apply warpImage to small rectangular patches
     img1_rect = img1[y1:y1 + h1, x1:x1 + w1]
-    size = (w2, h2)  # forse da invertire
+    size = (w2, h2)
     img2_rect = apply_affine_transform(img1_rect, t1_rect, t2_rect, size)
 
     img2_rect = img2_rect * mask
@@ -561,49 +524,51 @@ def warp_triangle(img1, img2, t1, t2):
 def morph(c_obj, r_obj):
     ref_image = r_obj.image
     cam_image = c_obj.image
-
+    MASK_DILATE_ITER = 15
+    MASK_ERODE_ITER = 20
+    BLUR = 35
     cam_points = c_obj.pix_points
     ref_points = r_obj.pix_points
-    offset = 10
-    cc_r_image = (255 * ref_image).astype(np.uint8)
-    cc_c_image = (255 * cam_image).astype(np.uint8)
+    offset = 5
     cc_r_roi = ref_image[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
                r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
     cc_c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
-    # cam_cc = cv2.cvtColor(color_correct(cam_image, ref_image), cv2.COLOR_BGRA2BGR)
     cam_cc = match_histograms(cc_c_roi, cc_r_roi)
-    # cam_cc = cv2.cvtColor(match_histograms(cc_c_roi, cc_r_roi), cv2.COLOR_BGRA2BGR)
-    cam_rgb =cv2.cvtColor(cam_cc,cv2.COLOR_BGR2RGB)
-
-
-    cv2.waitKey(0)
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset, c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = \
         cam_cc.astype('float64')
-    # cv2.imshow('0', cam_image)
     # Find convex hull
-    hull_index = cv2.convexHull(np.array(cam_points), returnPoints=False)
+    cam_hull = cv2.convexHull(np.array(cam_points), returnPoints=False)
+    ref_hull = cv2.convexHull(np.array(ref_points))
+    ref_hull_ids = cv2.convexHull(np.array(ref_points), returnPoints=False)
     # Create convex hull lists
-    # hull1 = []
-    hull = []
-    for i in range(0, len(hull_index)):
-        # hull1.append(cam_points[hull_index[i][0]])
-        hull.append(ref_points[hull_index[i][0]])
+    hull1 = []
+    hull2 = []
+    for i in range(0, len(cam_hull)):
+        hull1.append(ref_points[cam_hull[i][0]])
+    for i in range(0, len(ref_hull_ids)):
+        hull2.append(ref_points[ref_hull_ids[i][0]])
     # Calculate Mask for Seamless cloning
-    hull_8u = []
-    for i in range(0, len(hull)):
-        hull_8u.append((hull[i][0], hull[i][1]))
-
-    mask = np.zeros(ref_image.shape, dtype=ref_image.dtype)
-    cv2.fillConvexPoly(mask, np.int32(hull_8u), (255, 255, 255))
-    gray_mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray_mask, 127, 255, 0)
-    M = cv2.moments(thresh)    # mid = cv2.moments(mask[:, :, 1])  # Find Centroid
-    center = (int(M['m10'] / M['m00']), int(M['m01'] / M['m00']))
-
+    hull_1u = []
+    hull_2u = []
+    for i in range(0, len(hull1)):
+        hull_1u.append((hull1[i][0], hull1[i][1]))
+    for i in range(0, len(hull2)):
+        hull_2u.append((hull2[i][0], hull2[i][1]))
+    # mask = np.zeros(ref_image.shape, dtype=ref_image.dtype)
+    # cv2.fillConvexPoly(mask, np.int32(hull_1u), (255, 255, 255))
+    # mask2 = np.zeros(ref_image.shape, dtype=ref_image.dtype)
+    # cv2.fillConvexPoly(mask2, np.int32(hull_2u), (255, 255, 255))
+    # cv2.imshow('', mask)
+    # cv2.imshow('2', mask2)
+    # # cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    # #############
+    # mid = cv2.moments(mask[:, :, 1])  # Find Centroid
+    # center = (int(mid['m10'] / mid['m00']), int(mid['m01'] / mid['m00']))
+    # mid2 = cv2.moments(mask2[:, :, 1])  # Find Centroid
+    # center2 = (int(mid2['m10'] / mid2['m00']), int(mid2['m01'] / mid2['m00']))
+    # print(center , center2)
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
-    ref_conv_hull = cv2.convexHull(np.array(ref_points))
-
     dt = media_pipes_tris  # triangles
     tris1 = []
     tris2 = []
@@ -619,81 +584,32 @@ def morph(c_obj, r_obj):
     for i in range(0, len(tris1)):
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
     # GENERATE FINAL IMAGE
+    cv2.imshow('1', ref_new_face)
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
     ref_img_mask = np.zeros_like(ref_gray)
-
-
-    ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_conv_hull, 255)
-    # ref_face_mask = cv2.GaussianBlur(ref_face_mask, (15, 15), sigmaX=0, sigmaY=0)
+    ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_hull, 255)
+    ref_face_mask = cv2.dilate(ref_face_mask, None, iterations=MASK_DILATE_ITER)
+    ref_face_mask = cv2.erode(ref_face_mask, None, iterations=MASK_ERODE_ITER)
+    ref_face_mask = cv2.GaussianBlur(ref_face_mask, (BLUR, BLUR), sigmaX=0, sigmaY=0)
+    mid3 = cv2.moments(ref_face_mask)  # Find Centroid
+    center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
+    cv2.imshow('3', ref_face_mask)
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = ref_new_face.astype('float') / 255
     out_bg = ref_image.astype('float') / 255
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
-    # cv2.imshow('1', out)
-    # cv2.imshow('3', ref_image)
-    # cv2.imshow('3', ref_face_mask)
+    # center = int(ref_image.shape[0]/2), int(ref_image.shape[1]/2)
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
-    # cv2.imshow('2', output)
+    # output = cv2.addWeighted(out,.5,output,.5,0)
     return output
 
 
-# Color Correction Functions
-def sharpen(img):
-    # convert to gray
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # blur
-    smooth = cv2.GaussianBlur(gray, (99, 99), 0)
-
-    # divide gray by morphology image
-    division = cv2.divide(gray, smooth, scale=255)
-
-    # sharpen using unsharp masking
-    sharp = filters.unsharp_mask(division, radius=20, amount=2, preserve_range=False)
-    sharp = (255 * sharp).clip(0, 255).astype(np.uint8)
-
-    # threshold
-    thresh = cv2.threshold(sharp, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-    return sharp
-
-
-def color_correct(cam_img, ref_img):
-    roi1 = cam_img[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
-    roi2 = ref_img[ref[selected].bb_p1[1]:ref[selected].bb_p2[1], ref[selected].bb_p1[0]:ref[selected].bb_p2[0]]
-    sharp = sharpen(cam_img)
-    sharp_roi1 = sharp[cam_obj.bb_p1[1]:cam_obj.bb_p2[1], cam_obj.bb_p1[0]:cam_obj.bb_p2[0]]
-    sharp_roi1 = cv2.GaussianBlur(sharp_roi1, (11, 11), 0)
-
-    # transfer the color distribution from the source image to the target image
-    roi1 = color_transfer(roi2, roi1, clip=True, preserve_paper=False)
-
-    b_channel, g_channel, r_channel = cv2.split(roi1)
-    alpha_channel = np.ones(b_channel.shape, dtype=b_channel.dtype)  # creating a dummy alpha channel image.
-    roi1_4ch = cv2.merge((b_channel, g_channel, r_channel, alpha_channel))
-    sharp_channel, = cv2.split(sharp_roi1)
-    sharp_roi_4ch = cv2.merge((sharp_channel, sharp_channel, sharp_channel, alpha_channel))
-    info_roi1 = np.iinfo(roi1_4ch.dtype)
-    info_sharp = np.iinfo(sharp_roi_4ch.dtype)
-    roi1_norm_float = roi1_4ch.astype(np.float64) / info_roi1.max
-    sharp_norm_float = sharp_roi_4ch.astype(np.float64) / info_sharp.max
-    blended = blend_modes.darken_only(roi1_norm_float, sharp_norm_float, .5)
-    cc_out = (blended * 255).astype('uint8')
-    # cv2.imshow('roi1',roi1)
-    # cv2.imshow('sharp_roi1', sharp_roi1 )
-    # cv2.imshow('cc_out', cc_out)
-    # cv2.imshow('cam_img', cam_img)
-    # cv2.waitKey(0)
-    return cc_out
-
-
-valid_images = [".jpg", ".gif", ".png", ".tga"]
 for filename in glob.iglob(f'{ref_path}*'):
     ext = os.path.splitext(filename)[1]
     if ext.lower() not in valid_images:
         continue
     ref_files.append(filename)
 
-cam_obj = F_obj.Face('cam')
+# cam_obj = F_obj.Face('cam')
 MainApp().run()

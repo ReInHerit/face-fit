@@ -22,7 +22,7 @@ kivy.require("1.9.1")
 ref_files = []
 ref = []
 buttons = []
-result_buttons = []
+morphed_buttons = []
 ids = {}
 view = {}
 view_source = ''
@@ -31,12 +31,11 @@ morph_selected = -1
 last_match = -1
 r_rot = []
 c_rot = []
-progress_bars = []
+# progress_bars = []
 pb_rots = []
 delta = 7
 final_morphs = {}
 morph_texture = {}
-# capture = None
 filled = []
 valid_images = [".jpg", ".gif", ".png", ".tga"]
 cam_obj = F_obj.Face('cam')
@@ -70,11 +69,13 @@ class MyButton(ToggleButtonBehavior, Image):
 
     # The image changes depending on the state of the toggle button and the state.
     def on_state(self, widget, value):
-        global view
+        # global view
         if value == 'down':
+            print('down1')
             self.texture = self.button_texture(self.source, off=True)
             self.__setattr__('height', 200)
         else:
+            print('normal1')
             self.texture = self.button_texture(self.source)
             self.__setattr__('height', 150)
 
@@ -96,22 +97,19 @@ class MyCamera(Image):
         self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.selected = selected
         self.texture = default_texture
         self.source = view_default
         Clock.schedule_interval(self.update, 1.0/ 30)  # Set drawing interval
 
     def update(self, dt):
-        global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj
-        self.selected = selected
-        if self.selected != -1:
+        global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj, morph_selected
 
+        if selected != -1:
             success, frame = self.capture.read()
             image = cv2.flip(frame, 1)
 
             self.texture = view.texture
             if success:
-
                 image.flags.writeable = True
                 cam_obj.get_landmarks(image)
                 # # DRAW LANDMARKS
@@ -122,49 +120,55 @@ class MyCamera(Image):
                     c_rot[1] = str(int(cam_obj.alpha))
                     c_rot[2] = str(int(cam_obj.tilt['angle']))
 
-                    perc_x = 100 - abs(ref[self.selected].beta - cam_obj.beta)
-                    perc_y = 100 - abs(ref[self.selected].alpha - cam_obj.alpha)
-                    perc_z = 100 - abs(ref[self.selected].tilt['angle'] - cam_obj.tilt['angle'])
+                    perc_x = 100 - abs(ref[selected].beta - cam_obj.beta)
+                    perc_y = 100 - abs(ref[selected].alpha - cam_obj.alpha)
+                    perc_z = 100 - abs(ref[selected].tilt['angle'] - cam_obj.tilt['angle'])
                     pb_rots = [perc_x, perc_y, perc_z]
-                    overlaid = self.cut_paste(ref[self.selected], cam_obj)
 
+                    overlaid = self.cut_paste(ref[selected], cam_obj)
                     buf_overlaid = cv2.flip(overlaid, 0).tobytes()
                     texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
                     texture.blit_buffer(buf_overlaid, colorfmt='bgr', bufferfmt='ubyte')
-
                     self.texture = texture
+
                     if match():
-                        path = morph_path + 'morph_' + str(self.selected) + '.png'
-                        cv2.imwrite(path, final_morphs[self.selected])
+                        path = morph_path + 'morph_' + str(selected) + '.png'
+                        cv2.imwrite(path, final_morphs[selected])
                         cam_obj = F_obj.Face('cam')
-                        buttons[self.selected].state = 'normal'
-                        buttons[self.selected].height = 150
+                        buttons[selected].state = 'normal'
+                        buttons[selected].height = 150
                         last_morphed = cv2.imread(path)
-                        print(last_morphed.dtype)
                         buf_morph = cv2.flip(last_morphed, 0).tobytes()
-                        morph_texture[self.selected] = Texture.create(size=(last_morphed.shape[0],last_morphed.shape[1]), colorfmt='bgr')
-                        morph_texture[self.selected].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
+                        morph_texture[selected] = Texture.create(size=(last_morphed.shape[0],last_morphed.shape[1]), colorfmt='bgr')
+                        morph_texture[selected].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
                         for i in range(0, 3):
                             c_rot[i] = '-'
                             r_rot[i] = '-'
                             pb_rots[i] = 0
 
-                        self.texture = morph_texture[self.selected]
+                        self.texture = morph_texture[selected]
                         # ids.view.texture = self.texture
-                        result_buttons[self.selected].texture = morph_texture[self.selected]
+                        morphed_buttons[selected].texture = morph_texture[selected]
+                        morphed_buttons[selected].state = 'down'
+                        morphed_buttons[selected].height = 200
                         last_match = selected
+                        morph_selected = selected
                         filled.append(last_match)
                         selected = -1
             else:
                 print('camera not ready')
-        else:
+        else:  # selected = -1
             self.texture = None
             if last_match != -1 and morph_texture[last_match]:
-                self.texture = morph_texture[last_match]
-                if morph_selected != -1:
+                if morph_selected == -1:
+                    self.texture = morph_texture[last_match]
+                else:
                     self.texture = morph_texture[morph_selected]
             else:
-                self.texture = default_texture
+                if morph_selected == -1:
+                    self.texture = default_texture
+                else:
+                    self.texture = morph_texture[morph_selected]
 
     def on_play(self, instance, value):
         if not self._camera:
@@ -256,7 +260,7 @@ class MainLayout(Widget):
         self.build()
 
     def build(self):
-        global view, r_rot, c_rot, progress_bars, pb_rots, view_source
+        global view, r_rot, c_rot, pb_rots, view_source  # progress_bars,
         grid1 = ids['l_scroll']
         grid1.bind(minimum_height=grid1.setter('height'))
         grid1 = self.image_load(img_path, grid1)
@@ -266,12 +270,11 @@ class MainLayout(Widget):
         view = ids['view']
         r_rot = [ids['ref_x'].text, ids['ref_y'].text, ids['ref_z'].text]
         c_rot = [ids['cam_x'].text, ids['cam_y'].text, ids['cam_z'].text]
-        progress_bars = [ids['pb_x'], ids['pb_y'], ids['pb_z']]
         pb_rots = [self.pb_x, self.pb_y, self.pb_z]
         view_source = self.source
 
     def image_load(self, im_dir, grid):
-        if im_dir == "images/":
+        if im_dir == img_path:
             for idx, file in enumerate(ref_files):
                 ref_img = cv2.imread(file)
                 ref.append(F_obj.Face('ref'))
@@ -287,7 +290,7 @@ class MainLayout(Widget):
                 button.bind(on_press=self.select)
                 grid.add_widget(button)
 
-        elif im_dir == 'images/Thumbs/':
+        elif im_dir == thumbs_path:
             for idx, file in enumerate(ref_files):
                 thumb = 'morph_thumb.jpg'
                 button = MyButton(size_hint_y=None,
@@ -295,7 +298,7 @@ class MainLayout(Widget):
                                   disabled=False,
                                   source=os.path.join(im_dir, thumb),
                                   group="g2")
-                result_buttons.append(button)
+                morphed_buttons.append(button)
                 button.bind(on_press=self.select_morph_button)
                 grid.add_widget(button)
 
@@ -310,8 +313,8 @@ class MainLayout(Widget):
                 r_rot[2] = str(int(ref[b].tilt['angle']))
                 selected = b
                 if morph_selected != -1:
-                    result_buttons[morph_selected].height = 150
-                    result_buttons[morph_selected].state = 'normal'
+                    morphed_buttons[morph_selected].height = 150
+                    morphed_buttons[morph_selected].state = 'normal'
                     morph_selected = -1
             elif buttons[b] == btn and btn.state == 'normal':
                 view.source = ''
@@ -324,29 +327,29 @@ class MainLayout(Widget):
         return btn
 
     def select_morph_button(self, btn):
-        global selected, morph_selected
-        id = result_buttons.index(btn)
+        global selected, morph_selected, last_match
+        id = morphed_buttons.index(btn)
         if selected == -1 and id in filled:
-            print(btn.texture, type(btn.texture))
-            for b in range(0, len(result_buttons)):
-                if result_buttons[b] == btn and btn.state == 'down':
-                    morph_selected = b
-                    ids.view.texture = morph_texture[morph_selected]
-                    result_buttons[b].texture = morph_texture[morph_selected]
-
-                elif result_buttons[b] == btn and btn.state == 'normal':
-                    result_buttons[b].texture = morph_texture[morph_selected]
+            if morphed_buttons[id] == btn:
+                if btn.state == 'down':
+                    morph_selected = id
+                elif btn.state == 'normal':
                     morph_selected = -1
-                    ids.view.texture = default_texture
+                    last_match = -1
         else:
             btn.height = 150
             btn.state = 'normal'
+            if morph_selected != -1:
+                morphed_buttons[morph_selected].state = 'normal'
+                morphed_buttons[morph_selected].height = 150
+                morph_selected = -1
+            last_match = -1
 
     def update(self, dt):
-        view.texture = ids.view.texture
+        # view.texture = ids.view.texture
         if len(morph_texture) >> 0:
             for m_tex in morph_texture.keys():
-                result_buttons[m_tex].texture = morph_texture[m_tex]
+                morphed_buttons[m_tex].texture = morph_texture[m_tex]
         self.pb_x = pb_rots[0]
         self.pb_y = pb_rots[1]
         self.pb_z = pb_rots[2]
@@ -384,6 +387,25 @@ def match():
                 return False
 
 
+def find_edges(img, blur_size, dx, dy, ksize):
+    blurred = cv2.GaussianBlur(img, (blur_size, blur_size), sigmaX=0, sigmaY=0)
+    grayed = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    # Laplacian Edge Detection
+    laplacian = cv2.Laplacian(grayed, cv2.CV_64F)
+    abs_laplacian = cv2.convertScaleAbs(laplacian)
+    # Sobel Edge Detection
+    sobel_x = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=dx, dy=0, ksize=ksize)  # Sobel Edge Detection on the X axis
+    sobel_y = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=0, dy=dy, ksize=ksize)  # Sobel Edge Detection on the Y axis
+    abs_grad_x = cv2.convertScaleAbs(sobel_x)
+    abs_grad_y = cv2.convertScaleAbs(sobel_y)
+
+    edged = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+    edged = cv2.addWeighted(edged, 1, abs_laplacian, 0.5, 1)
+    edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2BGR)
+    return edged
+
+
+# COLOR CORRECTION functions
 def calculate_cdf(histogram):
     """
     This method calculates the cumulative distribution function
@@ -465,22 +487,7 @@ def match_histograms(src_image, ref_image):
     return image_after_matching
 
 
-def find_edges(img, blur_size, dx, dy, ksize):
-    blurred = cv2.GaussianBlur(img, (blur_size, blur_size), sigmaX=0, sigmaY=0)
-    grayed = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
-    # Laplacian Edge Detection
-    laplacian = cv2.Laplacian(grayed, cv2.CV_64F)
-    abs_laplacian = cv2.convertScaleAbs(laplacian)
-    # Sobel Edge Detection
-    sobel_x = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=dx, dy=0, ksize=ksize)  # Sobel Edge Detection on the X axis
-    sobel_y = cv2.Sobel(src=grayed, ddepth=cv2.CV_64F, dx=0, dy=dy, ksize=ksize)  # Sobel Edge Detection on the Y axis
-    abs_grad_x = cv2.convertScaleAbs(sobel_x)
-    abs_grad_y = cv2.convertScaleAbs(sobel_y)
 
-    edged = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
-    edged = cv2.addWeighted(edged, 1, abs_laplacian, 0.5, 1)
-    edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2BGR)
-    return edged
 
 
 # Morph Functions
@@ -521,6 +528,68 @@ def warp_triangle(img1, img2, t1, t2):
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] + img2_rect
 
 
+def adjust_center(center):
+    center_list = list(center)
+
+    if selected == 0:
+        center_list[0] -= 8
+        center_list[1] -= -13
+    elif selected == 1:
+        center_list[0] -= -2
+        center_list[1] -= -11
+    elif selected == 2:
+        center_list[0] -= -8
+        center_list[1] -= -6
+    elif selected == 3:
+        center_list[0] -= 4
+        center_list[1] -= -8
+    elif selected == 4:
+        center_list[0] -= -8
+        center_list[1] -= -9
+    elif selected == 5:
+        center_list[0] -= 7
+        center_list[1] -= -13
+    elif selected == 6:
+        center_list[0] -= -3
+        center_list[1] -= -14
+    elif selected == 7:
+        center_list[0] -= -11
+        center_list[1] -= -6
+    elif selected == 8:
+        center_list[0] -= -3
+        center_list[1] -= -8
+    elif selected == 9:
+        center_list[0] -= -6
+        center_list[1] -= -14
+    elif selected == 10:
+        center_list[0] -= 8
+        center_list[1] -= -13
+    elif selected == 11:
+        center_list[0] -= -10
+        center_list[1] -= -8
+    elif selected == 12:
+        center_list[0] -= 5
+        center_list[1] -= -10
+    elif selected == 13:
+        center_list[0] -= 3
+        center_list[1] -= -10
+    elif selected == 14:
+        center_list[0] -= 4
+        center_list[1] -= -18
+    return tuple(center_list)
+
+def find_noise_scratches(img):
+
+    # Denoising
+    dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
+    sub = cv2.subtract(img, dst)
+    cv2.imshow('0', img)
+    cv2.imshow('1', dst)
+    cv2.imshow('2', sub)
+    cv2.waitKey(0)
+    return sub
+
+
 def morph(c_obj, r_obj):
     ref_image = r_obj.image
     cam_image = c_obj.image
@@ -530,6 +599,8 @@ def morph(c_obj, r_obj):
     cam_points = c_obj.pix_points
     ref_points = r_obj.pix_points
     offset = 5
+    noise = find_noise_scratches(ref_image)
+    #######################################
     cc_r_roi = ref_image[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
                r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
     cc_c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
@@ -555,19 +626,7 @@ def morph(c_obj, r_obj):
         hull_1u.append((hull1[i][0], hull1[i][1]))
     for i in range(0, len(hull2)):
         hull_2u.append((hull2[i][0], hull2[i][1]))
-    # mask = np.zeros(ref_image.shape, dtype=ref_image.dtype)
-    # cv2.fillConvexPoly(mask, np.int32(hull_1u), (255, 255, 255))
-    # mask2 = np.zeros(ref_image.shape, dtype=ref_image.dtype)
-    # cv2.fillConvexPoly(mask2, np.int32(hull_2u), (255, 255, 255))
-    # cv2.imshow('', mask)
-    # cv2.imshow('2', mask2)
-    # # cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    # #############
-    # mid = cv2.moments(mask[:, :, 1])  # Find Centroid
-    # center = (int(mid['m10'] / mid['m00']), int(mid['m01'] / mid['m00']))
-    # mid2 = cv2.moments(mask2[:, :, 1])  # Find Centroid
-    # center2 = (int(mid2['m10'] / mid2['m00']), int(mid2['m01'] / mid2['m00']))
-    # print(center , center2)
+
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris  # triangles
     tris1 = []
@@ -593,15 +652,14 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (BLUR, BLUR), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(ref_face_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
-    cv2.imshow('3', ref_face_mask)
+    center = adjust_center(center)
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
-    out_face = ref_new_face.astype('float') / 255
+    out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_image.astype('float') / 255
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
-    # center = int(ref_image.shape[0]/2), int(ref_image.shape[1]/2)
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
-    # output = cv2.addWeighted(out,.5,output,.5,0)
+    # output = cv2.addWeighted(out, .5, output, 0.5, 0)
     return output
 
 
@@ -611,5 +669,4 @@ for filename in glob.iglob(f'{ref_path}*'):
         continue
     ref_files.append(filename)
 
-# cam_obj = F_obj.Face('cam')
 MainApp().run()

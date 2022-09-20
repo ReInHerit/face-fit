@@ -17,7 +17,7 @@ from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 
 import Face as F_obj
-
+import send_mail as mail
 kivy.require("1.9.1")
 ref_files = []
 ref = []
@@ -52,14 +52,30 @@ img_path = 'images/'
 thumbs_path = img_path + 'Thumbs/'
 morph_path = ref_path + 'final_morphs/'
 view_default = thumbs_path + 'view_default.jpg'
+morph_default = thumbs_path + 'morph_thumb.jpg'
 view_base_image = cv2.imread(view_default)
-buf = cv2.flip(view_base_image, 0).tobytes()
-default_texture = Texture.create(size=(view_base_image.shape[1], view_base_image.shape[0]), colorfmt='bgr')
-default_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-
+morph_base_image = cv2.imread(morph_default)
 with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
 
+
+def create_texture(image):
+    buf = cv2.flip(image, 0).tobytes()
+    my_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
+    my_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+    return my_texture
+
+
+view_default_texture = create_texture(view_base_image)
+morphs_default_texture = create_texture(morph_base_image)
+
+def btn_change(btn, state, height, texture):
+    btn.state = state
+    btn.height = height
+    if texture != 'same':
+        btn.texture = texture
+    else:
+        return
 
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
@@ -69,7 +85,6 @@ class MyButton(ToggleButtonBehavior, Image):
 
     # The image changes depending on the state of the toggle button and the state.
     def on_state(self, widget, value):
-        # global view
         if value == 'down':
             print('down1')
             self.texture = self.button_texture(self.source, off=True)
@@ -83,10 +98,7 @@ class MyButton(ToggleButtonBehavior, Image):
         im = cv2.imread(data)
         if off:
             im = cv2.rectangle(im, (1, 1), (im.shape[1] - 1, im.shape[0] - 1), (255, 255, 255), 10)
-
-        buf_butt = cv2.flip(im, 0)  # flip upside down
-        image_texture = Texture.create(size=(im.shape[1], im.shape[0]), colorfmt='bgr')
-        image_texture.blit_buffer(buf_butt.tobytes(), colorfmt='bgr', bufferfmt='ubyte')
+        image_texture = create_texture(im)
         if self:
             return image_texture
 
@@ -97,7 +109,7 @@ class MyCamera(Image):
         self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.texture = default_texture
+        self.texture = view_default_texture
         self.source = view_default
         Clock.schedule_interval(self.update, 1.0/ 30)  # Set drawing interval
 
@@ -126,21 +138,18 @@ class MyCamera(Image):
                     pb_rots = [perc_x, perc_y, perc_z]
 
                     overlaid = self.cut_paste(ref[selected], cam_obj)
-                    buf_overlaid = cv2.flip(overlaid, 0).tobytes()
-                    texture = Texture.create(size=(overlaid.shape[1], overlaid.shape[0]), colorfmt='bgr')
-                    texture.blit_buffer(buf_overlaid, colorfmt='bgr', bufferfmt='ubyte')
-                    self.texture = texture
+                    over_texture = create_texture(overlaid)
+                    self.texture = over_texture
 
                     if match():
                         path = morph_path + 'morph_' + str(selected) + '.png'
                         cv2.imwrite(path, final_morphs[selected])
                         cam_obj = F_obj.Face('cam')
-                        buttons[selected].state = 'normal'
-                        buttons[selected].height = 150
+                        btn_change(buttons[selected], 'normal', 150, 'same')
+                        # buttons[selected].state = 'normal'
+                        # buttons[selected].height = 150
                         last_morphed = cv2.imread(path)
-                        buf_morph = cv2.flip(last_morphed, 0).tobytes()
-                        morph_texture[selected] = Texture.create(size=(last_morphed.shape[0],last_morphed.shape[1]), colorfmt='bgr')
-                        morph_texture[selected].blit_buffer(buf_morph, colorfmt='bgr', bufferfmt='ubyte')
+                        morph_texture[selected] = create_texture(last_morphed)
                         for i in range(0, 3):
                             c_rot[i] = '-'
                             r_rot[i] = '-'
@@ -148,9 +157,10 @@ class MyCamera(Image):
 
                         self.texture = morph_texture[selected]
                         # ids.view.texture = self.texture
-                        morphed_buttons[selected].texture = morph_texture[selected]
-                        morphed_buttons[selected].state = 'down'
-                        morphed_buttons[selected].height = 200
+                        btn_change(morphed_buttons[selected], 'down', 200, morph_texture[selected])
+                        # morphed_buttons[selected].texture = morph_texture[selected]
+                        # morphed_buttons[selected].state = 'down'
+                        # morphed_buttons[selected].height = 200
                         last_match = selected
                         morph_selected = selected
                         filled.append(last_match)
@@ -159,15 +169,15 @@ class MyCamera(Image):
                 print('camera not ready')
         else:  # selected = -1
             self.texture = None
-            if last_match != -1 and morph_texture[last_match]:
+            if last_match != -1 and morph_texture and morph_texture[last_match]:
                 if morph_selected == -1:
                     self.texture = morph_texture[last_match]
                 else:
                     self.texture = morph_texture[morph_selected]
             else:
-                if morph_selected == -1:
-                    self.texture = default_texture
-                else:
+                if morph_selected == -1 :
+                    self.texture = view_default_texture
+                elif morph_texture:
                     self.texture = morph_texture[morph_selected]
 
     def on_play(self, instance, value):
@@ -296,7 +306,7 @@ class MainLayout(Widget):
                 button = MyButton(size_hint_y=None,
                                   height=150,
                                   disabled=False,
-                                  source=os.path.join(im_dir, thumb),
+                                  source= morph_default,  # os.path.join(im_dir, thumb),
                                   group="g2")
                 morphed_buttons.append(button)
                 button.bind(on_press=self.select_morph_button)
@@ -313,8 +323,9 @@ class MainLayout(Widget):
                 r_rot[2] = str(int(ref[b].tilt['angle']))
                 selected = b
                 if morph_selected != -1:
-                    morphed_buttons[morph_selected].height = 150
-                    morphed_buttons[morph_selected].state = 'normal'
+                    btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
+                    # morphed_buttons[morph_selected].height = 150
+                    # morphed_buttons[morph_selected].state = 'normal'
                     morph_selected = -1
             elif buttons[b] == btn and btn.state == 'normal':
                 view.source = ''
@@ -359,6 +370,22 @@ class MainLayout(Widget):
         self.cam_x = c_rot[0]
         self.cam_y = c_rot[1]
         self.cam_z = c_rot[2]
+
+    def checkout(self):
+        global selected, morph_selected, morph_texture, filled
+
+        morphed_files = images_in_folder(morph_path)
+        mail.send(morphed_files)
+        for m_tex in morph_texture.keys():
+            btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
+
+        selected = -1
+        morph_selected = -1
+        morph_texture = {}
+        filled = []
+        for file in morphed_files:
+            os.remove(file)
+
 
 
 class MainApp(App):
@@ -663,10 +690,21 @@ def morph(c_obj, r_obj):
     return output
 
 
-for filename in glob.iglob(f'{ref_path}*'):
-    ext = os.path.splitext(filename)[1]
-    if ext.lower() not in valid_images:
-        continue
-    ref_files.append(filename)
+def images_in_folder(folder):
+    filelist = []
+    for filename in glob.iglob(f'{folder}*'):
+        ext = os.path.splitext(filename)[1]
+        if ext.lower() not in valid_images:
+            continue
+        filelist.append(filename)
+    return filelist
+
+
+ref_files = images_in_folder(ref_path)
+# for filename in glob.iglob(f'{ref_path}*'):
+#     ext = os.path.splitext(filename)[1]
+#     if ext.lower() not in valid_images:
+#         continue
+#     ref_files.append(filename)
 
 MainApp().run()

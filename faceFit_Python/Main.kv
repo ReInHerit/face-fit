@@ -82,7 +82,7 @@ MainLayout:
                     size_hint: .1, 1
                     orientation: 'vertical'
                     StatsLabel:
-                        text: ''
+                        text: 'HINTS'
                         background_color: .05,.05,.05,1
 
                     StatsLabel:
@@ -158,16 +158,51 @@ MainLayout:
                     size_hint: .05, 1
                     orientation: 'vertical'
 
+                    StatsLabel:
+                        text: ''
+                        background_color: .05,.05,.05,1
+
+                    StatsLabel:
+                        text: ''
+                    StatsLabel:
+                        text: ''
+                    StatsLabel:
+                        text: ''
+                BoxLayout:
+                    size_hint: .05, 1
+                    orientation: 'vertical'
+
                 BoxLayout:
                     orientation: 'vertical'
                     size_hint: .2, 1
                     StatsLabel:
-                        text: 'click to end session and send mail with results'
+                        id: email_alert
+                        text: root.email_alert
+                        size_hint: 1, 0.25
                         background_color: .05,.05,.05,1
+                    TextInput:
+                        id: input
+                        multiline: False
+                        hint_text:'Enter your e-mail'
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        size_hint: 1, 0.25
+                        on_text_validate: root.on_new_text()
+
+
                     Button:
                         id: checkout
-                        text: 'click'
-                        on_press:root.checkout()
+                        text: 'SEND'
+                        text_size: self.size
+                        halign: 'center'
+                        valign: 'center'
+                        font_size: '25sp'
+                        markup: True
+                        size_hint: 1, 0.5
+                        on_press:root.on_new_text()
+                BoxLayout:
+                    size_hint: .02, 1
+                    orientation: 'vertical'
+
             MyCamera:
                 id: view
                 source: root.source

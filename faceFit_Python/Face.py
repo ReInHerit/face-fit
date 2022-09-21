@@ -247,21 +247,17 @@ def where_is_looking(img, f_landmarks, what):
     hr, wr, cr = img.shape
     face2d = []
     face3d = []
-    for indx, lm in enumerate(f_landmarks.landmark):
-        if indx == 33 or indx == 263 or indx == 1 or indx == 61 or indx == 291 or indx == 199:
-            if indx == 1:
+    for id, lm in enumerate(f_landmarks.landmark):
+        if id == 33 or id == 263 or id == 1 or id == 61 or id == 291 or id == 199:
+            if id == 1:
                 nose_2d = (lm.x * wr, lm.y * hr)
                 nose_3d = (lm.x * wr, lm.y * hr, lm.z * 8000)
-
             x1, y1 = int(lm.x * wr), int(lm.y * hr)
-
             # Get the 2D Coordinates
             face2d.append([x1, y1])
-
             # Get the 3D Coordinates
             face3d.append([x1, y1, lm.z])
 
-    # Convert to the NumPy array
     face_2d = np.array(face2d, dtype=np.float64)
     face_3d = np.array(face3d, dtype=np.float64)
     # The camera matrix

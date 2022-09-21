@@ -3,6 +3,7 @@ import numpy as np
 import glob
 import json
 import os
+import re
 
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 
@@ -15,9 +16,11 @@ from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
-
+from skimage import exposure
+from skimage.exposure import match_histograms as mh
 import Face as F_obj
 import send_mail as mail
+
 kivy.require("1.9.1")
 ref_files = []
 ref = []
@@ -39,6 +42,9 @@ morph_texture = {}
 filled = []
 valid_images = [".jpg", ".gif", ".png", ".tga"]
 cam_obj = F_obj.Face('cam')
+send_to = ''
+email_alert = ''
+input_field = '-'
 
 try:
     project_path = os.path.dirname(os.path.abspath(__file__))
@@ -69,6 +75,7 @@ def create_texture(image):
 view_default_texture = create_texture(view_base_image)
 morphs_default_texture = create_texture(morph_base_image)
 
+
 def btn_change(btn, state, height, texture):
     btn.state = state
     btn.height = height
@@ -76,6 +83,7 @@ def btn_change(btn, state, height, texture):
         btn.texture = texture
     else:
         return
+
 
 class MyButton(ToggleButtonBehavior, Image):
     def __init__(self, **kwargs):
@@ -111,7 +119,7 @@ class MyCamera(Image):
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.texture = view_default_texture
         self.source = view_default
-        Clock.schedule_interval(self.update, 1.0/ 30)  # Set drawing interval
+        Clock.schedule_interval(self.update, 1.0 / 60 )  # Set drawing interval / 30
 
     def update(self, dt):
         global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj, morph_selected
@@ -146,8 +154,6 @@ class MyCamera(Image):
                         cv2.imwrite(path, final_morphs[selected])
                         cam_obj = F_obj.Face('cam')
                         btn_change(buttons[selected], 'normal', 150, 'same')
-                        # buttons[selected].state = 'normal'
-                        # buttons[selected].height = 150
                         last_morphed = cv2.imread(path)
                         morph_texture[selected] = create_texture(last_morphed)
                         for i in range(0, 3):
@@ -156,11 +162,7 @@ class MyCamera(Image):
                             pb_rots[i] = 0
 
                         self.texture = morph_texture[selected]
-                        # ids.view.texture = self.texture
                         btn_change(morphed_buttons[selected], 'down', 200, morph_texture[selected])
-                        # morphed_buttons[selected].texture = morph_texture[selected]
-                        # morphed_buttons[selected].state = 'down'
-                        # morphed_buttons[selected].height = 200
                         last_match = selected
                         morph_selected = selected
                         filled.append(last_match)
@@ -175,7 +177,7 @@ class MyCamera(Image):
                 else:
                     self.texture = morph_texture[morph_selected]
             else:
-                if morph_selected == -1 :
+                if morph_selected == -1:
                     self.texture = view_default_texture
                 elif morph_texture:
                     self.texture = morph_texture[morph_selected]
@@ -257,9 +259,11 @@ class MainLayout(Widget):
     pb_y = NumericProperty(0)
     pb_z = NumericProperty(0)
     scroll = ObjectProperty(None)
+    email_alert = StringProperty('-')
 
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
+        self.email_alert = email_alert
         self.source = view_default
         Clock.schedule_once(self.verify_ids, 0)
         self.event = Clock.schedule_interval(self.update, 0.1)
@@ -270,7 +274,7 @@ class MainLayout(Widget):
         self.build()
 
     def build(self):
-        global view, r_rot, c_rot, pb_rots, view_source  # progress_bars,
+        global view, r_rot, c_rot, pb_rots, view_source, email_alert, input_field  # progress_bars,
         grid1 = ids['l_scroll']
         grid1.bind(minimum_height=grid1.setter('height'))
         grid1 = self.image_load(img_path, grid1)
@@ -278,6 +282,7 @@ class MainLayout(Widget):
         grid2.bind(minimum_height=grid2.setter('height'))
         grid2 = self.image_load(thumbs_path, grid2)
         view = ids['view']
+        email_alert = ids['email_alert']
         r_rot = [ids['ref_x'].text, ids['ref_y'].text, ids['ref_z'].text]
         c_rot = [ids['cam_x'].text, ids['cam_y'].text, ids['cam_z'].text]
         pb_rots = [self.pb_x, self.pb_y, self.pb_z]
@@ -306,7 +311,7 @@ class MainLayout(Widget):
                 button = MyButton(size_hint_y=None,
                                   height=150,
                                   disabled=False,
-                                  source= morph_default,  # os.path.join(im_dir, thumb),
+                                  source=morph_default,  # os.path.join(im_dir, thumb),
                                   group="g2")
                 morphed_buttons.append(button)
                 button.bind(on_press=self.select_morph_button)
@@ -357,10 +362,11 @@ class MainLayout(Widget):
             last_match = -1
 
     def update(self, dt):
-        # view.texture = ids.view.texture
+        global input_field
         if len(morph_texture) >> 0:
             for m_tex in morph_texture.keys():
                 morphed_buttons[m_tex].texture = morph_texture[m_tex]
+        self.email_alert = email_alert.text
         self.pb_x = pb_rots[0]
         self.pb_y = pb_rots[1]
         self.pb_z = pb_rots[2]
@@ -371,21 +377,49 @@ class MainLayout(Widget):
         self.cam_y = c_rot[1]
         self.cam_z = c_rot[2]
 
+    def on_new_text(self):
+        global send_to
+        if self.ids.input.text != '':
+            send_to = self.ids.input.text
+
+            check = self.check_email_address(send_to)
+            if check:
+                self.checkout()
+        else:
+            email_alert.text = 'insert email'
+
+
+    def check_email_address(self, address):
+        global email_alert
+        # Checks if the address match regular expression
+        is_valid = re.search('^\w+@\w+.\w+$', address)
+        # If there is a matching group
+        if is_valid:
+            email_alert.text = 'email format is valid'
+            return True
+        else:
+            email_alert.text = "email format isn't valid"
+            return False
+
     def checkout(self):
         global selected, morph_selected, morph_texture, filled
-
+        print(send_to)
         morphed_files = images_in_folder(morph_path)
-        mail.send(morphed_files)
-        for m_tex in morph_texture.keys():
-            btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
-
-        selected = -1
-        morph_selected = -1
-        morph_texture = {}
-        filled = []
-        for file in morphed_files:
-            os.remove(file)
-
+        if send_to != '':
+            mail.send(morphed_files, send_to)
+            for m_tex in morph_texture.keys():
+                btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
+            selected = -1
+            morph_selected = -1
+            morph_texture = {}
+            filled = []
+            email_alert.text = ''
+            self.ids.input.text = ''
+            for file in morphed_files:
+                os.remove(file)
+        else:
+            print('cannot send email')
+            return
 
 
 class MainApp(App):
@@ -426,7 +460,7 @@ def find_edges(img, blur_size, dx, dy, ksize):
     abs_grad_x = cv2.convertScaleAbs(sobel_x)
     abs_grad_y = cv2.convertScaleAbs(sobel_y)
 
-    edged = cv2.addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0)
+    edged = cv2.addWeighted(abs_grad_x, 1, abs_grad_y, 1, 0)
     edged = cv2.addWeighted(edged, 1, abs_laplacian, 0.5, 1)
     edged = cv2.cvtColor(edged, cv2.COLOR_GRAY2BGR)
     return edged
@@ -514,9 +548,14 @@ def match_histograms(src_image, ref_image):
     return image_after_matching
 
 
-
-
-
+def match_color(src_BGR, ref_BGR):
+    src_BGR = cv2.cvtColor(src_BGR, cv2.COLOR_BGR2RGB)
+    ref_BGR = cv2.cvtColor(ref_BGR, cv2.COLOR_BGR2RGB)
+    reference = np.array(src_BGR, dtype=np.uint8)
+    image = np.array(ref_BGR, dtype=np.uint8)
+    matched = mh(image, reference, channel_axis=-1)
+    matched = cv2.cvtColor(matched, cv2.COLOR_RGB2BGR)
+    return matched
 # Morph Functions
 
 def apply_affine_transform(src, src_tri, dst_tri, siz):
@@ -605,16 +644,16 @@ def adjust_center(center):
         center_list[1] -= -18
     return tuple(center_list)
 
-def find_noise_scratches(img):
 
+def find_noise_scratches(img):
     # Denoising
     dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
-    sub = cv2.subtract(img, dst)
-    cv2.imshow('0', img)
-    cv2.imshow('1', dst)
-    cv2.imshow('2', sub)
-    cv2.waitKey(0)
-    return sub
+    noise = cv2.subtract(img, dst)
+    # cv2.imshow('0', img)
+    # cv2.imshow('1', dst)
+    # cv2.imshow('2', noise)
+    # cv2.waitKey(0)
+    return dst, noise
 
 
 def morph(c_obj, r_obj):
@@ -626,16 +665,24 @@ def morph(c_obj, r_obj):
     cam_points = c_obj.pix_points
     ref_points = r_obj.pix_points
     offset = 5
-    noise = find_noise_scratches(ref_image)
+    ref_denoised, noise = find_noise_scratches(ref_image)
     #######################################
-    cc_r_roi = ref_image[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
+    cc_r_roi = ref_denoised[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
                r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
     cc_c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
     cam_cc = match_histograms(cc_c_roi, cc_r_roi)
+    # cam_cc2 = match_color(cc_r_roi, cc_c_roi)
+    # renoised = ref_denoised + noise
+    # cv2.imshow('denois', ref_denoised)
+    # cv2.imshow('ref', ref_image)
+    # cv2.imshow('noise', noise)
+    # cv2.imshow('renoised', renoised)
+
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset, c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = \
         cam_cc.astype('float64')
     # Find convex hull
+    # cv2.imshow('cam_cc', cam_image)
     cam_hull = cv2.convexHull(np.array(cam_points), returnPoints=False)
     ref_hull = cv2.convexHull(np.array(ref_points))
     ref_hull_ids = cv2.convexHull(np.array(ref_points), returnPoints=False)
@@ -670,23 +717,33 @@ def morph(c_obj, r_obj):
     for i in range(0, len(tris1)):
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
     # GENERATE FINAL IMAGE
-    cv2.imshow('1', ref_new_face)
+    # cv2.imshow('warped', ref_new_face)
+
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
     ref_img_mask = np.zeros_like(ref_gray)
     ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_hull, 255)
+    # cv2.imshow('convexPolyMask', ref_face_mask)
     ref_face_mask = cv2.dilate(ref_face_mask, None, iterations=MASK_DILATE_ITER)
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=MASK_ERODE_ITER)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (BLUR, BLUR), sigmaX=0, sigmaY=0)
+    # cv2.imshow('gaussedMask', ref_face_mask)
     mid3 = cv2.moments(ref_face_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
     center = adjust_center(center)
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
-    out_bg = ref_image.astype('float') / 255
+    out_bg = ref_denoised.astype('float') / 255
+    # cv2.imshow('out_face', out_face)
+    # cv2.imshow('out_bg', out_bg)
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
+    out = cv2.add(out, noise)
+    out = cv2.add(out, noise)
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
     # output = cv2.addWeighted(out, .5, output, 0.5, 0)
+    # cv2.imshow('out', out)
+    # cv2.imshow('output', output)
+    cv2.waitKey(0)
     return output
 
 

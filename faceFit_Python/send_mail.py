@@ -1,9 +1,10 @@
 import smtplib
 import imghdr
 import os
+import re
 from email.message import EmailMessage
 
-def send(attachments_list):
+def send(attachments_list, mail_to_address):
     msg= EmailMessage()
 
     my_address ='fitface.unifi@gmail.com'   #sender address
@@ -12,14 +13,14 @@ def send(attachments_list):
     msg["Subject"] ="The Email Subject"
     msg["From"]= my_address   #sender address
 
-    msg["To"] = 'arkfil@gmail.com'         #reciver addresss
+    msg["To"] = mail_to_address  # 'arkfil@gmail.com'         #reciver addresss
     msg.set_content('''Hello,
     This is a test mail.
     In this mail we are sending some attachments.
     The mail is sent using Python SMTP library.
     Thank You
     ''')
-    ### AGGIUNGERE CICLO PER AGGIUNGERE TUTTI I MORPHS CREATI
+
     for address in attachments_list:
         head, tail = os.path.split(address)
         with open(address, "rb") as file:     #open image file
@@ -39,3 +40,16 @@ def send(attachments_list):
         print("sending mail\\.....")
         smtp.send_message(msg)    #send mail
         print("mail has sent!")
+
+
+def check_email_address(address):
+  # Checks if the address match regular expression
+  is_valid = re.search('^\w+@\w+.\w+$', address)
+  # If there is a matching group
+  if is_valid:
+    return True
+  else:
+    print('It looks that provided mail is not in correct format. \n'
+          'Please make sure that you have "@" and "." in your address \n'
+          'and the length of your mail is at least 6 characters long')
+    return False

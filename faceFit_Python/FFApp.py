@@ -4,24 +4,19 @@ import glob
 import json
 import os
 import re
-
+# import kivy
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
-
-from kivy.uix.widget import Widget
-
-import kivy
 from kivy.app import App
+from kivy.uix.widget import Widget
 from kivy.uix.image import Image
 from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
-from skimage import exposure
-from skimage.exposure import match_histograms as mh
 import Face as F_obj
 import send_mail as mail
 
-kivy.require("1.9.1")
+# kivy.require("1.9.1")
 ref_files = []
 ref = []
 buttons = []
@@ -34,7 +29,6 @@ morph_selected = -1
 last_match = -1
 r_rot = []
 c_rot = []
-# progress_bars = []
 pb_rots = []
 delta = 7
 final_morphs = {}
@@ -50,7 +44,6 @@ try:
     project_path = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     import sys
-
     project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
 ref_path = project_path + '/images/'
@@ -63,6 +56,19 @@ view_base_image = cv2.imread(view_default)
 morph_base_image = cv2.imread(morph_default)
 with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
+
+
+def images_in_folder(folder):
+    filelist = []
+    for filename in glob.iglob(f'{folder}*'):
+        ext = os.path.splitext(filename)[1]
+        if ext.lower() not in valid_images:
+            continue
+        filelist.append(filename)
+    return filelist
+
+
+ref_files = images_in_folder(ref_path)
 
 
 def create_texture(image):
@@ -91,14 +97,11 @@ class MyButton(ToggleButtonBehavior, Image):
         self.source = kwargs["source"]  # Stores the image name of the image button
         self.texture = self.button_texture(self.source)  # Treat the image as a texture, so you can edit it
 
-    # The image changes depending on the state of the toggle button and the state.
     def on_state(self, widget, value):
         if value == 'down':
-            print('down1')
             self.texture = self.button_texture(self.source, off=True)
             self.__setattr__('height', 200)
         else:
-            print('normal1')
             self.texture = self.button_texture(self.source)
             self.__setattr__('height', 150)
 
@@ -114,12 +117,11 @@ class MyButton(ToggleButtonBehavior, Image):
 class MyCamera(Image):
     def __init__(self, **kwargs):
         super(MyCamera, self).__init__(**kwargs)
-        self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
+        self.capture = cv2.VideoCapture(0, cv2.CAP_MSMF)  # Connect to 0th camera
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        self.texture = view_default_texture
-        self.source = view_default
-        Clock.schedule_interval(self.update, 1.0 / 60 )  # Set drawing interval / 30
+        self.fps = self.capture.get(cv2.CAP_PROP_FPS)
+        Clock.schedule_interval(self.update, 1.0 / self.fps)  # Set drawing interval / 30
 
     def update(self, dt):
         global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj, morph_selected
@@ -127,7 +129,6 @@ class MyCamera(Image):
         if selected != -1:
             success, frame = self.capture.read()
             image = cv2.flip(frame, 1)
-
             self.texture = view.texture
             if success:
                 image.flags.writeable = True
@@ -139,33 +140,37 @@ class MyCamera(Image):
                     c_rot[0] = str(int(cam_obj.beta))
                     c_rot[1] = str(int(cam_obj.alpha))
                     c_rot[2] = str(int(cam_obj.tilt['angle']))
-
+                    # calc Rotation's Hints
                     perc_x = 100 - abs(ref[selected].beta - cam_obj.beta)
                     perc_y = 100 - abs(ref[selected].alpha - cam_obj.alpha)
                     perc_z = 100 - abs(ref[selected].tilt['angle'] - cam_obj.tilt['angle'])
                     pb_rots = [perc_x, perc_y, perc_z]
-
-                    overlaid = self.cut_paste(ref[selected], cam_obj)
+                    # apply user's mask
+                    overlaid = cut_paste_user_mask(ref[selected], cam_obj)
                     over_texture = create_texture(overlaid)
                     self.texture = over_texture
 
                     if match():
+                        # save result
                         path = morph_path + 'morph_' + str(selected) + '.png'
                         cv2.imwrite(path, final_morphs[selected])
+                        # reset values
                         cam_obj = F_obj.Face('cam')
                         btn_change(buttons[selected], 'normal', 150, 'same')
                         last_morphed = cv2.imread(path)
-                        morph_texture[selected] = create_texture(last_morphed)
                         for i in range(0, 3):
                             c_rot[i] = '-'
                             r_rot[i] = '-'
                             pb_rots[i] = 0
-
+                        # create result texture and apply to view and morph button
+                        morph_texture[selected] = create_texture(last_morphed)
                         self.texture = morph_texture[selected]
                         btn_change(morphed_buttons[selected], 'down', 200, morph_texture[selected])
+                        # set trackers
                         last_match = selected
                         morph_selected = selected
                         filled.append(last_match)
+                        #reset selected
                         selected = -1
             else:
                 print('camera not ready')
@@ -189,62 +194,6 @@ class MyCamera(Image):
             self._camera.start()
         else:
             self._camera.stop()
-
-    def cut_paste(self, r_obj, c_obj):
-        offset = 10
-        img1 = r_obj.image
-        img2 = c_obj.image
-        mask2 = c_obj.self_hud_mask()
-        mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
-
-        temp1 = img1.copy()
-        temp2 = img2.copy()
-        masked2 = cv2.bitwise_and(temp2, temp2, mask=mask2gray)
-
-        center1 = r_obj.pix_points[168]
-        center2 = c_obj.pix_points[168]
-
-        rx = (r_obj.delta_x + 2 * offset) / (c_obj.delta_x + 2 * offset)
-        ry = (r_obj.delta_y + 2 * offset) / (c_obj.delta_y + 2 * offset)
-        media_scale = round((rx + ry) / 2, 2)
-        min_x, min_y = c_obj.bb_p1
-        max_x, max_y = c_obj.bb_p2
-
-        delta_2_min = [min_x - offset, min_y - offset]
-        delta_2_max = [max_x + offset, max_y + offset]
-        if delta_2_min[0] < 0:
-            delta_2_min[0] = 0
-        elif delta_2_max[0] > img2.shape[1]:
-            delta_2_max[0] = img2.shape[1]
-        if delta_2_min[1] < 0:
-            delta_2_min[1] = 0
-        elif delta_2_max[1] > img2.shape[0]:
-            delta_2_max[1] = img2.shape[0]
-
-        new_min_x = center1[0] - int((center2[0] - delta_2_min[0]) * media_scale)
-        new_min_y = center1[1] - int((center2[1] - delta_2_min[1]) * media_scale)
-        new_max_x = center1[0] + int((delta_2_max[0] - center2[0]) * media_scale)
-        new_max_y = center1[1] + int((delta_2_max[1] - center2[1]) * media_scale)
-        if new_min_x < 0:
-            new_min_x = 0
-        elif new_min_y < 0:
-            new_min_y = 0
-        elif new_max_x > img1.shape[1]:
-            new_max_x = img1.shape[1]
-        elif new_max_y > img1.shape[0]:
-            new_max_y = img1.shape[0]
-        cropped2 = masked2[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
-        cropped2 = cv2.resize(cropped2, ((new_max_x - new_min_x), (new_max_y - new_min_y)),
-                              interpolation=cv2.INTER_LINEAR)
-
-        edged = find_edges(cropped2, 3, 1, 1, 3)
-
-        copied = temp1[new_min_y:new_max_y, new_min_x:new_max_x]
-        print(copied.shape, edged.shape)
-        if copied.shape == edged.shape:
-            copied = cv2.addWeighted(copied, 1, edged, .99, 1)
-        temp1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
-        return temp1
 
 
 class MainLayout(Widget):
@@ -276,11 +225,25 @@ class MainLayout(Widget):
     def build(self):
         global view, r_rot, c_rot, pb_rots, view_source, email_alert, input_field  # progress_bars,
         grid1 = ids['l_scroll']
-        grid1.bind(minimum_height=grid1.setter('height'))
-        grid1 = self.image_load(img_path, grid1)
         grid2 = ids['r_box_grid']
+        grid1.bind(minimum_height=grid1.setter('height'))
         grid2.bind(minimum_height=grid2.setter('height'))
-        grid2 = self.image_load(thumbs_path, grid2)
+
+        for idx, file in enumerate(ref_files):
+            ref_img = cv2.imread(file)
+            ref.append(F_obj.Face('ref'))
+            ref[idx].get_landmarks(ref_img)
+            # DRAW LANDMARKS
+            # ref[idx].draw('contours')
+            # ref[idx].draw('tessellation')
+            button_ref = MyButton(source=os.path.join(img_path, file), group="g1")
+            button_morphs = MyButton(disabled=False, source=morph_default, group="g2")
+            buttons.append(button_ref)
+            button_ref.bind(on_press=self.select)
+            grid1.add_widget(button_ref)
+            morphed_buttons.append(button_morphs)
+            button_morphs.bind(on_press=self.select_morph_button)
+            grid2.add_widget(button_morphs)
         view = ids['view']
         email_alert = ids['email_alert']
         r_rot = [ids['ref_x'].text, ids['ref_y'].text, ids['ref_z'].text]
@@ -288,38 +251,8 @@ class MainLayout(Widget):
         pb_rots = [self.pb_x, self.pb_y, self.pb_z]
         view_source = self.source
 
-    def image_load(self, im_dir, grid):
-        if im_dir == img_path:
-            for idx, file in enumerate(ref_files):
-                ref_img = cv2.imread(file)
-                ref.append(F_obj.Face('ref'))
-                ref[idx].get_landmarks(ref_img)
-                # DRAW LANDMARKS
-                # ref[idx].draw('contours')
-                # ref[idx].draw('tessellation')
-                button = MyButton(size_hint_y=None,
-                                  height=150,
-                                  source=os.path.join(im_dir, file),
-                                  group="g1")
-                buttons.append(button)
-                button.bind(on_press=self.select)
-                grid.add_widget(button)
-
-        elif im_dir == thumbs_path:
-            for idx, file in enumerate(ref_files):
-                thumb = 'morph_thumb.jpg'
-                button = MyButton(size_hint_y=None,
-                                  height=150,
-                                  disabled=False,
-                                  source=morph_default,  # os.path.join(im_dir, thumb),
-                                  group="g2")
-                morphed_buttons.append(button)
-                button.bind(on_press=self.select_morph_button)
-                grid.add_widget(button)
-
-        return grid
-
-    def select(self, btn):
+    @staticmethod
+    def select(btn):
         global selected, morph_selected
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
@@ -342,7 +275,8 @@ class MainLayout(Widget):
                 view.source = view_default
         return btn
 
-    def select_morph_button(self, btn):
+    @staticmethod
+    def select_morph_button(btn):
         global selected, morph_selected, last_match
         id = morphed_buttons.index(btn)
         if selected == -1 and id in filled:
@@ -388,8 +322,8 @@ class MainLayout(Widget):
         else:
             email_alert.text = 'insert email'
 
-
-    def check_email_address(self, address):
+    @staticmethod
+    def check_email_address(address):
         global email_alert
         # Checks if the address match regular expression
         is_valid = re.search('^\w+@\w+.\w+$', address)
@@ -403,10 +337,11 @@ class MainLayout(Widget):
 
     def checkout(self):
         global selected, morph_selected, morph_texture, filled
-        print(send_to)
         morphed_files = images_in_folder(morph_path)
         if send_to != '':
+            # send mail with attachments
             mail.send(morphed_files, send_to)
+            # reset GUI and variables
             for m_tex in morph_texture.keys():
                 btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
             selected = -1
@@ -415,6 +350,7 @@ class MainLayout(Widget):
             filled = []
             email_alert.text = ''
             self.ids.input.text = ''
+            # delete attached images
             for file in morphed_files:
                 os.remove(file)
         else:
@@ -448,6 +384,62 @@ def match():
                 return False
 
 
+def cut_paste_user_mask(r_obj, c_obj):
+    offset = 10
+    img1 = r_obj.image
+    img2 = c_obj.image
+
+    # create masks
+    mask2 = c_obj.self_hud_mask()
+    mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
+
+    temp1 = img1.copy()
+    temp2 = img2.copy()
+    masked2 = cv2.bitwise_and(temp2, temp2, mask=mask2gray)
+    # calc BBs scale factor
+    center1 = r_obj.pix_points[168]
+    center2 = c_obj.pix_points[168]
+
+    rx = (r_obj.delta_x + 2 * offset) / (c_obj.delta_x + 2 * offset)
+    ry = (r_obj.delta_y + 2 * offset) / (c_obj.delta_y + 2 * offset)
+    media_scale = round((rx + ry) / 2, 2)
+    # calc Mask resize
+    min_x, min_y = c_obj.bb_p1
+    max_x, max_y = c_obj.bb_p2
+
+    delta_2_min = [min_x - offset, min_y - offset]
+    delta_2_max = [max_x + offset, max_y + offset]
+    if delta_2_min[0] < 0:
+        delta_2_min[0] = 0
+    elif delta_2_max[0] > img2.shape[1]:
+        delta_2_max[0] = img2.shape[1]
+    if delta_2_min[1] < 0:
+        delta_2_min[1] = 0
+    elif delta_2_max[1] > img2.shape[0]:
+        delta_2_max[1] = img2.shape[0]
+
+    new_min_x = center1[0] - int((center2[0] - delta_2_min[0]) * media_scale)
+    new_min_y = center1[1] - int((center2[1] - delta_2_min[1]) * media_scale)
+    new_max_x = center1[0] + int((delta_2_max[0] - center2[0]) * media_scale)
+    new_max_y = center1[1] + int((delta_2_max[1] - center2[1]) * media_scale)
+    if new_min_x < 0:
+        new_min_x = 0
+    elif new_min_y < 0:
+        new_min_y = 0
+    elif new_max_x > img1.shape[1]:
+        new_max_x = img1.shape[1]
+    elif new_max_y > img1.shape[0]:
+        new_max_y = img1.shape[0]
+    cropped2 = masked2[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
+    cropped2 = cv2.resize(cropped2, ((new_max_x - new_min_x), (new_max_y - new_min_y)),
+                          interpolation=cv2.INTER_LINEAR)
+    # find Mask edges and apply
+    edged = find_edges(cropped2, 3, 1, 1, 3)
+    copied = temp1[new_min_y:new_max_y, new_min_x:new_max_x]
+    if copied.shape == edged.shape:
+        copied = cv2.addWeighted(copied, 1, edged, .99, 1)
+    temp1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
+    return temp1
 def find_edges(img, blur_size, dx, dy, ksize):
     blurred = cv2.GaussianBlur(img, (blur_size, blur_size), sigmaX=0, sigmaY=0)
     grayed = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
@@ -476,10 +468,8 @@ def calculate_cdf(histogram):
     """
     # Get the cumulative sum of the elements
     cdf = histogram.cumsum()
-
     # Normalize the cdf
     normalized_cdf = cdf / float(cdf.max())
-
     return normalized_cdf
 
 
@@ -494,7 +484,6 @@ def calculate_lookup(src_cdf, ref_cdf):
     lookup_table = np.zeros(256)
     lookup_val = 0
     for src_pixel_val in range(len(src_cdf)):
-        # lookup_val
         for ref_pixel_val in range(len(ref_cdf)):
             if ref_cdf[ref_pixel_val] >= src_cdf[src_pixel_val]:
                 lookup_val = ref_pixel_val
@@ -511,19 +500,16 @@ def match_histograms(src_image, ref_image):
     :return: image_after_matching
     :rtype: image (array)
     """
-    # Split the images into the different color channels b means blue, g means green and r means red
+    # Split the images into the different color channels
     src_b, src_g, src_r = cv2.split(src_image)
     ref_b, ref_g, ref_r = cv2.split(ref_image)
-
     # Compute the b, g, and r histograms separately
-    # The flatten() Numpy method returns a copy of the array c collapsed into one dimension.
     src_hist_blue, bin_0 = np.histogram(src_b.flatten(), 256, [0, 256])
     src_hist_green, bin_1 = np.histogram(src_g.flatten(), 256, [0, 256])
     src_hist_red, bin_2 = np.histogram(src_r.flatten(), 256, [0, 256])
     ref_hist_blue, bin_3 = np.histogram(ref_b.flatten(), 256, [0, 256])
     ref_hist_green, bin_4 = np.histogram(ref_g.flatten(), 256, [0, 256])
     ref_hist_red, bin_5 = np.histogram(ref_r.flatten(), 256, [0, 256])
-
     # Compute the normalized cdf for the source and reference image
     src_cdf_blue = calculate_cdf(src_hist_blue)
     src_cdf_green = calculate_cdf(src_hist_green)
@@ -531,12 +517,10 @@ def match_histograms(src_image, ref_image):
     ref_cdf_blue = calculate_cdf(ref_hist_blue)
     ref_cdf_green = calculate_cdf(ref_hist_green)
     ref_cdf_red = calculate_cdf(ref_hist_red)
-
     # Make a separate lookup table for each color
     blue_lookup_table = calculate_lookup(src_cdf_blue, ref_cdf_blue)
     green_lookup_table = calculate_lookup(src_cdf_green, ref_cdf_green)
     red_lookup_table = calculate_lookup(src_cdf_red, ref_cdf_red)
-
     # Use the lookup function to transform the colors of the original source image
     blue_after_transform = cv2.LUT(src_b, blue_lookup_table)
     green_after_transform = cv2.LUT(src_g, green_lookup_table)
@@ -544,20 +528,10 @@ def match_histograms(src_image, ref_image):
     # Put the image back together
     image_after_matching = cv2.merge([blue_after_transform, green_after_transform, red_after_transform])
     image_after_matching = cv2.convertScaleAbs(image_after_matching)
-
     return image_after_matching
 
 
-def match_color(src_BGR, ref_BGR):
-    src_BGR = cv2.cvtColor(src_BGR, cv2.COLOR_BGR2RGB)
-    ref_BGR = cv2.cvtColor(ref_BGR, cv2.COLOR_BGR2RGB)
-    reference = np.array(src_BGR, dtype=np.uint8)
-    image = np.array(ref_BGR, dtype=np.uint8)
-    matched = mh(image, reference, channel_axis=-1)
-    matched = cv2.cvtColor(matched, cv2.COLOR_RGB2BGR)
-    return matched
 # Morph Functions
-
 def apply_affine_transform(src, src_tri, dst_tri, siz):
     warp_mat = cv2.getAffineTransform(np.float32(src_tri), np.float32(dst_tri))
     # Apply the Affine Transform just found to the src image
@@ -581,14 +555,11 @@ def warp_triangle(img1, img2, t1, t2):
     # Get mask by filling triangle
     mask = np.zeros((h2, w2, 3), dtype=np.float32)
     cv2.fillConvexPoly(mask, np.int32(t2_rect_int), (1.0, 1.0, 1.0), 16, 0)
-
     # Apply warpImage to small rectangular patches
     img1_rect = img1[y1:y1 + h1, x1:x1 + w1]
     size = (w2, h2)
     img2_rect = apply_affine_transform(img1_rect, t1_rect, t2_rect, size)
-
     img2_rect = img2_rect * mask
-
     # Copy triangular region of the rectangular patch to the output image
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask)
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] + img2_rect
@@ -596,7 +567,6 @@ def warp_triangle(img1, img2, t1, t2):
 
 def adjust_center(center):
     center_list = list(center)
-
     if selected == 0:
         center_list[0] -= 8
         center_list[1] -= -13
@@ -645,62 +615,35 @@ def adjust_center(center):
     return tuple(center_list)
 
 
-def find_noise_scratches(img):
-    # Denoising
+def find_noise_scratches(img):  # De-noising
     dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
     noise = cv2.subtract(img, dst)
-    # cv2.imshow('0', img)
-    # cv2.imshow('1', dst)
-    # cv2.imshow('2', noise)
-    # cv2.waitKey(0)
     return dst, noise
 
 
 def morph(c_obj, r_obj):
     ref_image = r_obj.image
     cam_image = c_obj.image
-    MASK_DILATE_ITER = 15
-    MASK_ERODE_ITER = 20
-    BLUR = 35
     cam_points = c_obj.pix_points
     ref_points = r_obj.pix_points
+    mask_dilate_iter = 15
+    mask_erode_iter = 20
+    blur_value = 35
     offset = 5
+
+    # COLOR CORRECTION
     ref_denoised, noise = find_noise_scratches(ref_image)
-    #######################################
+    
     cc_r_roi = ref_denoised[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
                r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
     cc_c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
     cam_cc = match_histograms(cc_c_roi, cc_r_roi)
-    # cam_cc2 = match_color(cc_r_roi, cc_c_roi)
-    # renoised = ref_denoised + noise
-    # cv2.imshow('denois', ref_denoised)
-    # cv2.imshow('ref', ref_image)
-    # cv2.imshow('noise', noise)
-    # cv2.imshow('renoised', renoised)
-
+    
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset, c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = \
         cam_cc.astype('float64')
-    # Find convex hull
-    # cv2.imshow('cam_cc', cam_image)
-    cam_hull = cv2.convexHull(np.array(cam_points), returnPoints=False)
-    ref_hull = cv2.convexHull(np.array(ref_points))
-    ref_hull_ids = cv2.convexHull(np.array(ref_points), returnPoints=False)
-    # Create convex hull lists
-    hull1 = []
-    hull2 = []
-    for i in range(0, len(cam_hull)):
-        hull1.append(ref_points[cam_hull[i][0]])
-    for i in range(0, len(ref_hull_ids)):
-        hull2.append(ref_points[ref_hull_ids[i][0]])
-    # Calculate Mask for Seamless cloning
-    hull_1u = []
-    hull_2u = []
-    for i in range(0, len(hull1)):
-        hull_1u.append((hull1[i][0], hull1[i][1]))
-    for i in range(0, len(hull2)):
-        hull_2u.append((hull2[i][0], hull2[i][1]))
 
+    # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris  # triangles
     tris1 = []
@@ -713,55 +656,32 @@ def morph(c_obj, r_obj):
             tri2.append(ref_points[dt[i][j]])
         tris1.append(tri1)
         tris2.append(tri2)
-    # Apply affine transformation to Delaunay triangles
-    for i in range(0, len(tris1)):
+    for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
-    # GENERATE FINAL IMAGE
-    # cv2.imshow('warped', ref_new_face)
 
+    # GENERATE FINAL IMAGE
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
     ref_img_mask = np.zeros_like(ref_gray)
+    ref_hull = cv2.convexHull(np.array(ref_points))
     ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_hull, 255)
-    # cv2.imshow('convexPolyMask', ref_face_mask)
-    ref_face_mask = cv2.dilate(ref_face_mask, None, iterations=MASK_DILATE_ITER)
-    ref_face_mask = cv2.erode(ref_face_mask, None, iterations=MASK_ERODE_ITER)
-    ref_face_mask = cv2.GaussianBlur(ref_face_mask, (BLUR, BLUR), sigmaX=0, sigmaY=0)
-    # cv2.imshow('gaussedMask', ref_face_mask)
+    ref_face_mask = cv2.dilate(ref_face_mask, None, iterations=mask_dilate_iter)
+    ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
+    ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(ref_face_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
     center = adjust_center(center)
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_denoised.astype('float') / 255
-    # cv2.imshow('out_face', out_face)
-    # cv2.imshow('out_bg', out_bg)
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
     out = cv2.add(out, noise)
     out = cv2.add(out, noise)
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
-    # output = cv2.addWeighted(out, .5, output, 0.5, 0)
-    # cv2.imshow('out', out)
-    # cv2.imshow('output', output)
-    cv2.waitKey(0)
+    
     return output
 
 
-def images_in_folder(folder):
-    filelist = []
-    for filename in glob.iglob(f'{folder}*'):
-        ext = os.path.splitext(filename)[1]
-        if ext.lower() not in valid_images:
-            continue
-        filelist.append(filename)
-    return filelist
 
-
-ref_files = images_in_folder(ref_path)
-# for filename in glob.iglob(f'{ref_path}*'):
-#     ext = os.path.splitext(filename)[1]
-#     if ext.lower() not in valid_images:
-#         continue
-#     ref_files.append(filename)
 
 MainApp().run()

@@ -4,7 +4,6 @@ import glob
 import json
 import os
 import re
-# import kivy
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 from kivy.app import App
 from kivy.uix.widget import Widget
@@ -16,7 +15,6 @@ from kivy.core.window import Window
 import Face as F_obj
 import send_mail as mail
 
-# kivy.require("1.9.1")
 ref_files = []
 ref = []
 buttons = []
@@ -262,8 +260,6 @@ class MainLayout(Widget):
                 selected = b
                 if morph_selected != -1:
                     btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
-                    # morphed_buttons[morph_selected].height = 150
-                    # morphed_buttons[morph_selected].state = 'normal'
                     morph_selected = -1
             elif buttons[b] == btn and btn.state == 'normal':
                 view.source = ''
@@ -440,6 +436,8 @@ def cut_paste_user_mask(r_obj, c_obj):
         copied = cv2.addWeighted(copied, 1, edged, .99, 1)
     temp1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
     return temp1
+
+
 def find_edges(img, blur_size, dx, dy, ksize):
     blurred = cv2.GaussianBlur(img, (blur_size, blur_size), sigmaX=0, sigmaY=0)
     grayed = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)

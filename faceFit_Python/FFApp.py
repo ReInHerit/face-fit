@@ -14,6 +14,11 @@ from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 import Face as F_obj
 import send_mail as mail
+from shapely.geometry import MultiLineString
+from shapely.ops import unary_union, polygonize
+from scipy.spatial import Delaunay
+from collections import Counter
+import itertools
 
 ref_files = []
 ref = []
@@ -28,7 +33,7 @@ last_match = -1
 r_rot = []
 c_rot = []
 pb_rots = []
-delta = 7
+delta = 5
 final_morphs = {}
 morph_texture = {}
 filled = []
@@ -384,14 +389,15 @@ def cut_paste_user_mask(r_obj, c_obj):
     offset = 10
     img1 = r_obj.image
     img2 = c_obj.image
-
     # create masks
-    mask2 = c_obj.self_hud_mask()
-    mask2gray = cv2.cvtColor(mask2, cv2.COLOR_BGR2GRAY)
+    edges, concave_points = concave_hull(np.int32(c_obj.pix_points))
+    mask = np.zeros(cam_obj.image.shape, dtype=cam_obj.image.dtype)
+    mask = cv2.fillPoly(mask, [concave_points], (255, 255, 255))
+    mask2gray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
 
-    temp1 = img1.copy()
-    temp2 = img2.copy()
-    masked2 = cv2.bitwise_and(temp2, temp2, mask=mask2gray)
+    r_img = img1.copy()
+    c_img = img2.copy()
+    c_masked = cv2.bitwise_and(c_img, c_img, mask=mask2gray)
     # calc BBs scale factor
     center1 = r_obj.pix_points[168]
     center2 = c_obj.pix_points[168]
@@ -403,39 +409,22 @@ def cut_paste_user_mask(r_obj, c_obj):
     min_x, min_y = c_obj.bb_p1
     max_x, max_y = c_obj.bb_p2
 
-    delta_2_min = [min_x - offset, min_y - offset]
-    delta_2_max = [max_x + offset, max_y + offset]
-    if delta_2_min[0] < 0:
-        delta_2_min[0] = 0
-    elif delta_2_max[0] > img2.shape[1]:
-        delta_2_max[0] = img2.shape[1]
-    if delta_2_min[1] < 0:
-        delta_2_min[1] = 0
-    elif delta_2_max[1] > img2.shape[0]:
-        delta_2_max[1] = img2.shape[0]
+    delta_2_min = [clamp(min_x - offset, 0, img2.shape[1]), clamp(min_y - offset, 0, img2.shape[0])]
+    delta_2_max = [clamp(max_x + offset, 0, img2.shape[1]), clamp(max_y + offset, 0, img2.shape[0])]
 
-    new_min_x = center1[0] - int((center2[0] - delta_2_min[0]) * media_scale)
-    new_min_y = center1[1] - int((center2[1] - delta_2_min[1]) * media_scale)
-    new_max_x = center1[0] + int((delta_2_max[0] - center2[0]) * media_scale)
-    new_max_y = center1[1] + int((delta_2_max[1] - center2[1]) * media_scale)
-    if new_min_x < 0:
-        new_min_x = 0
-    elif new_min_y < 0:
-        new_min_y = 0
-    elif new_max_x > img1.shape[1]:
-        new_max_x = img1.shape[1]
-    elif new_max_y > img1.shape[0]:
-        new_max_y = img1.shape[0]
-    cropped2 = masked2[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
-    cropped2 = cv2.resize(cropped2, ((new_max_x - new_min_x), (new_max_y - new_min_y)),
-                          interpolation=cv2.INTER_LINEAR)
+    new_min_x = clamp(center1[0] - int((center2[0] - delta_2_min[0]) * media_scale), 0, img1.shape[1])
+    new_min_y = clamp(center1[1] - int((center2[1] - delta_2_min[1]) * media_scale), 0, img1.shape[0])
+    new_max_x = clamp(center1[0] + int((delta_2_max[0] - center2[0]) * media_scale), 0, img1.shape[1])
+    new_max_y = clamp(center1[1] + int((delta_2_max[1] - center2[1]) * media_scale), 0, img1.shape[0])
+
+    c_new_roi = c_masked[delta_2_min[1]:delta_2_max[1], delta_2_min[0]:delta_2_max[0]]
+    c_new_roi = cv2.resize(c_new_roi, ((new_max_x - new_min_x), (new_max_y - new_min_y)), interpolation=cv2.INTER_LINEAR)
     # find Mask edges and apply
-    edged = find_edges(cropped2, 3, 1, 1, 3)
-    copied = temp1[new_min_y:new_max_y, new_min_x:new_max_x]
-    if copied.shape == edged.shape:
-        copied = cv2.addWeighted(copied, 1, edged, .99, 1)
-    temp1[new_min_y:new_max_y, new_min_x:new_max_x] = copied
-    return temp1
+    edged = find_edges(c_new_roi, 3, 1, 1, 3)
+    copied = r_img[new_min_y:new_max_y, new_min_x:new_max_x]
+    if copied.shape == edged.shape: copied = cv2.addWeighted(copied, 1, edged, .99, 1)
+    r_img[new_min_y:new_max_y, new_min_x:new_max_x] = copied
+    return r_img
 
 
 def find_edges(img, blur_size, dx, dy, ksize):
@@ -456,14 +445,14 @@ def find_edges(img, blur_size, dx, dy, ksize):
     return edged
 
 
+def clamp(num, min_value, max_value):
+    num = max(min(num, max_value), min_value)
+    return num
+
+
 # COLOR CORRECTION functions
 def calculate_cdf(histogram):
-    """
-    This method calculates the cumulative distribution function
-    :param array histogram: The values of the histogram
-    :return: normalized_cdf: The normalized cumulative distribution function
-    :rtype: array
-    """
+    """ This method calculates the cumulative distribution function """
     # Get the cumulative sum of the elements
     cdf = histogram.cumsum()
     # Normalize the cdf
@@ -472,13 +461,7 @@ def calculate_cdf(histogram):
 
 
 def calculate_lookup(src_cdf, ref_cdf):
-    """
-    This method creates the lookup table
-    :param array src_cdf: The cdf for the source image
-    :param array ref_cdf: The cdf for the reference image
-    :return: lookup_table: The lookup table
-    :rtype: array
-    """
+    """ This method creates the lookup table """
     lookup_table = np.zeros(256)
     lookup_val = 0
     for src_pixel_val in range(len(src_cdf)):
@@ -491,13 +474,7 @@ def calculate_lookup(src_cdf, ref_cdf):
 
 
 def match_histograms(src_image, ref_image):
-    """
-    This method matches the source image histogram to the reference signal
-    :param image src_image: The original source image
-    :param image  ref_image: The reference image
-    :return: image_after_matching
-    :rtype: image (array)
-    """
+    """ This method matches the source image histogram to the reference signal """
     # Split the images into the different color channels
     src_b, src_g, src_r = cv2.split(src_image)
     ref_b, ref_g, ref_r = cv2.split(ref_image)
@@ -530,13 +507,203 @@ def match_histograms(src_image, ref_image):
 
 
 # Morph Functions
-def apply_affine_transform(src, src_tri, dst_tri, siz):
-    warp_mat = cv2.getAffineTransform(np.float32(src_tri), np.float32(dst_tri))
-    # Apply the Affine Transform just found to the src image
-    dst = cv2.warpAffine(src, warp_mat, (siz[0], siz[1]), None, flags=cv2.INTER_LINEAR,
-                         borderMode=cv2.BORDER_REFLECT_101)
-    return dst
+def concave_hull(coords):  # coords is a 2D numpy array
 
+    # i removed the Qbb option from the scipy defaults.
+    # it is much faster and equally precise without it.
+    # unless your coords are integers.
+    # see http://www.qhull.org/html/qh-optq.htm
+    tri = Delaunay(coords, qhull_options="Qc Qz Q12").vertices
+
+    ia, ib, ic = (
+        tri[:, 0],
+        tri[:, 1],
+        tri[:, 2],
+    )  # indices of each of the triangles' points
+    pa, pb, pc = (
+        coords[ia],
+        coords[ib],
+        coords[ic],
+    )  # coordinates of each of the triangles' points
+
+    a = np.sqrt((pa[:, 0] - pb[:, 0]) ** 2 + (pa[:, 1] - pb[:, 1]) ** 2)
+    b = np.sqrt((pb[:, 0] - pc[:, 0]) ** 2 + (pb[:, 1] - pc[:, 1]) ** 2)
+    c = np.sqrt((pc[:, 0] - pa[:, 0]) ** 2 + (pc[:, 1] - pa[:, 1]) ** 2)
+
+    s = (a + b + c) * 0.5  # Semi-perimeter of triangle
+    print(s)
+    area = np.sqrt(
+        s * (s - a) * (s - b) * (s - c)
+    )  # Area of triangle by Heron's formula
+    print(a * b * c/ (4.0 * area))
+    filter = (
+        a * b * c / (4.0 * area) < 50
+    )  # Radius Filter based on alpha value
+    # Filter the edges
+    edges = tri[filter]
+
+    # now a main difference with the aforementioned approaches is that we dont
+    # use a Set() because this eliminates duplicate edges. in the list below
+    # both (i, j) and (j, i) pairs are counted. The reasoning is that boundary
+    # edges appear only once while interior edges twice
+    edges = [tuple(sorted(combo)) for e in edges for combo in itertools.combinations(e, 2)]
+
+    count = Counter(edges)  # count occurrences of each edge
+
+    # keep only edges that appear one time (concave hull edges)
+    edges = [e for e, c in count.items() if c == 1]
+
+    # these are the coordinates of the edges that comprise the concave hull
+    edges = [(coords[e[0]], coords[e[1]]) for e in edges]
+    # use this only if you need to return your hull points in "order" (i think
+    # its CCW)
+    ml = MultiLineString(edges)
+    poly = polygonize(ml)
+    hull = unary_union(list(poly))
+    hull_vertices = hull.exterior.coords.xy
+    vertices = []
+    length = len(hull_vertices[0])
+    for id in range(length):
+        point = [np.int32(hull_vertices[0][id]), np.int32(hull_vertices[1][id])]
+        vertices.append(point)
+    vertices = np.array(vertices)
+    # vertices = np.array(hull_vertices, dtype=np.int32)
+    return edges, vertices
+
+# def alpha_shape(points, alpha, only_outer=True):
+#     """
+#     Compute the alpha shape (concave hull) of a set of points.
+#     :param points: np.array of shape (n,2) points.
+#     :param alpha: alpha value.
+#     :param only_outer: boolean value to specify if we keep only the outer border
+#     or also inner edges.
+#     :return: set of (i,j) pairs representing edges of the alpha-shape. (i,j) are
+#     the indices in the points array.
+#     """
+#     assert points.shape[0] > 3, "Need at least four points"
+#     def add_edge(edges, i, j):
+#         """
+#         Add an edge between the i-th and j-th points,
+#         if not in the list already
+#         """
+#
+#         if (i, j) in edges or (j, i) in edges:
+#             # already added
+#             print('already added')
+#             assert (j, i) in edges, "Can't go twice over same directed edge right?"
+#             if only_outer:
+#                 # if both neighboring triangles are in shape, it's not a boundary edge
+#                 edges.remove((j, i))
+#             return
+#         edges.add((i, j))
+#
+#     # result = {tuple(sorted(i)): i for i in media_pipes_all_tris}.values()
+#     # print(len(result), len(media_pipes_all_tris))
+#     tri = new_tris #Delaunay(points)
+#     edges = set()
+#     perimeter_points = []
+#     perimeter_indices = []
+#     # Loop over triangles:
+#     # ia, ib, ic = indices of corner points of the triangle
+#     for ia, ib, ic in tri:#.vertices
+#
+#         pa = points[ia]
+#         pb = points[ib]
+#         pc = points[ic]
+#         # Computing radius of triangle circumcircle
+#         # www.mathalino.com/reviewer/derivation-of-formulas/derivation-of-formula-for-radius-of-circumcircle
+#         a = np.sqrt((pa[0] - pb[0]) ** 2 + (pa[1] - pb[1]) ** 2)
+#         b = np.sqrt((pb[0] - pc[0]) ** 2 + (pb[1] - pc[1]) ** 2)
+#         c = np.sqrt((pc[0] - pa[0]) ** 2 + (pc[1] - pa[1]) ** 2)
+#         s = (a + b + c) / 2.0
+#         area = np.sqrt(s * (s - a) * (s - b) * (s - c))
+#         circum_r = a * b * c / (4.0 * area)
+#         if circum_r < alpha:
+#             print('qui')
+#             add_edge(edges, ia, ib)
+#             add_edge(edges, ib, ic)
+#             add_edge(edges, ic, ia)
+#     print('fuori')
+#     for el in edges:
+#         print('in edges')
+#         perimeter_indices.append([el[0], el[1]])
+#         perimeter_points.append([points[el[0]][0], points[el[0]][1]])
+#         perimeter_points.append([points[el[1]][0], points[el[1]][1]])
+#     new_list = []
+#     for l in perimeter_points:
+#         if l not in new_list:
+#             new_list.append(l)
+#     perimeter_points = new_list
+#     # print(np.asarray(perimeter_points))
+#     data = np.array(perimeter_points)
+#     center = data.mean(0)
+#     angle = np.arctan2(*(data - center).T[::-1])
+#     index = np.argsort(angle)
+#     new_pp = []
+#     for id in index:
+#         new_pp.append(perimeter_points[id])
+#     # print('index', new_pp)
+#     vertices = np.array(new_pp, dtype=np.int32)
+#     # print('index', vertices)
+#     # edges = np.array(edges)
+#     # for p in points:
+#
+#     return [vertices, tri]
+#
+
+# def concave(points, k=3):
+#     """
+#     Calculates the concave hull for a list of points. Each point is a tuple
+#     containing the x- and y-coordinate. k defines the number of considered
+#     neighbours.
+#     :param points: list of points
+#     :param k: considered neighbours
+#     :return: concave hull
+#     """
+#     dataset = list(set(points))  # Remove duplicates
+#     if len(dataset) < 3:
+#         raise Exception("Dataset length cannot be smaller than 3")
+#     if len(dataset) == 3:
+#         return dataset  # Points are a polygon already
+#
+#     k = min(max(k, 3), len(dataset) - 1)  # Make sure that k neighbours can be found
+#
+#     first = current = min(dataset, key=lambda x: x[1])
+#     hull = [first]  # Initialize hull
+#     dataset.remove(first)  # Remove processed point
+#     previous_angle = 0
+#
+#     while (current != first or len(hull) == 1) and len(dataset) > 0:
+#         if len(hull) == 3:
+#             dataset.append(first)  # Add first point again
+#
+#         neighbours = knn(dataset, current, k)
+#         c_points = sorted(neighbours, key=lambda x: -angle(x, current, previous_angle))
+#
+#         its = True
+#         i = -1
+#         while its and i < len(c_points) - 1:
+#             i += 1
+#             last_point = 1 if c_points[i] == first else 0
+#             j = 1
+#             its = False
+#             while not its and j < len(hull) - last_point:
+#                 its = intersects(hull[-1], c_points[i], hull[-j - 1], hull[-j])
+#                 j += 1
+#
+#         if its:  # All points intersect, try again with higher a number of neighbours
+#             return concave(points, k + 1)
+#
+#         previous_angle = angle(c_points[i], current)
+#         current = c_points[i]
+#         hull.append(current)  # Valid candidate was found
+#         dataset.remove(current)
+#
+#     for point in dataset:
+#         if not point_in_polygon(point, hull):
+#             return concave(points, k + 1)
+#
+#     return hull
 
 def warp_triangle(img1, img2, t1, t2):
     x1, y1, w1, h1 = cv2.boundingRect(np.float32([t1]))
@@ -549,14 +716,16 @@ def warp_triangle(img1, img2, t1, t2):
         t1_rect.append(((t1[i][0] - x1), (t1[i][1] - y1)))
         t2_rect.append(((t2[i][0] - x2), (t2[i][1] - y2)))
         t2_rect_int.append(((t2[i][0] - x2), (t2[i][1] - y2)))
-
     # Get mask by filling triangle
     mask = np.zeros((h2, w2, 3), dtype=np.float32)
     cv2.fillConvexPoly(mask, np.int32(t2_rect_int), (1.0, 1.0, 1.0), 16, 0)
     # Apply warpImage to small rectangular patches
     img1_rect = img1[y1:y1 + h1, x1:x1 + w1]
     size = (w2, h2)
-    img2_rect = apply_affine_transform(img1_rect, t1_rect, t2_rect, size)
+    # Affine Transformation
+    warp_mat = cv2.getAffineTransform(np.float32(t1_rect), np.float32(t2_rect))
+    img2_rect = cv2.warpAffine(img1_rect, warp_mat, (size[0], size[1]), None, flags=cv2.INTER_LINEAR,
+                         borderMode=cv2.BORDER_REFLECT_101)
     img2_rect = img2_rect * mask
     # Copy triangular region of the rectangular patch to the output image
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask)
@@ -565,49 +734,51 @@ def warp_triangle(img1, img2, t1, t2):
 
 def adjust_center(center):
     center_list = list(center)
-    if selected == 0:
+    refname = os.path.splitext(os.path.basename(ref_files[selected]))[0]
+
+    if refname == 'image01':
         center_list[0] -= 8
         center_list[1] -= -13
-    elif selected == 1:
+    elif refname == 'image02':
         center_list[0] -= -2
         center_list[1] -= -11
-    elif selected == 2:
+    elif refname == 'image04':
         center_list[0] -= -8
         center_list[1] -= -6
-    elif selected == 3:
+    elif refname == 'image05':
         center_list[0] -= 4
         center_list[1] -= -8
-    elif selected == 4:
+    elif refname == 'image06':
         center_list[0] -= -8
         center_list[1] -= -9
-    elif selected == 5:
+    elif refname == 'image07':
         center_list[0] -= 7
         center_list[1] -= -13
-    elif selected == 6:
+    elif refname == 'image08':
         center_list[0] -= -3
         center_list[1] -= -14
-    elif selected == 7:
+    elif refname == 'image09':
         center_list[0] -= -11
         center_list[1] -= -6
-    elif selected == 8:
+    elif refname == 'image10':
         center_list[0] -= -3
         center_list[1] -= -8
-    elif selected == 9:
+    elif refname == 'image11':
         center_list[0] -= -6
         center_list[1] -= -14
-    elif selected == 10:
+    elif refname == 'image12':
         center_list[0] -= 8
         center_list[1] -= -13
-    elif selected == 11:
+    elif refname == 'image13':
         center_list[0] -= -10
         center_list[1] -= -8
-    elif selected == 12:
+    elif refname == 'image14':
         center_list[0] -= 5
         center_list[1] -= -10
-    elif selected == 13:
+    elif refname == 'image15':
         center_list[0] -= 3
         center_list[1] -= -10
-    elif selected == 14:
+    elif refname == 'image16':
         center_list[0] -= 4
         center_list[1] -= -18
     return tuple(center_list)
@@ -624,11 +795,12 @@ def morph(c_obj, r_obj):
     cam_image = c_obj.image
     cam_points = c_obj.pix_points
     ref_points = r_obj.pix_points
-    mask_dilate_iter = 15
-    mask_erode_iter = 20
+    mask_dilate_iter = 10
+    mask_erode_iter = 15
     blur_value = 35
     offset = 5
-
+    # concave_poly, tris = alpha_shape(np.array(ref_points), alpha=25, only_outer=True)
+    edges, conc_hull = concave_hull(np.array(ref_points))
     # COLOR CORRECTION
     ref_denoised, noise = find_noise_scratches(ref_image)
     
@@ -661,8 +833,11 @@ def morph(c_obj, r_obj):
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
     ref_img_mask = np.zeros_like(ref_gray)
     ref_hull = cv2.convexHull(np.array(ref_points))
-    ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_hull, 255)
-    ref_face_mask = cv2.dilate(ref_face_mask, None, iterations=mask_dilate_iter)
+    test_mask = cv2.fillPoly(ref_img_mask, [conc_hull], 255)
+    cv2.imshow('', test_mask)
+    cv2.waitKey(0)
+    # ref_face_mask = cv2.fillConvexPoly(ref_img_mask, ref_hull, 255)
+    ref_face_mask = cv2.dilate(test_mask, None, iterations=mask_dilate_iter)
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(ref_face_mask)  # Find Centroid
@@ -678,8 +853,6 @@ def morph(c_obj, r_obj):
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
     
     return output
-
-
 
 
 MainApp().run()

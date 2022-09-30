@@ -25,22 +25,18 @@ class Face:
     def __init__(self, which):
         self.which = which
         self.image = []
-        # self.np_image = []
         self.f_landmarks = []
         self.landmarks = []
         self.points = []
         self.pix_points = []
-        # self.where_looks = ''
         self.alpha = 0
         self.beta = 0
         self.tilt = {'where': '', 'angle': 0}
         self.status = {'l_e': '', 'r_e': '', 'lips': ''}
-        # self.centers = {'l_e': (0, 0), 'r_e': (0, 0), 'lips': (0, 0)}
         self.delta_x = 0
         self.delta_y = 0
         self.bb_p1 = (0, 0)
         self.bb_p2 = (0, 0)
-        # self.bb_center = (0, 0)
         self.l_e = FacePart(LEFT_EYE)
         self.r_e = FacePart(RIGHT_EYE)
         self.lips = FacePart(LIPS)
@@ -55,8 +51,7 @@ class Face:
             picture = image
             # Convert the BGR image to RGB before processing.
             result = face_m.process(cv2.cvtColor(picture, cv2.COLOR_BGR2RGB))
-            if result.multi_face_landmarks: 
-                # self.np_image = picture.copy()
+            if result.multi_face_landmarks:
                 w, h, c = picture.shape
                 for face_landmarks in result.multi_face_landmarks:
                     self.points = []
@@ -91,40 +86,18 @@ class Face:
                     self.bb_p2 = (cx_max, cy_max)
                     self.delta_x = cx_max - cx_min
                     self.delta_y = cy_max - cy_min
-                    # self.bb_center = (int(cx_min + self.delta_x / 2), int(cy_min + self.delta_y / 2))
                     # where is looking
                     self.l_e.calc_pts(self.points)
                     self.r_e.calc_pts(self.points)
                     self.lips.calc_pts(self.points)
                     self.where_is_looking()
 
-                # self.np_image = np.asarray(self.np_image)
-
-    # def self_hud_mask(self):
-    #     # Find convex hull indices
-    #     hull_indices = cv2.convexHull(np.array(self.pix_points), returnPoints=False)
-    #
-    #     # Create convex hull lists
-    #     hull = []
-    #     for i in range(0, len(hull_indices)):
-    #         hull.append(self.pix_points[hull_indices[i][0]])
-    #     # Calculate Mask for Seamless cloning
-    #     hull_8u = []
-    #     for i in range(0, len(hull)):
-    #         hull_8u.append((hull[i][0], hull[i][1]))
-    #     mask = np.zeros(self.image.shape, dtype=self.image.dtype)
-    #     cv2.fillConvexPoly(mask, np.int32(hull_8u), (255, 255, 255))
-    #     return mask
-
-    def where_is_looking(self):  # , img, f_landmarks, what
+    def where_is_looking(self):
         hr, wr, cr = self.image.shape
         face2d = []
         face3d = []
-        for id, lm in enumerate(self.f_landmarks.landmark):
-            if id == 33 or id == 263 or id == 1 or id == 61 or id == 291 or id == 199:
-                # if id == 1:
-                #     nose_2d = (lm.x * wr, lm.y * hr)
-                #     nose_3d = (lm.x * wr, lm.y * hr, lm.z * 8000)
+        for n, lm in enumerate(self.f_landmarks.landmark):
+            if n == 33 or n == 263 or n == 1 or n == 61 or n == 291 or n == 199:
                 x1, y1 = int(lm.x * wr), int(lm.y * hr)
                 face2d.append([x1, y1])  # Get the 2D Coordinates
                 face3d.append([x1, y1, lm.z])  # Get the 3D Coordinates
@@ -137,16 +110,13 @@ class Face:
                                [0, focal_length, wr / 2],
                                [0, 0, 1]])
         dist_matrix = np.zeros((4, 1), dtype=np.float64)  # The Distance Matrix
-        succ, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)  # Solve PnP
+        success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)  # Solve PnP
         r_mat, jac = cv2.Rodrigues(rot_vec)  # Get rotational matrix
         # Get angles
         angles, mtx_r, mtx_q, qx, qy, qz = cv2.RQDecomp3x3(r_mat)
         alpha = angles[0] * 360
         beta = angles[1] * 360
-        if self.which == 'ref':  # if reference
-            alpha = angles[0] * 360
-            beta = angles[1] * 360
-        else:
+        if self.which == 'cam':  # if camera
             alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
             beta = int(normalize(beta, {'actual': {'lower': -15, 'upper': 12}, 'desired': {'lower': -65, 'upper': 55}}))
         # tilt
@@ -258,4 +228,5 @@ def check_expression(img, landmarks):
         lips = 'full opened'
 
     return l_e, r_e, lips
+
 

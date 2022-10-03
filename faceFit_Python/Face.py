@@ -1,9 +1,9 @@
 import math
 from operator import itemgetter
-
 import cv2
 import mediapipe as mp
 import numpy as np
+
 # Mediapipe
 
 mp_face_detection = mp.solutions.face_detection

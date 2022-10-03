@@ -19,7 +19,7 @@ from shapely.ops import unary_union, polygonize
 from scipy.spatial import Delaunay
 from collections import Counter
 import itertools
-
+reset = -1
 ref_files = []
 ref = []
 buttons = []
@@ -118,6 +118,8 @@ class MyButton(ToggleButtonBehavior, Image):
 
 
 class MyCamera(Image):
+    intro_images = ObjectProperty(Image(source='intro.zip', anim_delay=0.1, anim_loop=1))
+
     def __init__(self, **kwargs):
         super(MyCamera, self).__init__(**kwargs)
         self.capture = cv2.VideoCapture(0, cv2.CAP_MSMF)  # Connect to 0th camera
@@ -178,16 +180,19 @@ class MyCamera(Image):
                 print('camera not ready')
         else:  # selected = -1
             self.texture = None
-            if last_match != -1 and morph_texture and morph_texture[last_match]:
-                if morph_selected == -1:
-                    self.texture = morph_texture[last_match]
+            if reset == 0:
+                if last_match != -1 and morph_texture and morph_texture[last_match]:
+                    if morph_selected == -1:
+                        self.texture = morph_texture[last_match]
+                    else:
+                        self.texture = morph_texture[morph_selected]
                 else:
-                    self.texture = morph_texture[morph_selected]
+                    if morph_selected == -1:
+                        self.texture = view_default_texture
+                    elif morph_texture:
+                        self.texture = morph_texture[morph_selected]
             else:
-                if morph_selected == -1:
-                    self.texture = view_default_texture
-                elif morph_texture:
-                    self.texture = morph_texture[morph_selected]
+                self.texture = self.intro_images.texture
 
     def on_play(self, instance, value):
         if not self._camera:
@@ -230,7 +235,6 @@ class MainLayout(Widget):
         grid2 = ids['r_box_grid']
         grid1.bind(minimum_height=grid1.setter('height'))
         grid2.bind(minimum_height=grid2.setter('height'))
-
         for idx, file in enumerate(ref_files):
             ref_img = cv2.imread(file)
             ref.append(F_obj.Face('ref'))
@@ -255,13 +259,14 @@ class MainLayout(Widget):
 
     @staticmethod
     def select(btn):
-        global selected, morph_selected
+        global selected, morph_selected, reset
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
                 r_rot[0] = str(int(ref[b].beta))
                 r_rot[1] = str(int(ref[b].alpha))
                 r_rot[2] = str(int(ref[b].tilt['angle']))
                 selected = b
+                reset = 0
                 if morph_selected != -1:
                     btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
                     morph_selected = -1
@@ -336,7 +341,7 @@ class MainLayout(Widget):
             return False
 
     def checkout(self):
-        global selected, morph_selected, morph_texture, filled
+        global selected, morph_selected, morph_texture, filled, reset
         morphed_files = images_in_folder(morph_path)
         if send_to != '':
             # send mail with attachments
@@ -345,6 +350,7 @@ class MainLayout(Widget):
             for m_tex in morph_texture.keys():
                 btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
             selected = -1
+            reset = -1
             morph_selected = -1
             morph_texture = {}
             filled = []

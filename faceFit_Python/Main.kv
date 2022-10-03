@@ -58,10 +58,12 @@ MainLayout:
         pos: root.width*0.2, 0
         orientation: 'vertical'
         Label:
-            text: 'FACE FIT'
+            id: title
+            text: 'Fit-Face'
             bold: True
+            font_size: c_side.size[1] * 0.1 * 0.9
             text_size: self.size
-            size: self.width, self.height
+
             size_hint: 1, .1
             halign: 'center'
             valign: 'middle'

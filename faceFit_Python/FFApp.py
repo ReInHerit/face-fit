@@ -59,6 +59,8 @@ view_base_image = cv2.imread(view_default)
 morph_base_image = cv2.imread(morph_default)
 with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = json.load(f)
+with open('descriptions.json', 'r') as f:
+    descriptions = json.load(f)
 
 
 def images_in_folder(folder):
@@ -157,7 +159,10 @@ class MyCamera(Image):
 
                     if match():
                         # save result
-                        path = morph_path + 'morph_' + str(selected) + '.png'
+                        if selected <= 8:
+                            numb = "0" + str(selected + 1)
+                        else: numb = str(selected + 1)
+                        path = morph_path + 'morph_' + numb + '.png'
                         cv2.imwrite(path, final_morphs[selected])
                         # reset values
                         cam_obj = F_obj.Face('cam')
@@ -341,11 +346,11 @@ class MainLayout(Widget):
             return False
 
     def checkout(self):
-        global selected, morph_selected, morph_texture, filled, reset
+        global selected, morph_selected, morph_texture, filled, reset, descriptions
         morphed_files = images_in_folder(morph_path)
         if send_to != '':
             # send mail with attachments
-            mail.send(morphed_files, send_to)
+            mail.send(morphed_files, send_to, descriptions)
             # reset GUI and variables
             for m_tex in morph_texture.keys():
                 btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
@@ -601,6 +606,9 @@ def adjust_center(center):
     elif ref_name == 'image02':
         center_list[0] -= -2
         center_list[1] -= -11
+    elif ref_name == 'image03':
+        center_list[0] -= 5
+        center_list[1] -= -10
     elif ref_name == 'image04':
         center_list[0] -= -8
         center_list[1] -= -6
@@ -632,12 +640,9 @@ def adjust_center(center):
         center_list[0] -= -10
         center_list[1] -= -8
     elif ref_name == 'image14':
-        center_list[0] -= 5
-        center_list[1] -= -10
-    elif ref_name == 'image15':
         center_list[0] -= 3
         center_list[1] -= -10
-    elif ref_name == 'image16':
+    elif ref_name == 'image15':
         center_list[0] -= 4
         center_list[1] -= -18
     return tuple(center_list)

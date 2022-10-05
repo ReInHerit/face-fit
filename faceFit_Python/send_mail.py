@@ -11,13 +11,13 @@ def send(attachments_list, mail_to_address, descriptions):
     my_address = 'fitface.unifi@gmail.com'
     app_generated_password = 'iksrhpyebmjchesm'
 
-    msg["Subject"] = "Fit-Face Matches"
+    msg["Subject"] = "Your Face-Fit Images !"
     msg["From"] = my_address
 
     msg["To"] = mail_to_address
     msg.add_header('Content-Type', 'text/html')
     content = """Hello,<br>
-    Fit-Face App here. These are the results of your matches.<br>
+    Face-Fit App here. These are the results of your matches.<br>
     The characters in which you impersonated yourself are:<br>"""
 
     for address in attachments_list:
@@ -43,4 +43,4 @@ def send(attachments_list, mail_to_address, descriptions):
         smtp.login(my_address, app_generated_password)   # login to gmail
         print("sending mail\\.....")
         smtp.send_message(msg)    # send mail
-        print("mail has sent!")
+        print("mail has been sent!")

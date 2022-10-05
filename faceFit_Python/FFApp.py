@@ -70,6 +70,7 @@ def images_in_folder(folder):
         if ext.lower() not in valid_images:
             continue
         files_list.append(filename)
+        files_list.sort()
     return files_list
 
 
@@ -124,7 +125,7 @@ class MyCamera(Image):
 
     def __init__(self, **kwargs):
         super(MyCamera, self).__init__(**kwargs)
-        self.capture = cv2.VideoCapture(0, cv2.CAP_MSMF)  # Connect to 0th camera
+        self.capture = cv2.VideoCapture(0)  # Connect to 0th camera
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.fps = self.capture.get(cv2.CAP_PROP_FPS)
@@ -336,7 +337,7 @@ class MainLayout(Widget):
     def check_email_address(address):
         global email_alert
         # Checks if the address match regular expression
-        is_valid = re.search('^\w+@\w+.\w+$', address)
+        is_valid = re.search("""^\w+([-+."]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$""", address)
         # If there is a matching group
         if is_valid:
             email_alert.text = 'email format is valid'

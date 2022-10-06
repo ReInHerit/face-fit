@@ -646,6 +646,18 @@ def adjust_center(center):
     elif ref_name == 'image15':
         center_list[0] -= 4
         center_list[1] -= -18
+    elif ref_name == 'image16':
+        center_list[0] -= -2
+        center_list[1] -= -4
+    elif ref_name == 'image17':
+        center_list[0] -= -6
+        center_list[1] -= -14
+    elif ref_name == 'image18':
+        center_list[0] -= 3
+        center_list[1] -= -10
+    elif ref_name == 'image15':
+        center_list[0] -= -4
+        center_list[1] -= -18
     return tuple(center_list)
 
 

@@ -168,7 +168,7 @@ class MyCamera(Image):
                         # reset values
                         cam_obj = F_obj.Face('cam')
                         btn_change(buttons[selected], 'normal', 150, 'same')
-                        last_morphed = cv2.imread(path)
+                        last_morphed = cv2.imread(path)  # FIX create directories if does not exist
                         for i in range(0, 3):
                             c_rot[i] = '-'
                             r_rot[i] = '-'

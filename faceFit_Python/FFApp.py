@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 import glob
-import json
+from json import load as load_json
 import os
-import re
+from re import search
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 from kivy.app import App
 from kivy.uix.widget import Widget
@@ -13,12 +13,12 @@ from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 from kivy.core.window import Window
 import Face as F_obj
-import send_mail as mail
+from send_mail import send as send_mail
 from shapely.geometry import MultiLineString
 from shapely.ops import unary_union, polygonize
 from scipy.spatial import Delaunay
 from collections import Counter
-import itertools
+from itertools import combinations
 reset = -1
 ref_files = []
 ref = []
@@ -49,18 +49,20 @@ except NameError:
     import sys
     project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-ref_path = project_path + '/images/'
+ref_path = ''.join([project_path, '/images/'])
 img_path = 'images/'
-thumbs_path = img_path + 'Thumbs/'
-morph_path = ref_path + 'final_morphs/'
-view_default = thumbs_path + 'view_default.jpg'
-morph_default = thumbs_path + 'morph_thumb.jpg'
+thumbs_path = ''.join([img_path, 'Thumbs/'])
+morph_path = ''.join([ref_path, 'final_morphs/'])
+if not os.path.exists(morph_path):
+    os.makedirs(morph_path)
+view_default = ''.join([thumbs_path, 'view_default.jpg'])
+morph_default = ''.join([thumbs_path, 'morph_thumb.jpg'])
 view_base_image = cv2.imread(view_default)
 morph_base_image = cv2.imread(morph_default)
 with open('triangles_reduced2.json', 'r') as f:
-    media_pipes_tris = json.load(f)
+    media_pipes_tris = load_json(f)
 with open('descriptions.json', 'r') as f:
-    descriptions = json.load(f)
+    descriptions = load_json(f)
 
 
 def images_in_folder(folder):
@@ -145,13 +147,13 @@ class MyCamera(Image):
                 # cam_obj.draw('contours')
                 # cam_obj.draw('tessellation')
                 if cam_obj.pix_points:
-                    c_rot[0] = str(int(cam_obj.beta))
-                    c_rot[1] = str(int(cam_obj.alpha))
-                    c_rot[2] = str(int(cam_obj.tilt['angle']))
+                    c_rot[0] = str(int(cam_obj.alpha))
+                    c_rot[1] = str(int(cam_obj.beta))
+                    c_rot[2] = str(int(cam_obj.gamma))
                     # calc Rotation's Hints
-                    percent_x = 100 - abs(ref[selected].beta - cam_obj.beta)
-                    percent_y = 100 - abs(ref[selected].alpha - cam_obj.alpha)
-                    percent_z = 100 - abs(ref[selected].tilt['angle'] - cam_obj.tilt['angle'])
+                    percent_x = 100 - abs(ref[selected].alpha - cam_obj.alpha)
+                    percent_y = 100 - abs(ref[selected].beta - cam_obj.beta)
+                    percent_z = 100 - abs(ref[selected].gamma - cam_obj.gamma)
                     pb_rots = [percent_x, percent_y, percent_z]
                     # apply user's mask
                     overlaid = cut_paste_user_mask(ref[selected], cam_obj)
@@ -237,7 +239,7 @@ class MainLayout(Widget):
 
     def build(self):
         global view, r_rot, c_rot, pb_rots, view_source, email_alert, input_field  # progress_bars,
-        grid1 = ids['l_scroll']
+        grid1 = ids['l_box_grid']
         grid2 = ids['r_box_grid']
         grid1.bind(minimum_height=grid1.setter('height'))
         grid2.bind(minimum_height=grid2.setter('height'))
@@ -268,9 +270,9 @@ class MainLayout(Widget):
         global selected, morph_selected, reset
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
-                r_rot[0] = str(int(ref[b].beta))
-                r_rot[1] = str(int(ref[b].alpha))
-                r_rot[2] = str(int(ref[b].tilt['angle']))
+                r_rot[0] = str(int(ref[b].alpha))
+                r_rot[1] = str(int(ref[b].beta))
+                r_rot[2] = str(int(ref[b].gamma))
                 selected = b
                 reset = 0
                 if morph_selected != -1:
@@ -290,7 +292,7 @@ class MainLayout(Widget):
     def select_morph_button(btn):
         global selected, morph_selected, last_match
         m_id = morphed_buttons.index(btn)
-        if selected == -1 and m_id in filled:
+        if selected == -1 and m_id in filled :
             if morphed_buttons[m_id] == btn:
                 if btn.state == 'down':
                     morph_selected = m_id
@@ -298,11 +300,9 @@ class MainLayout(Widget):
                     morph_selected = -1
                     last_match = -1
         else:
-            btn.height = 150
-            btn.state = 'normal'
+            btn_change(btn, 'normal', 150, 'same')
             if morph_selected != -1:
-                morphed_buttons[morph_selected].state = 'normal'
-                morphed_buttons[morph_selected].height = 150
+                btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
                 morph_selected = -1
             last_match = -1
 
@@ -312,15 +312,9 @@ class MainLayout(Widget):
             for m_tex in morph_texture.keys():
                 morphed_buttons[m_tex].texture = morph_texture[m_tex]
         self.email_alert = email_alert.text
-        self.pb_x = pb_rots[0]
-        self.pb_y = pb_rots[1]
-        self.pb_z = pb_rots[2]
-        self.ref_x = r_rot[0]
-        self.ref_y = r_rot[1]
-        self.ref_z = r_rot[2]
-        self.cam_x = c_rot[0]
-        self.cam_y = c_rot[1]
-        self.cam_z = c_rot[2]
+        self.pb_x, self.pb_y, self.pb_z = pb_rots
+        self.ref_x, self.ref_y, self.ref_z = r_rot
+        self.cam_x, self.cam_y, self.cam_z = c_rot
 
     def on_new_text(self):
         global send_to
@@ -337,7 +331,7 @@ class MainLayout(Widget):
     def check_email_address(address):
         global email_alert
         # Checks if the address match regular expression
-        is_valid = re.search("""^\w+([-+."]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$""", address)
+        is_valid = search("""^\w+([-+."]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$""", address)
         # If there is a matching group
         if is_valid:
             email_alert.text = 'email format is valid'
@@ -351,17 +345,14 @@ class MainLayout(Widget):
         morphed_files = images_in_folder(morph_path)
         if send_to != '':
             # send mail with attachments
-            mail.send(morphed_files, send_to, descriptions)
+            send_mail(morphed_files, send_to, descriptions)
             # reset GUI and variables
             for m_tex in morph_texture.keys():
                 btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
-            selected = -1
-            reset = -1
-            morph_selected = -1
+            selected, reset, morph_selected = -1, -1, -1
             morph_texture = {}
             filled = []
-            email_alert.text = ''
-            self.ids.input.text = ''
+            email_alert.text, self.ids.input.text = '', ''
             # delete attached images
             for file in morphed_files:
                 os.remove(file)
@@ -379,9 +370,8 @@ class MainApp(App):
 def match():
     if len(cam_obj.points) != 0:
         # CHECK HEAD ORIENTATION
-        if ref[selected].alpha - delta <= cam_obj.alpha <= ref[selected].alpha + delta and \
-                ref[selected].beta - delta <= cam_obj.beta <= ref[selected].beta + delta and \
-                ref[selected].tilt['angle'] - delta <= cam_obj.tilt['angle'] <= ref[selected].tilt['angle'] + delta:
+        if abs(cam_obj.alpha - ref[selected].alpha) <= delta and abs(cam_obj.beta - ref[selected].beta) <= delta and \
+                abs(cam_obj.gamma - ref[selected].gamma) <= delta:
             print('match_angles')
             # CHECK EXPRESSION
             cam_exp = (cam_obj.status['l_e'], cam_obj.status['r_e'], cam_obj.status['lips'])
@@ -389,7 +379,6 @@ def match():
             if cam_exp == ref_exp:
                 print('MATCH')
                 morphed = morph(cam_obj, ref[selected])
-
                 final_morphs[selected] = morphed
                 return True
             else:
@@ -397,25 +386,22 @@ def match():
 
 
 def cut_paste_user_mask(r_obj, c_obj):
-    offset = 10
-    img1 = r_obj.image
-    img2 = c_obj.image
-    # create masks
-    concave_points = concave_hull(np.int32(c_obj.pix_points))
-    mask = np.zeros(cam_obj.image.shape, dtype=cam_obj.image.dtype)
-    mask = cv2.fillPoly(mask, [concave_points], (255, 255, 255))
-    mask2gray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
 
-    r_img = img1.copy()
-    c_img = img2.copy()
+    img1, img2 = r_obj.image, c_obj.image
+    r_img, c_img = img1.copy(), img2.copy()
+    # create masks
+    concave_hull = get_concave_hull(np.int32(c_obj.pix_points))
+    mask = np.zeros(cam_obj.image.shape, dtype=cam_obj.image.dtype)
+    mask = cv2.fillPoly(mask, [concave_hull], (255, 255, 255))
+    mask2gray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     c_masked = cv2.bitwise_and(c_img, c_img, mask=mask2gray)
     # calc BBs scale factor
     center1 = r_obj.pix_points[168]
     center2 = c_obj.pix_points[168]
-
-    rx = (r_obj.delta_x + 2 * offset) / (c_obj.delta_x + 2 * offset)
-    ry = (r_obj.delta_y + 2 * offset) / (c_obj.delta_y + 2 * offset)
-    media_scale = round((rx + ry) / 2, 2)
+    offset = 10
+    ratio_x = (r_obj.delta_x + 2 * offset) / (c_obj.delta_x + 2 * offset)
+    ratio_y = (r_obj.delta_y + 2 * offset) / (c_obj.delta_y + 2 * offset)
+    media_scale = round((ratio_x + ratio_y) / 2, 2)
     # calc Mask resize
     min_x, min_y = c_obj.bb_p1
     max_x, max_y = c_obj.bb_p2
@@ -458,8 +444,8 @@ def find_edges(img, blur_size, dx, dy, k_size):
 
 
 def clamp(num, min_value, max_value):
-    num = max(min(num, max_value), min_value)
-    return num
+    clamped = max(min(num, max_value), min_value)
+    return clamped
 
 
 # COLOR CORRECTION functions
@@ -519,37 +505,25 @@ def match_histograms(src_image, ref_image):
 
 
 # Morph Functions
-def concave_hull(points_list):  # points_list is a 2D numpy array
+def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
     # unless your points_list are integers. see http://www.qhull.org/html/qh-optq.htm
     tri = Delaunay(points_list, qhull_options="Qc Qz Q12").vertices
 
-    ia, ib, ic = (
-        tri[:, 0],
-        tri[:, 1],
-        tri[:, 2],
-    )  # indices of each of the triangles' points
-    pa, pb, pc = (
-        points_list[ia],
-        points_list[ib],
-        points_list[ic],
-    )  # coordinates of each of the triangles' points
+    ia, ib, ic = tri[:, 0], tri[:, 1], tri[:, 2]  # indices of each of the triangles' points
+    pa, pb, pc = points_list[ia], points_list[ib], points_list[ic]  # coordinates of each of the triangles' points
 
     a = np.sqrt((pa[:, 0] - pb[:, 0]) ** 2 + (pa[:, 1] - pb[:, 1]) ** 2)
     b = np.sqrt((pb[:, 0] - pc[:, 0]) ** 2 + (pb[:, 1] - pc[:, 1]) ** 2)
     c = np.sqrt((pc[:, 0] - pa[:, 0]) ** 2 + (pc[:, 1] - pa[:, 1]) ** 2)
 
     s = (a + b + c) * 0.5  # Semi-perimeter of triangle
-    area = np.sqrt(
-        s * (s - a) * (s - b) * (s - c)
-    )  # Area of triangle by Heron's formula
-    edge_filter = (
-        a * b * c / (4.0 * area) < 50
-    )  # Radius Filter based
+    area = np.sqrt(s * (s - a) * (s - b) * (s - c))  # Area of triangle by Heron's formula
+    edge_filter = (a * b * c / (4.0 * area) < 50)  # Radius Filter based
     edges = tri[edge_filter]  # Filter the edges
-    # in the list below both (i, j) and (j, i) pairs are counted. The reasoning is that boundary
-    # edges appear only once while interior edges twice
-    edges = [tuple(sorted(combo)) for e in edges for combo in itertools.combinations(e, 2)]
+    # in the list below both (i, j) and (j, i) pairs are counted. The reasoning is that boundary edges appear only once
+    # while interior edges twice
+    edges = [tuple(sorted(combo)) for e in edges for combo in combinations(e, 2)]
 
     count = Counter(edges)  # count occurrences of each edge
     edges = [e for e, c in count.items() if c == 1]  # keep only edges that appear one time (concave hull edges)
@@ -561,11 +535,7 @@ def concave_hull(points_list):  # points_list is a 2D numpy array
     hull = unary_union(list(poly))
     hull_vertices = hull.exterior.coords.xy
 
-    vertices = []
-    length = len(hull_vertices[0])
-    for num in range(length):
-        point = [np.int32(hull_vertices[0][num]), np.int32(hull_vertices[1][num])]
-        vertices.append(point)
+    vertices = [[np.int32(hull_vertices[0][n]), np.int32(hull_vertices[1][n])] for n in range(len(hull_vertices[0]))]
     vertices = np.array(vertices)
     return vertices
 
@@ -574,16 +544,11 @@ def warp_triangle(img1, img2, t1, t2):
     x1, y1, w1, h1 = cv2.boundingRect(np.float32([t1]))
     x2, y2, w2, h2 = cv2.boundingRect(np.float32([t2]))
     # Offset points by left top corner of the respective rectangles
-    t1_rect = []
-    t2_rect = []
-    t2_rect_int = []
-    for i in range(0, 3):
-        t1_rect.append(((t1[i][0] - x1), (t1[i][1] - y1)))
-        t2_rect.append(((t2[i][0] - x2), (t2[i][1] - y2)))
-        t2_rect_int.append(((t2[i][0] - x2), (t2[i][1] - y2)))
+    t1_rect = [((t1[i][0] - x1), (t1[i][1] - y1)) for i in range(0, 3)]
+    t2_rect = [((t2[i][0] - x2), (t2[i][1] - y2)) for i in range(0, 3)]
     # Get mask by filling triangle
     mask = np.zeros((h2, w2, 3), dtype=np.float32)
-    cv2.fillConvexPoly(mask, np.int32(t2_rect_int), (1.0, 1.0, 1.0), 16, 0)
+    cv2.fillConvexPoly(mask, np.int32(t2_rect), (1.0, 1.0, 1.0), 16, 0)
     # Apply warpImage to small rectangular patches
     img1_rect = img1[y1:y1 + h1, x1:x1 + w1]
     size = (w2, h2)
@@ -593,8 +558,7 @@ def warp_triangle(img1, img2, t1, t2):
                          borderMode=cv2.BORDER_REFLECT_101)
     img2_rect = img2_rect * mask
     # Copy triangular region of the rectangular patch to the output image
-    img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask)
-    img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] + img2_rect
+    img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask) + img2_rect
 
 
 def adjust_center(center):
@@ -655,7 +619,7 @@ def adjust_center(center):
     elif ref_name == 'image18':
         center_list[0] -= 3
         center_list[1] -= -10
-    elif ref_name == 'image15':
+    elif ref_name == 'image19':
         center_list[0] -= -4
         center_list[1] -= -18
     return tuple(center_list)
@@ -668,52 +632,39 @@ def find_noise_scratches(img):  # De-noising
 
 
 def morph(c_obj, r_obj):
-    ref_image = r_obj.image
-    cam_image = c_obj.image
-    cam_points = c_obj.pix_points
-    ref_points = r_obj.pix_points
-    mask_dilate_iter = 10
-    mask_erode_iter = 15
-    blur_value = 35
-    offset = 5
-    c_h = concave_hull(np.array(ref_points))
+    cam_image, cam_points, ref_image, ref_points = c_obj.image, c_obj.pix_points, r_obj.image, r_obj.pix_points
+    mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
+
     # COLOR CORRECTION
     ref_smoothed, noise = find_noise_scratches(ref_image)
-    cc_r_roi = ref_smoothed[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
+    r_roi = ref_smoothed[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
                r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
-    cc_c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
+    c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
-    cam_cc = match_histograms(cc_c_roi, cc_r_roi)
-    
+    cam_cc = match_histograms(c_roi, r_roi)
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset, c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = \
         cam_cc.astype('float64')
 
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris  # triangles
-    tris1 = []
-    tris2 = []
-    for i in range(0, len(dt)):
-        tri1 = []
-        tri2 = []
-        for j in range(0, 3):
-            tri1.append(cam_points[dt[i][j]])
-            tri2.append(ref_points[dt[i][j]])
-        tris1.append(tri1)
-        tris2.append(tri2)
+
+    tris1 = [[cam_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
+    tris2 = [[ref_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
 
     # GENERATE FINAL IMAGE
+    concave_hull = get_concave_hull(np.array(ref_points))
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
     ref_img_mask = np.zeros_like(ref_gray)
-    concave_mask = cv2.fillPoly(ref_img_mask, [c_h], 255)
+    concave_mask = cv2.fillPoly(ref_img_mask, [concave_hull], 255)
     ref_face_mask = cv2.dilate(concave_mask, None, iterations=mask_dilate_iter)
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
-    mid3 = cv2.moments(ref_face_mask)  # Find Centroid
+    mid3 = cv2.moments(concave_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
-    center = adjust_center(center)
+    # center = adjust_center(center)
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255

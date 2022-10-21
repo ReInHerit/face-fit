@@ -1,7 +1,6 @@
 import smtplib
 import imghdr
 import os
-# import re
 from email.message import EmailMessage
 
 

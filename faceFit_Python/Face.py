@@ -6,18 +6,12 @@ import numpy as np
 
 # Mediapipe
 
-mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_face_mesh = mp.solutions.face_mesh
 LEFT_EYE = mp_face_mesh.FACEMESH_LEFT_EYE
-LEFT_EYEBROW = mp_face_mesh.FACEMESH_LEFT_EYEBROW
-LEFT_IRIS = mp_face_mesh.FACEMESH_LEFT_IRIS
 RIGHT_EYE = mp_face_mesh.FACEMESH_RIGHT_EYE
-RIGHT_EYEBROW = mp_face_mesh.FACEMESH_RIGHT_EYEBROW
-RIGHT_IRIS = mp_face_mesh.FACEMESH_RIGHT_IRIS
 LIPS = mp_face_mesh.FACEMESH_LIPS
-FACE_OVAL = mp_face_mesh.FACEMESH_FACE_OVAL
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 
@@ -31,7 +25,7 @@ class Face:
         self.pix_points = []
         self.alpha = 0
         self.beta = 0
-        self.tilt = {'where': '', 'angle': 0}
+        self.gamma = 0
         self.status = {'l_e': '', 'r_e': '', 'lips': ''}
         self.delta_x = 0
         self.delta_y = 0
@@ -52,7 +46,7 @@ class Face:
             # Convert the BGR image to RGB before processing.
             result = face_m.process(cv2.cvtColor(picture, cv2.COLOR_BGR2RGB))
             if result.multi_face_landmarks:
-                w, h, c = picture.shape
+                w, h, c = self.image.shape
                 for face_landmarks in result.multi_face_landmarks:
                     self.points = []
                     self.pix_points = []
@@ -70,18 +64,13 @@ class Face:
                     self.status['r_e'] = expression[1]
                     self.status['lips'] = expression[2]
                     # calc BBOX
-                    cx_min = h
-                    cy_min = w
-                    cx_max = 0
-                    cy_max = 0
+                    cx_min, cy_min, cx_max, cy_max= h, w, 0, 0
                     for lm in self.points:
                         cx, cy = int(lm[0] * h), int(lm[1] * w)
-                        if cx < cx_min: cx_min = cx
-                        elif cx > cx_max: cx_max = cx
-
-                        if cy < cy_min: cy_min = cy
-                        elif cy > cy_max: cy_max = cy
-
+                        cx_min = cx if cx < cx_min else cx_min
+                        cx_max = cx if cx > cx_max else cx_max
+                        cy_min = cy if cy < cy_min else cy_min
+                        cy_max = cy if cy > cy_max else cy_max
                     self.bb_p1 = (cx_min, cy_min)
                     self.bb_p2 = (cx_max, cy_max)
                     self.delta_x = cx_max - cx_min
@@ -112,14 +101,14 @@ class Face:
         dist_matrix = np.zeros((4, 1), dtype=np.float64)  # The Distance Matrix
         success, rot_vec, trans_vec = cv2.solvePnP(face_3d, face_2d, cam_matrix, dist_matrix)  # Solve PnP
         r_mat, jac = cv2.Rodrigues(rot_vec)  # Get rotational matrix
-        # Get angles
+        # Get angles alpha (pitch) and beta (yaw)
         angles, mtx_r, mtx_q, qx, qy, qz = cv2.RQDecomp3x3(r_mat)
         alpha = angles[0] * 360
         beta = angles[1] * 360
         if self.which == 'cam':  # if camera
             alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
             beta = int(normalize(beta, {'actual': {'lower': -15, 'upper': 12}, 'desired': {'lower': -65, 'upper': 55}}))
-        # tilt
+        # get gamma (roll)
         min_a = min(self.l_e.raw_pts, key=itemgetter(1))[1]
         max_a = max(self.l_e.raw_pts, key=itemgetter(1))[1]
         min_b = min(self.r_e.raw_pts, key=itemgetter(1))[1]
@@ -132,10 +121,10 @@ class Face:
             text = 'even'
         point1 = self.l_e.raw_pts[1]
         point2 = self.r_e.raw_pts[1]
-        tilt_angle = math.degrees(math.atan2(-(point2[1] - point1[1]), point2[0] - point1[0])) % 360
+        gamma = math.degrees(math.atan2(-(point2[1] - point1[1]), point2[0] - point1[0])) % 360
         self.alpha = alpha
         self.beta = beta
-        self.tilt = {'where': text, 'angle': tilt_angle}
+        self.gamma = gamma
 
     def draw(self, part):
         conn = ''

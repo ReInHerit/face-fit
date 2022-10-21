@@ -1,24 +1,26 @@
-import math
-from operator import itemgetter
+from math import degrees, atan2
 import cv2
-import mediapipe as mp
+from mediapipe import solutions as mp_solutions
 import numpy as np
 
 # Mediapipe
 
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-mp_face_mesh = mp.solutions.face_mesh
+mp_drawing = mp_solutions.drawing_utils
+mp_drawing_styles = mp_solutions.drawing_styles
+mp_face_mesh = mp_solutions.face_mesh
 LEFT_EYE = mp_face_mesh.FACEMESH_LEFT_EYE
 RIGHT_EYE = mp_face_mesh.FACEMESH_RIGHT_EYE
 LIPS = mp_face_mesh.FACEMESH_LIPS
+IRISES = mp_face_mesh.FACEMESH_IRISES
+CONTOURS = mp_face_mesh.FACEMESH_CONTOURS
+TESSELATION = mp_face_mesh.FACEMESH_TESSELATION
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 
 class Face:
     def __init__(self, which):
         self.which = which
-        self.image = []
+        self.image = np.array([])
         self.f_landmarks = []
         self.landmarks = []
         self.points = []
@@ -47,26 +49,23 @@ class Face:
             result = face_m.process(cv2.cvtColor(picture, cv2.COLOR_BGR2RGB))
             if result.multi_face_landmarks:
                 w, h, c = self.image.shape
-                for face_landmarks in result.multi_face_landmarks:
-                    self.points = []
-                    self.pix_points = []
-                    self.f_landmarks = face_landmarks
-                    self.landmarks = face_landmarks.landmark
-                    for i in range(0, len(face_landmarks.landmark)):
-                        x = face_landmarks.landmark[i].x
-                        y = face_landmarks.landmark[i].y
-                        z = face_landmarks.landmark[i].z
+                for landmarks in result.multi_face_landmarks:
+                    self.points, self.pix_points = [], []
+                    self.f_landmarks = landmarks
+                    self.landmarks = landmarks.landmark
+                    for i in range(0, len(landmarks.landmark)):
+                        x, y, z = landmarks.landmark[i].x, landmarks.landmark[i].y, landmarks.landmark[i].z
                         self.points.append([x, y, z])
                         self.pix_points.append([int(x * h), int(y * w)])
                     # calc expression
-                    expression = check_expression(image, self.landmarks)
+                    expression = check_expression(self.pix_points)
                     self.status['l_e'] = expression[0]
                     self.status['r_e'] = expression[1]
                     self.status['lips'] = expression[2]
                     # calc BBOX
-                    cx_min, cy_min, cx_max, cy_max= h, w, 0, 0
-                    for lm in self.points:
-                        cx, cy = int(lm[0] * h), int(lm[1] * w)
+                    cx_min, cy_min, cx_max, cy_max = h, w, 0, 0
+                    for point in self.points:
+                        cx, cy = int(point[0] * h), int(point[1] * w)
                         cx_min = cx if cx < cx_min else cx_min
                         cx_max = cx if cx > cx_max else cx_max
                         cy_min = cy if cy < cy_min else cy_min
@@ -83,14 +82,10 @@ class Face:
 
     def where_is_looking(self):
         hr, wr, cr = self.image.shape
-        face2d = []
-        face3d = []
-        for n, lm in enumerate(self.f_landmarks.landmark):
-            if n == 33 or n == 263 or n == 1 or n == 61 or n == 291 or n == 199:
-                x1, y1 = int(lm.x * wr), int(lm.y * hr)
-                face2d.append([x1, y1])  # Get the 2D Coordinates
-                face3d.append([x1, y1, lm.z])  # Get the 3D Coordinates
 
+        face2d = [self.pix_points[index] for index in [33, 263, 1, 61, 291, 199]]
+        face3d = [[self.pix_points[index][0], self.pix_points[index][1], self.points[index][2]]
+                  for index in [33, 263, 1, 61, 291, 199]]
         face_2d = np.array(face2d, dtype=np.float64)
         face_3d = np.array(face3d, dtype=np.float64)
         # The camera matrix
@@ -103,40 +98,28 @@ class Face:
         r_mat, jac = cv2.Rodrigues(rot_vec)  # Get rotational matrix
         # Get angles alpha (pitch) and beta (yaw)
         angles, mtx_r, mtx_q, qx, qy, qz = cv2.RQDecomp3x3(r_mat)
-        alpha = angles[0] * 360
-        beta = angles[1] * 360
+        alpha, beta, tilt = tuple(angle * 360 for angle in angles)
         if self.which == 'cam':  # if camera
             alpha = int(normalize(alpha, {'actual': {'lower': -40, 'upper': 40}, 'desired': {'lower': -40, 'upper': 40}}))
             beta = int(normalize(beta, {'actual': {'lower': -15, 'upper': 12}, 'desired': {'lower': -65, 'upper': 55}}))
         # get gamma (roll)
-        min_a = min(self.l_e.raw_pts, key=itemgetter(1))[1]
-        max_a = max(self.l_e.raw_pts, key=itemgetter(1))[1]
-        min_b = min(self.r_e.raw_pts, key=itemgetter(1))[1]
-        max_b = max(self.r_e.raw_pts, key=itemgetter(1))[1]
-        if max_a < min_b:
-            text = 'left'
-        elif max_b < min_a:
-            text = 'right'
-        else:
-            text = 'even'
         point1 = self.l_e.raw_pts[1]
         point2 = self.r_e.raw_pts[1]
-        gamma = math.degrees(math.atan2(-(point2[1] - point1[1]), point2[0] - point1[0])) % 360
+        gamma = degrees(atan2(-(point2[1] - point1[1]), point2[0] - point1[0])) % 360 - 180
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
 
     def draw(self, part):
-        conn = ''
-        dr_spec = ''
+        conn, dr_spec = '', ''
         if part == 'iris':
-            conn = mp_face_mesh.FACEMESH_IRISES
+            conn = IRISES
             dr_spec = mp_drawing_styles.get_default_face_mesh_iris_connections_style()
         elif part == 'contours':
-            conn = mp_face_mesh.FACEMESH_CONTOURS
+            conn = CONTOURS
             dr_spec = mp_drawing_styles.get_default_face_mesh_contours_style()
         elif part == 'tessellation':
-            conn = mp_face_mesh.FACEMESH_TESSELATION
+            conn = TESSELATION
             dr_spec = mp_drawing_styles.get_default_face_mesh_tesselation_style()
         else:
             print('WRONG PART DESCRIPTOR')
@@ -164,26 +147,21 @@ class FacePart:
         self.idx = sorted(set(self.idx))
 
     def calc_pts(self, points_array):
-        temp_array = []
-        for i in self.idx:
-            temp_array.append(points_array[i])
-        self.raw_pts = temp_array
-        v = np.array(temp_array)
+        self.raw_pts = [points_array[i] for i in self.idx]
+        v = np.array(self.raw_pts)
         new_range = (0, 1)
-        max_range = max(new_range)
-        min_range = min(new_range)
-        scaled_unit = (max_range - min_range) / (np.max(v) - np.min(v))
-        new_points = v * scaled_unit - np.min(v) * scaled_unit + min_range
+        scaled_unit = (max(new_range) - min(new_range)) / (np.max(v) - np.min(v))
+        new_points = v * scaled_unit - np.min(v) * scaled_unit + min(new_range)
         self.pts = new_points.tolist()
 
 
-def aperture(img, landmark_a, id1, id2, id3, id4):
-    p1 = (int(landmark_a[id1].x * img.shape[1]), int(landmark_a[id1].y * img.shape[0]), 0)
-    p2 = (int(landmark_a[id2].x * img.shape[1]), int(landmark_a[id2].y * img.shape[0]), 0)
-    p3 = (int(landmark_a[id3].x * img.shape[1]), int(landmark_a[id3].y * img.shape[0]), 0)
-    p4 = (int(landmark_a[id4].x * img.shape[1]), int(landmark_a[id4].y * img.shape[0]), 0)
-    p4_p3 = ((p4[0] - p3[0]) ** 2 + (p4[1] - p3[1]) ** 2 + (p4[2] - p3[2]) ** 2) ** 0.5
-    p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2) ** 0.5
+def aperture(pixel_points, id1, id2, id3, id4):
+    p1 = (pixel_points[id1][0], pixel_points[id1][1])
+    p2 = (pixel_points[id2][0], pixel_points[id2][1])
+    p3 = (pixel_points[id3][0], pixel_points[id3][1])
+    p4 = (pixel_points[id4][0], pixel_points[id4][1])
+    p4_p3 = ((p4[0] - p3[0]) ** 2 + (p4[1] - p3[1]) ** 2) ** 0.5
+    p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
     division = p4_p3 / p2_p1
     return division
 
@@ -194,21 +172,21 @@ def normalize(value, bounds):
            (bounds['actual']['upper'] - bounds['actual']['lower'])
 
 
-def check_expression(img, landmarks):
+def check_expression(face_points):
     # l_eye
-    l_gap = aperture(img, landmarks, 362, 263, 386, 374)
+    l_gap = aperture(face_points, 362, 263, 386, 374)
     if l_gap <= 0.1:
         l_e = 'closed'
     else:
         l_e = 'opened'
     # r_eye
-    r_gap = aperture(img, landmarks, 33, 133, 159, 145)
+    r_gap = aperture(face_points, 33, 133, 159, 145)
     if r_gap <= 0.1:
         r_e = 'closed'
     else:
         r_e = 'opened'
     # Mouth
-    lips_gap = aperture(img, landmarks, 78, 308, 13, 14)
+    lips_gap = aperture(face_points, 78, 308, 13, 14)
     if lips_gap < 0.15:
         lips = 'closed'
     elif 0.15 <= lips_gap < 0.4:
@@ -217,5 +195,3 @@ def check_expression(img, landmarks):
         lips = 'full opened'
 
     return l_e, r_e, lips
-
-

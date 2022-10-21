@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import glob
+from glob import iglob
 from json import load as load_json
 import os
 from re import search
@@ -19,46 +19,35 @@ from shapely.ops import unary_union, polygonize
 from scipy.spatial import Delaunay
 from collections import Counter
 from itertools import combinations
-reset = -1
-ref_files = []
-ref = []
-buttons = []
-morphed_buttons = []
-ids = {}
-view = {}
-view_source = ''
-selected = -1
-morph_selected = -1
-last_match = -1
-r_rot = []
-c_rot = []
-pb_rots = []
+selected = reset = morph_selected = last_match = -1
 delta = 7
-final_morphs = {}
-morph_texture = {}
-filled = []
+ref, ref_files, buttons, morphed_buttons = [], [], [], []
+r_rot, c_rot, pb_rots, filled = [], [], [], []
 valid_images = [".jpg", ".gif", ".png", ".tga"]
-cam_obj = F_obj.Face('cam')
-send_to = ''
-email_alert = ''
-input_field = '-'
+ids, view, final_morphs, morph_texture = {}, {}, {}, {}
+send_to, email_alert, input_field, view_source = '', '', '', ''
 
+cam_obj = F_obj.Face('cam')
+
+# PATHS
 try:
     project_path = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     import sys
     project_path = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-ref_path = ''.join([project_path, '/images/'])
-img_path = 'images/'
-thumbs_path = ''.join([img_path, 'Thumbs/'])
-morph_path = ''.join([ref_path, 'final_morphs/'])
-if not os.path.exists(morph_path):
-    os.makedirs(morph_path)
-view_default = ''.join([thumbs_path, 'view_default.jpg'])
-morph_default = ''.join([thumbs_path, 'morph_thumb.jpg'])
+path_to = {"project": project_path, "images": 'images/'}
+path_to["ref"] = ''.join([project_path, '/', path_to["images"]])
+path_to["thumbs"] = ''.join([path_to["images"], 'Thumbs/'])
+path_to["morphs"] = ''.join([path_to["ref"], 'final_morphs/'])
+if not os.path.exists(path_to["morphs"]):
+    os.makedirs(path_to["morphs"])
+
+view_default = ''.join([path_to["thumbs"], 'view_default.jpg'])
+morph_default = ''.join([path_to["thumbs"], 'morph_thumb.jpg'])
 view_base_image = cv2.imread(view_default)
 morph_base_image = cv2.imread(morph_default)
+
 with open('triangles_reduced2.json', 'r') as f:
     media_pipes_tris = load_json(f)
 with open('descriptions.json', 'r') as f:
@@ -67,7 +56,7 @@ with open('descriptions.json', 'r') as f:
 
 def images_in_folder(folder):
     files_list = []
-    for filename in glob.iglob(f'{folder}*'):
+    for filename in iglob(f'{folder}*'):
         ext = os.path.splitext(filename)[1]
         if ext.lower() not in valid_images:
             continue
@@ -76,18 +65,11 @@ def images_in_folder(folder):
     return files_list
 
 
-ref_files = images_in_folder(ref_path)
-
-
 def create_texture(image):
     buf = cv2.flip(image, 0).tobytes()
     my_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
     my_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
     return my_texture
-
-
-view_default_texture = create_texture(view_base_image)
-morphs_default_texture = create_texture(morph_base_image)
 
 
 def btn_change(btn, state, height, texture):
@@ -109,9 +91,11 @@ class MyButton(ToggleButtonBehavior, Image):
         if value == 'down':
             self.texture = self.button_texture(self.source, off=True)
             self.__setattr__('height', 200)
+            print('down')
         else:
             self.texture = self.button_texture(self.source)
             self.__setattr__('height', 150)
+            print('normal')
 
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
@@ -162,26 +146,24 @@ class MyCamera(Image):
 
                     if match():
                         # save result
-                        if selected <= 8:
-                            numb = "0" + str(selected + 1)
-                        else: numb = str(selected + 1)
-                        path = morph_path + 'morph_' + numb + '.png'
+                        numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
+                        # if selected <= 8:
+                        #     numb = "0" + str(selected + 1)
+                        # else: numb = str(selected + 1)
+                        path = path_to["morphs"] + 'morph_' + numb + '.png'
                         cv2.imwrite(path, final_morphs[selected])
                         # reset values
                         cam_obj = F_obj.Face('cam')
                         btn_change(buttons[selected], 'normal', 150, 'same')
                         last_morphed = cv2.imread(path)  # FIX create directories if does not exist
                         for i in range(0, 3):
-                            c_rot[i] = '-'
-                            r_rot[i] = '-'
-                            pb_rots[i] = 0
+                            c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
                         # create result texture and apply to view and morph button
                         morph_texture[selected] = create_texture(last_morphed)
                         self.texture = morph_texture[selected]
                         btn_change(morphed_buttons[selected], 'down', 200, morph_texture[selected])
                         # set trackers
-                        last_match = selected
-                        morph_selected = selected
+                        last_match = morph_selected = selected
                         filled.append(last_match)                        
                         selected = -1  # reset selected
             else:
@@ -250,7 +232,7 @@ class MainLayout(Widget):
             # DRAW LANDMARKS
             # ref[idx].draw('contours')
             # ref[idx].draw('tessellation')
-            button_ref = MyButton(source=os.path.join(img_path, file), group="g1")
+            button_ref = MyButton(source=os.path.join(path_to["images"], file), group="g1")
             button_morphs = MyButton(disabled=False, source=morph_default, group="g2")
             buttons.append(button_ref)
             button_ref.bind(on_press=self.select)
@@ -290,21 +272,47 @@ class MainLayout(Widget):
 
     @staticmethod
     def select_morph_button(btn):
-        global selected, morph_selected, last_match
+        global selected, morph_selected, last_match, reset
         m_id = morphed_buttons.index(btn)
-        if selected == -1 and m_id in filled :
-            if morphed_buttons[m_id] == btn:
+        while m_id in filled:
+            print('in')
+            if selected == -1:
                 if btn.state == 'down':
+                    print('1')
                     morph_selected = m_id
+                    break
                 elif btn.state == 'normal':
+                    print('2')
                     morph_selected = -1
                     last_match = -1
-        else:
-            btn_change(btn, 'normal', 150, 'same')
-            if morph_selected != -1:
+                    break
+            elif morph_selected != -1:
                 btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
                 morph_selected = -1
-            last_match = -1
+            else:
+                print('3')
+                btn_change(buttons[selected], 'normal', 150, 'same')
+                for i in range(0, 3):
+                    c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
+                selected = -1
+                last_match = -1
+                morph_selected = m_id
+                reset = 0
+
+        # if selected == -1 and m_id in filled:
+        #     # if morphed_buttons[m_id] == btn:
+        #     if btn.state == 'down':
+        #         morph_selected = m_id
+        #     elif btn.state == 'normal':
+        #         morph_selected = -1
+        #         last_match = -1
+
+        # else:
+        #     btn_change(btn, 'normal', 150, 'same')
+        #     if morph_selected != -1:
+        #         btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
+        #         morph_selected = -1
+        #     last_match = -1
 
     def update(self, dt):
         global input_field
@@ -342,7 +350,7 @@ class MainLayout(Widget):
 
     def checkout(self):
         global selected, morph_selected, morph_texture, filled, reset, descriptions
-        morphed_files = images_in_folder(morph_path)
+        morphed_files = images_in_folder(path_to["morphs"] )
         if send_to != '':
             # send mail with attachments
             send_mail(morphed_files, send_to, descriptions)
@@ -676,5 +684,10 @@ def morph(c_obj, r_obj):
     
     return output
 
+
+ref_files = images_in_folder(path_to["ref"])
+
+view_default_texture = create_texture(view_base_image)
+morphs_default_texture = create_texture(morph_base_image)
 
 MainApp().run()

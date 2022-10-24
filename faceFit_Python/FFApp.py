@@ -195,6 +195,7 @@ class MyCamera(Image):
 
 class MainLayout(Widget):
     source = StringProperty('')
+    email_alert = StringProperty('-')
     ref_x = StringProperty('-')
     ref_y = StringProperty('-')
     ref_z = StringProperty('-')
@@ -204,8 +205,6 @@ class MainLayout(Widget):
     pb_x = NumericProperty(0)
     pb_y = NumericProperty(0)
     pb_z = NumericProperty(0)
-    scroll = ObjectProperty(None)
-    email_alert = StringProperty('-')
 
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
@@ -274,23 +273,30 @@ class MainLayout(Widget):
     def select_morph_button(btn):
         global selected, morph_selected, last_match, reset
         m_id = morphed_buttons.index(btn)
-        while m_id in filled:
-            print('in')
+        if m_id not in filled:
+
+            print('not', last_match, morph_selected, selected)
+            btn_change(morphed_buttons[m_id], 'normal', 150, 'same')
+            btn_change(morphed_buttons[morph_selected], 'down', 200, 'same')
+            return
+
+        else:
+            print('in', last_match, morph_selected, selected)
             if selected == -1:
                 if btn.state == 'down':
-                    print('1')
+                    print('1', last_match, morph_selected, selected)
                     morph_selected = m_id
-                    break
+
                 elif btn.state == 'normal':
-                    print('2')
+                    print('2', last_match, morph_selected, selected)
                     morph_selected = -1
                     last_match = -1
-                    break
+
             elif morph_selected != -1:
                 btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
                 morph_selected = -1
             else:
-                print('3')
+                print('3', last_match, morph_selected, selected)
                 btn_change(buttons[selected], 'normal', 150, 'same')
                 for i in range(0, 3):
                     c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
@@ -394,7 +400,6 @@ def match():
 
 
 def cut_paste_user_mask(r_obj, c_obj):
-
     img1, img2 = r_obj.image, c_obj.image
     r_img, c_img = img1.copy(), img2.copy()
     # create masks

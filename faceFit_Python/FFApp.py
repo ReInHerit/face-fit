@@ -25,10 +25,12 @@ ref, ref_files, buttons, morphed_buttons = [], [], [], []
 r_rot, c_rot, pb_rots, filled = [], [], [], []
 valid_images = [".jpg", ".gif", ".png", ".tga"]
 ids, view, final_morphs, morph_texture = {}, {}, {}, {}
-send_to, email_alert, input_field, view_source = '', '', '', ''
+send_to, email_alert, view_source = '', '', ''
 
 cam_obj = F_obj.Face('cam')
 
+Window.fullscreen = 'auto'
+Window.maximize()
 # PATHS
 try:
     project_path = os.path.dirname(os.path.abspath(__file__))
@@ -48,10 +50,11 @@ morph_default = ''.join([path_to["thumbs"], 'morph_thumb.jpg'])
 view_base_image = cv2.imread(view_default)
 morph_base_image = cv2.imread(morph_default)
 
-with open('triangles_reduced2.json', 'r') as f:
+with open('triangulation.json', 'r') as f:
     media_pipes_tris = load_json(f)
-with open('descriptions.json', 'r') as f:
-    descriptions = load_json(f)
+
+with open('painting_data.json', 'r') as f:
+    painting_data = load_json(f)
 
 
 def images_in_folder(folder):
@@ -87,15 +90,15 @@ class MyButton(ToggleButtonBehavior, Image):
         self.source = kwargs["source"]  # Stores the image name of the image button
         self.texture = self.button_texture(self.source)  # Treat the image as a texture, so you can edit it
 
-    def on_state(self, widget, value):
-        if value == 'down':
-            self.texture = self.button_texture(self.source, off=True)
-            self.__setattr__('height', 200)
-            print('down')
-        else:
-            self.texture = self.button_texture(self.source)
-            self.__setattr__('height', 150)
-            print('normal')
+    # def on_state(self, widget, value):
+    #     if value == 'down':
+    #         self.texture = self.button_texture(self.source, off=True)
+    #         self.__setattr__('height', 200)
+    #         print('down')
+    #     else:
+    #         self.texture = self.button_texture(self.source)
+    #         self.__setattr__('height', 150)
+    #         print('normal')
 
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
@@ -147,9 +150,7 @@ class MyCamera(Image):
                     if match():
                         # save result
                         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
-                        # if selected <= 8:
-                        #     numb = "0" + str(selected + 1)
-                        # else: numb = str(selected + 1)
+
                         path = path_to["morphs"] + 'morph_' + numb + '.png'
                         cv2.imwrite(path, final_morphs[selected])
                         # reset values
@@ -205,6 +206,7 @@ class MainLayout(Widget):
     pb_x = NumericProperty(0)
     pb_y = NumericProperty(0)
     pb_z = NumericProperty(0)
+    scroll = ObjectProperty()
 
     def __init__(self, **kwargs):
         super(MainLayout, self).__init__(**kwargs)
@@ -219,7 +221,7 @@ class MainLayout(Widget):
         self.build()
 
     def build(self):
-        global view, r_rot, c_rot, pb_rots, view_source, email_alert, input_field  # progress_bars,
+        global view, r_rot, c_rot, pb_rots, view_source, email_alert # progress_bars,
         grid1 = ids['l_box_grid']
         grid2 = ids['r_box_grid']
         grid1.bind(minimum_height=grid1.setter('height'))
@@ -249,6 +251,7 @@ class MainLayout(Widget):
     @staticmethod
     def select(btn):
         global selected, morph_selected, reset
+        btn_change(buttons[selected], 'normal', 150, texture='same') if selected >= 0 else print('no')
         for b in range(0, len(buttons)):
             if buttons[b] == btn and btn.state == 'down':
                 r_rot[0] = str(int(ref[b].alpha))
@@ -256,17 +259,21 @@ class MainLayout(Widget):
                 r_rot[2] = str(int(ref[b].gamma))
                 selected = b
                 reset = 0
+                btn_change(buttons[selected], 'down', 200, texture='same')
                 if morph_selected != -1:
                     btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
                     morph_selected = -1
             elif buttons[b] == btn and btn.state == 'normal':
                 view.source = ''
+                btn_change(buttons[selected], 'normal', 150, texture='same')
                 for i in range(0, 3):
                     c_rot[i] = '-'
                     r_rot[i] = '-'
                     pb_rots[i] = 0
                 selected = -1
+                reset = 0
                 view.source = view_default
+
         return btn
 
     @staticmethod
@@ -274,54 +281,30 @@ class MainLayout(Widget):
         global selected, morph_selected, last_match, reset
         m_id = morphed_buttons.index(btn)
         if m_id not in filled:
-
-            print('not', last_match, morph_selected, selected)
             btn_change(morphed_buttons[m_id], 'normal', 150, 'same')
             btn_change(morphed_buttons[morph_selected], 'down', 200, 'same')
-            return
-
-        else:
-            print('in', last_match, morph_selected, selected)
-            if selected == -1:
-                if btn.state == 'down':
-                    print('1', last_match, morph_selected, selected)
-                    morph_selected = m_id
-
-                elif btn.state == 'normal':
-                    print('2', last_match, morph_selected, selected)
-                    morph_selected = -1
-                    last_match = -1
-
-            elif morph_selected != -1:
-                btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
-                morph_selected = -1
-            else:
-                print('3', last_match, morph_selected, selected)
-                btn_change(buttons[selected], 'normal', 150, 'same')
-                for i in range(0, 3):
-                    c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
-                selected = -1
-                last_match = -1
+            # return
+        elif selected == -1:
+            if btn.state == 'down':
+                last_match = morph_selected
                 morph_selected = m_id
-                reset = 0
-
-        # if selected == -1 and m_id in filled:
-        #     # if morphed_buttons[m_id] == btn:
-        #     if btn.state == 'down':
-        #         morph_selected = m_id
-        #     elif btn.state == 'normal':
-        #         morph_selected = -1
-        #         last_match = -1
-
-        # else:
-        #     btn_change(btn, 'normal', 150, 'same')
-        #     if morph_selected != -1:
-        #         btn_change(morphed_buttons[morph_selected], 'normal', 150, 'same')
-        #         morph_selected = -1
-        #     last_match = -1
+                btn_change(morphed_buttons[morph_selected], 'down', 200, 'same')
+                btn_change(morphed_buttons[last_match], 'normal', 150, 'same')
+            elif btn.state == 'normal':
+                last_match = -1
+                morph_selected = -1
+                btn_change(morphed_buttons[m_id], 'normal', 150, 'same')
+        else:
+            btn_change(buttons[selected], 'normal', 150, 'same')
+            btn_change(morphed_buttons[m_id], 'down', 200, 'same')
+            for i in range(0, 3):
+                c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
+            selected = -1
+            last_match = -1
+            morph_selected = m_id
+            reset = 0
 
     def update(self, dt):
-        global input_field
         if len(morph_texture) >> 0:
             for m_tex in morph_texture.keys():
                 morphed_buttons[m_tex].texture = morph_texture[m_tex]
@@ -334,7 +317,6 @@ class MainLayout(Widget):
         global send_to
         if self.ids.input.text != '':
             send_to = self.ids.input.text
-
             check = self.check_email_address(send_to)
             if check:
                 self.checkout()
@@ -346,8 +328,7 @@ class MainLayout(Widget):
         global email_alert
         # Checks if the address match regular expression
         is_valid = search("""^\w+([-+."]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$""", address)
-        # If there is a matching group
-        if is_valid:
+        if is_valid:  # If there is a matching group
             email_alert.text = 'email format is valid'
             return True
         else:
@@ -355,11 +336,11 @@ class MainLayout(Widget):
             return False
 
     def checkout(self):
-        global selected, morph_selected, morph_texture, filled, reset, descriptions
+        global selected, morph_selected, morph_texture, filled, reset
         morphed_files = images_in_folder(path_to["morphs"] )
         if send_to != '':
             # send mail with attachments
-            send_mail(morphed_files, send_to, descriptions)
+            send_mail(morphed_files, send_to, painting_data)
             # reset GUI and variables
             for m_tex in morph_texture.keys():
                 btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
@@ -574,70 +555,6 @@ def warp_triangle(img1, img2, t1, t2):
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask) + img2_rect
 
 
-def adjust_center(center):
-    center_list = list(center)
-    ref_name = os.path.splitext(os.path.basename(ref_files[selected]))[0]
-
-    if ref_name == 'image01':
-        center_list[0] -= 8
-        center_list[1] -= -13
-    elif ref_name == 'image02':
-        center_list[0] -= -2
-        center_list[1] -= -11
-    elif ref_name == 'image03':
-        center_list[0] -= 5
-        center_list[1] -= -10
-    elif ref_name == 'image04':
-        center_list[0] -= -8
-        center_list[1] -= -6
-    elif ref_name == 'image05':
-        center_list[0] -= 4
-        center_list[1] -= -8
-    elif ref_name == 'image06':
-        center_list[0] -= -8
-        center_list[1] -= -9
-    elif ref_name == 'image07':
-        center_list[0] -= 7
-        center_list[1] -= -13
-    elif ref_name == 'image08':
-        center_list[0] -= -3
-        center_list[1] -= -14
-    elif ref_name == 'image09':
-        center_list[0] -= -11
-        center_list[1] -= -6
-    elif ref_name == 'image10':
-        center_list[0] -= -3
-        center_list[1] -= -8
-    elif ref_name == 'image11':
-        center_list[0] -= -6
-        center_list[1] -= -14
-    elif ref_name == 'image12':
-        center_list[0] -= 8
-        center_list[1] -= -13
-    elif ref_name == 'image13':
-        center_list[0] -= -10
-        center_list[1] -= -8
-    elif ref_name == 'image14':
-        center_list[0] -= 3
-        center_list[1] -= -10
-    elif ref_name == 'image15':
-        center_list[0] -= 4
-        center_list[1] -= -18
-    elif ref_name == 'image16':
-        center_list[0] -= -2
-        center_list[1] -= -4
-    elif ref_name == 'image17':
-        center_list[0] -= -6
-        center_list[1] -= -14
-    elif ref_name == 'image18':
-        center_list[0] -= 3
-        center_list[1] -= -10
-    elif ref_name == 'image19':
-        center_list[0] -= -4
-        center_list[1] -= -18
-    return tuple(center_list)
-
-
 def find_noise_scratches(img):  # De-noising
     dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
     noise = cv2.subtract(img, dst)
@@ -647,7 +564,7 @@ def find_noise_scratches(img):  # De-noising
 def morph(c_obj, r_obj):
     cam_image, cam_points, ref_image, ref_points = c_obj.image, c_obj.pix_points, r_obj.image, r_obj.pix_points
     mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
-
+    head, file_name = os.path.split(ref_files[selected])
     # COLOR CORRECTION
     ref_smoothed, noise = find_noise_scratches(ref_image)
     r_roi = ref_smoothed[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
@@ -677,7 +594,7 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(concave_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
-    # center = adjust_center(center)
+    center = [x - y for x, y in zip(center, painting_data[file_name]["center_delta"])]
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255

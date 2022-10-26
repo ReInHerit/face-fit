@@ -59,7 +59,7 @@ MainLayout:
         orientation: 'vertical'
         Label:
             id: title
-            text: 'Fit-Face'
+            text: 'Face-Fit'
             bold: True
             font_size: c_side.size[1] * self.size_hint[1] * 0.9
             text_size: self.size
@@ -92,18 +92,18 @@ MainLayout:
                     StatsLabel:
                         id: rot_x
                         font_size: rot_x.size[1] * self.size_hint[1] * 0.5
-                        text: 'X Rotation'
+                        text: 'X Rot: Jaw'
                         halign: 'right'
                     StatsLabel:
                         id: rot_y
                         font_size: rot_y.size[1] * self.size_hint[1] * 0.5
-                        text: 'Y Rotation'
+                        text: 'Y Rot: Pitch'
                         halign: 'right'
 
                     StatsLabel:
                         id: rot_z
                         font_size: rot_z.size[1] * self.size_hint[1] * 0.5
-                        text: 'Z Rotation'
+                        text: 'Z Rot: Roll'
                         halign: 'right'
 
 
@@ -191,11 +191,11 @@ MainLayout:
                         id: input
                         multiline: False
                         hint_text:'Enter your e-mail'
-                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
                         size_hint: 1, 0.25
+                        font_size: self.height * 0.5
+                        valign: 'middle'
+
                         on_text_validate: root.on_new_text()
-
-
                     Button:
                         id: checkout
                         text: 'SEND'

@@ -29,8 +29,8 @@ send_to, email_alert, view_source = '', '', ''
 
 cam_obj = F_obj.Face('cam')
 
-Window.fullscreen = 'auto'
-Window.maximize()
+# Window.fullscreen = 'auto'
+# Window.maximize()
 # PATHS
 try:
     project_path = os.path.dirname(os.path.abspath(__file__))
@@ -89,16 +89,6 @@ class MyButton(ToggleButtonBehavior, Image):
         super(MyButton, self).__init__(**kwargs)
         self.source = kwargs["source"]  # Stores the image name of the image button
         self.texture = self.button_texture(self.source)  # Treat the image as a texture, so you can edit it
-
-    # def on_state(self, widget, value):
-    #     if value == 'down':
-    #         self.texture = self.button_texture(self.source, off=True)
-    #         self.__setattr__('height', 200)
-    #         print('down')
-    #     else:
-    #         self.texture = self.button_texture(self.source)
-    #         self.__setattr__('height', 150)
-    #         print('normal')
 
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
@@ -323,6 +313,19 @@ class MainLayout(Widget):
         else:
             email_alert.text = 'insert email'
 
+    def on_reset(self):
+        global selected, morph_selected, morph_texture, filled, reset
+        morphed_files = images_in_folder(path_to["morphs"])
+        for m_tex in morph_texture.keys():
+            btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
+        selected, reset, morph_selected = -1, -1, -1
+        morph_texture = {}
+        filled = []
+        email_alert.text, self.ids.input.text = '', ''
+        # delete attached images
+        for file in morphed_files:
+            os.remove(file)
+
     @staticmethod
     def check_email_address(address):
         global email_alert
@@ -337,20 +340,21 @@ class MainLayout(Widget):
 
     def checkout(self):
         global selected, morph_selected, morph_texture, filled, reset
-        morphed_files = images_in_folder(path_to["morphs"] )
+        morphed_files = images_in_folder(path_to["morphs"])
         if send_to != '':
             # send mail with attachments
             send_mail(morphed_files, send_to, painting_data)
-            # reset GUI and variables
-            for m_tex in morph_texture.keys():
-                btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
-            selected, reset, morph_selected = -1, -1, -1
-            morph_texture = {}
-            filled = []
-            email_alert.text, self.ids.input.text = '', ''
-            # delete attached images
-            for file in morphed_files:
-                os.remove(file)
+            self.on_reset()
+            # # reset GUI and variables
+            # for m_tex in morph_texture.keys():
+            #     btn_change(morphed_buttons[m_tex], 'normal', 150, morphs_default_texture)
+            # selected, reset, morph_selected = -1, -1, -1
+            # morph_texture = {}
+            # filled = []
+            # email_alert.text, self.ids.input.text = '', ''
+            # # delete attached images
+            # for file in morphed_files:
+            #     os.remove(file)
         else:
             print('cannot send email')
             return
@@ -378,7 +382,6 @@ def match():
                 return True
             else:
                 return False
-
 
 def cut_paste_user_mask(r_obj, c_obj):
     img1, img2 = r_obj.image, c_obj.image

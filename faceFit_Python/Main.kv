@@ -23,226 +23,207 @@ MainLayout:
     background_color: .1,.1,.1,1
     max: 100
     size_hint: 1, .3
-
 <MainLayout>:
-    cols: 3
     BoxLayout:
-        id: l_side
-        size: root.width*0.2, root.height
+        size: root.width, root.height
         orientation: 'vertical'
         Label:
-            text: ''
-            height: '20dp'
-            text_size: self.width, self.height
-            padding: 5,5
-            size_hint: 1, .1
-            halign: 'center'
-            valign: 'bottom'
-        ScrollView:
-            id: l_sv
-            do_scroll_y: True
-            scroll_y: r_sv.scroll_y
-            pos_hint: {'top': 1}
-            size_hint: 1, .9
-            padding: 5,5,5,5
-            GridLayout:
-                id: l_box_grid
-                padding:0, 25, 0, 0
-                cols:1
-                spacing:20
-                size_hint_y:None
 
-    BoxLayout:
-        id: c_side
-        size: root.width*0.6, root.height
-        pos: root.width*0.2, 0
-        orientation: 'vertical'
-        Label:
             id: title
             text: 'Face-Fit'
             bold: True
             font_size: c_side.size[1] * self.size_hint[1] * 0.9
             text_size: self.size
-
             size_hint: 1, .1
             halign: 'center'
             valign: 'middle'
-
         ColorBox:
-            id: c_box
-            orientation: 'vertical'
-            background_color: .2, .2, .2, 1
+            size_hint: 1, .005
+            background_color: .9, .9, .9, 1
+        BoxLayout:
+            orientation: 'horizontal'
+            BoxLayout:
+                id: l_side
+                size_hint: .2, 1
 
-            ColorBox:
-                size_hint: 1, .2
-                orientation: 'horizontal'
-                background_color: .05,.05,.05,1
-                padding: 0, 5, 0, 0
+                orientation: 'vertical'
 
-                BoxLayout:
-                    size_hint: .05, 1
+                ScrollView:
+                    id: l_sv
+                    do_scroll_y: True
+                    scroll_y: r_sv.scroll_y
+                    pos_hint: {'top': 1}
+                    size_hint: 1, .9
+                    padding: 5,5,5,5
+                    GridLayout:
+                        id: l_box_grid
+                        padding:0, 25, 0, 0
+                        cols:1
+                        spacing:20
+                        size_hint_y:None
+            BoxLayout:
+                id: c_side
+                size_hint: .6, 1
+
+                orientation: 'vertical'
+
+                ColorBox:
+                    id: c_box
+                    size_hint: 1, .895
                     orientation: 'vertical'
-                BoxLayout:
-                    size_hint: .1, 1
-                    orientation: 'vertical'
-                    StatsLabel:
-                        text: 'HINTS'
+                    background_color: .136, .136, .136, 1
+                    ColorBox:
+                        size_hint: 1, .2
+                        orientation: 'horizontal'
                         background_color: .05,.05,.05,1
+                        padding: 0, 5, 0, 0
+                        BoxLayout:
+                            size_hint: .04, 1
+                            orientation: 'vertical'
+                        BoxLayout:
+                            size_hint: .12, 1
+                            orientation: 'vertical'
+                            StatsLabel:
+                                text: 'HINTS'
+                                halign: 'right'
+                                background_color: .05,.05,.05,1
+                            StatsLabel:
+                                id: rot_x
+                                font_size: rot_x.size[1] * self.size_hint[1] * 0.5
+                                text: 'X Rot [Jaw]'
+                                halign: 'right'
+                            StatsLabel:
+                                id: rot_y
+                                font_size: rot_y.size[1] * self.size_hint[1] * 0.5
+                                text: 'Y Rot [Pitch]'
+                                halign: 'right'
+                            StatsLabel:
+                                id: rot_z
+                                font_size: rot_z.size[1] * self.size_hint[1] * 0.5
+                                text: 'Z Rot [Roll]'
+                                halign: 'right'
+                        BoxLayout:
+                            size_hint: .12, 1
+                            orientation: 'vertical'
+                            StatsLabel:
+                                text: 'Painting'
+                                background_color: .05,.05,.05,1
+                            StatsLabel:
+                                id: ref_x
+                                text: root.ref_x
+                            StatsLabel:
+                                id: ref_y
+                                text: root.ref_y
 
-                    StatsLabel:
-                        id: rot_x
-                        font_size: rot_x.size[1] * self.size_hint[1] * 0.5
-                        text: 'X Rot: Jaw'
-                        halign: 'right'
-                    StatsLabel:
-                        id: rot_y
-                        font_size: rot_y.size[1] * self.size_hint[1] * 0.5
-                        text: 'Y Rot: Pitch'
-                        halign: 'right'
+                            StatsLabel:
+                                id: ref_z
+                                text: root.ref_z
+                        BoxLayout:
+                            size_hint: .12, 1
+                            orientation: 'vertical'
+                            StatsLabel:
+                                text: 'Camera'
+                                background_color: .05,.05,.05,1
+                            StatsLabel:
+                                id: cam_x
+                                text: root.cam_x
+                            StatsLabel:
+                                id: cam_y
+                                text: root.cam_y
+                            StatsLabel:
+                                id: cam_z
+                                text: root.cam_z
+                        BoxLayout:
+                            size_hint: .3, 1
+                            orientation: 'vertical'
+                            StatsLabel:
+                                text: 'Match Up'
+                                background_color: .05,.05,.05,1
+                                size_hint: 1, .3
+                            ColorPB:
+                                id: pb_x
+                                value: root.pb_x
+                            ColorPB:
+                                id: pb_y
+                                value: root.pb_y
+                            ColorPB:
+                                id: pb_z
+                                value: root.pb_z
+                        BoxLayout:
+                            size_hint: .02, 1
+                            orientation: 'vertical'
+                            StatsLabel:
+                                text: ''
+                                background_color: .05,.05,.05,1
+                            StatsLabel:
+                                text: ''
+                            StatsLabel:
+                                text: ''
+                            StatsLabel:
+                                text: ''
+                        BoxLayout:
+                            size_hint: .05, 1
+                            orientation: 'vertical'
+                        BoxLayout:
+                            orientation: 'vertical'
+                            size_hint: .2, 1
+                            StatsLabel:
+                                id: email_alert
+                                text: root.email_alert
+                                size_hint: 1, 0.25
+                                background_color: .05,.05,.05,1
+                            TextInput:
+                                id: input
+                                multiline: False
+                                hint_text:'Enter your e-mail'
+                                size_hint: 1, 0.25
+                                font_size: self.height * 0.5
+                                valign: 'middle'
+                                on_text_validate: root.on_new_text()
+                            Button:
+                                id: checkout
+                                text: 'Send'
+                                text_size: self.size
+                                halign: 'center'
+                                valign: 'center'
+                                font_size: self.height * 0.75
+                                markup: True
+                                size_hint: 1, 0.25
+                                on_press:root.on_new_text()
+                            Button:
+                                id: reset
+                                text: 'Reset'
+                                text_size: self.size
+                                halign: 'center'
+                                valign: 'center'
+                                font_size: self.height * 0.75
+                                markup: True
+                                size_hint: 1, 0.25
+                                on_press:root.on_reset()
+                        BoxLayout:
+                            size_hint: .04, 1
+                            orientation: 'vertical'
+                    MyCamera:
+                        id: view
+                        source: root.source
+                        size_hint: 1, 1
+                        allow_stretch: True
+            BoxLayout:
+                id: r_side
+                orientation: 'vertical'
+                size_hint: .2, 1
 
-                    StatsLabel:
-                        id: rot_z
-                        font_size: rot_z.size[1] * self.size_hint[1] * 0.5
-                        text: 'Z Rot: Roll'
-                        halign: 'right'
-
-
-                BoxLayout:
-                    size_hint: .15, 1
-                    orientation: 'vertical'
-                    StatsLabel:
-                        text: 'Painting'
-                        background_color: .05,.05,.05,1
-                    StatsLabel:
-                        id: ref_x
-                        text: root.ref_x
-
-                    StatsLabel:
-                        id: ref_y
-                        text: root.ref_y
-
-                    StatsLabel:
-                        id: ref_z
-                        text: root.ref_z
-
-                BoxLayout:
-                    size_hint: .15, 1
-                    orientation: 'vertical'
-                    StatsLabel:
-                        text: 'Camera'
-                        background_color: .05,.05,.05,1
-                    StatsLabel:
-                        id: cam_x
-                        text: root.cam_x
-
-                    StatsLabel:
-                        id: cam_y
-                        text: root.cam_y
-
-                    StatsLabel:
-                        id: cam_z
-                        text: root.cam_z
-                BoxLayout:
-                    size_hint: .3, 1
-                    orientation: 'vertical'
-
-                    StatsLabel:
-                        text: 'Match Up'
-                        background_color: .05,.05,.05,1
-                        size_hint: 1, .3
-                    ColorPB:
-                        id: pb_x
-                        value: root.pb_x
-
-                    ColorPB:
-                        id: pb_y
-                        value: root.pb_y
-
-                    ColorPB:
-                        id: pb_z
-                        value: root.pb_z
-                BoxLayout:
-                    size_hint: .05, 1
-                    orientation: 'vertical'
-
-                    StatsLabel:
-                        text: ''
-                        background_color: .05,.05,.05,1
-
-                    StatsLabel:
-                        text: ''
-                    StatsLabel:
-                        text: ''
-                    StatsLabel:
-                        text: ''
-                BoxLayout:
-                    size_hint: .05, 1
-                    orientation: 'vertical'
-
-                BoxLayout:
-                    orientation: 'vertical'
-                    size_hint: .2, 1
-                    StatsLabel:
-                        id: email_alert
-                        text: root.email_alert
-                        size_hint: 1, 0.25
-                        background_color: .05,.05,.05,1
-                    TextInput:
-                        id: input
-                        multiline: False
-                        hint_text:'Enter your e-mail'
-                        size_hint: 1, 0.25
-                        font_size: self.height * 0.5
-                        valign: 'middle'
-
-                        on_text_validate: root.on_new_text()
-                    Button:
-                        id: checkout
-                        text: 'SEND'
-                        text_size: self.size
-                        halign: 'center'
-                        valign: 'center'
-                        font_size: '25sp'
-                        markup: True
-                        size_hint: 1, 0.5
-                        on_press:root.on_new_text()
-                BoxLayout:
-                    size_hint: .02, 1
-                    orientation: 'vertical'
-
-            MyCamera:
-                id: view
-                source: root.source
-                size_hint: 1, 1
-                allow_stretch: True
-
-
-    BoxLayout:
-        id: r_side
-        orientation: 'vertical'
-        size: root.width*0.2, root.height
-        pos: root.width*0.8, 0
-        Label:
-            text: ''
-            height: '20dp'
-            text_size: self.width, self.height
-            padding: 5,5
-            size_hint: 1, .1
-            halign: 'center'
-            valign: 'bottom'
-        ScrollView:
-            id: r_sv
-            pos_hint: {'top': 1}
-            scroll_b: root.scroll
-            do_scroll_y:True
-            scroll_y: l_sv.scroll_y
-
-            size_hint: 1, .9
-            padding: 5,5,5,5
-            GridLayout:
-                id: r_box_grid
-                padding:0, 25, 0, 0
-                cols: 1
-                spacing:20
-                size_hint_y:None
-
+                ScrollView:
+                    id: r_sv
+                    pos_hint: {'top': 1}
+                    scroll_b: root.scroll
+                    do_scroll_y:True
+                    scroll_y: l_sv.scroll_y
+                    size_hint: 1, .895
+                    padding: 5,5,5,5
+                    GridLayout:
+                        id: r_box_grid
+                        padding:0, 25, 0, 0
+                        cols: 1
+                        spacing:20
+                        size_hint_y:None

@@ -29,6 +29,10 @@
 // let source = cv.imread('/images/image11.jpg')
 
 
+
+const sharp = require("sharp");
+// import sharp from "sharp";
+
 function match_c(target, source) {
 //  Transfers the colour distribution from the source image to the target image by matching the mean and standard
 //  deviation and the colour cross correlation in the L-alpha-beta colour space.
@@ -161,8 +165,9 @@ function CoreProcessing(targetf, sourcef, CrossCovarianceLimit, ReshapingIterati
         'image depth: ' + targetf.depth() + '\n' +
         'image channels ' + targetf.channels() + '\n' +
         'image type: ' + targetf.type() + '\n');
-    targetf = convertTolab(targetf);
-    sourcef = convertTolab(sourcef);
+    cv.cvtColor(targetf, targetf, cv.COLOR_RGBA2RGB)
+    targetf = rgb2lab(targetf); //    convertTolab(targetf);
+    sourcef = rgb2lab(sourcef);
     console.log(targetf)
     //cv::meanStdDev(targetf, tmean, tdev);
     //cv::meanStdDev(sourcef, smean, sdev);
@@ -739,12 +744,52 @@ function lab2rgb(lab){
         Math.max(0, Math.min(1, b)) * 255]
 }
 
-function rgb2lab(rgb){
+async function separateRGB(image) {
+    try {
+        await sharp(image)
+            .extractChannel(0)
+            .raw()
+            .toBuffer()
+    } catch (e) {
+        console.log(e)
+    }
+
+    const green = await sharp(image)
+        .extractChannel(1)
+        .raw()
+        .toBuffer()
+    const blue = await sharp(image)
+        .extractChannel(2)
+        .raw()
+        .toBuffer()
+    return {red: red, green: green, blue: blue};
+}
+function getChannel(channelName, image) {
+    const copy = copyToCanvas(image);
+    const ctx = copy.ctx;
+    ctx.fillStyle = channels[channelName];
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(image, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    return copy;
+}
+function copyToCanvas(image) {
+    let can = document.createElement("newcanvas");
+    can.width = image.naturalWidth || image.width;
+    can.height = image.naturalHeight || image.height;
+    can.ctx = can.getContext("2d");
+    can.ctx.drawImage(image, 0, 0);
+    return can;
+}
+function rgb2lab(image){
+    let rgb = separateRGB(image)
+    console.log(rgb[0])
     let r = rgb[0] / 255,
         g = rgb[1] / 255,
         b = rgb[2] / 255,
         x, y, z;
-
     r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
     g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
     b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
@@ -756,7 +801,7 @@ function rgb2lab(rgb){
     x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
     y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
     z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
-
+    console.log(r + ' ' +g + ' ' +b + ' ' +x + ' ' +y+ ' ' +z)
     return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)]
 }
 

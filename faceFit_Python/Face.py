@@ -42,7 +42,7 @@ class Face:
                 static_image_mode=True,
                 max_num_faces=1,
                 refine_landmarks=True,
-                min_detection_confidence=0.5) as face_m:
+                min_detection_confidence=0.50) as face_m:
             self.image = image
             picture = image
             # Convert the BGR image to RGB before processing.

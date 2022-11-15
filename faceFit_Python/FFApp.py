@@ -505,7 +505,7 @@ def match_histograms(src_image, ref_image):
 def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
     # unless your points_list are integers. see http://www.qhull.org/html/qh-optq.htm
-    tri = Delaunay(points_list, qhull_options="Qc Qz Q12").vertices
+    tri = Delaunay(points_list, qhull_options="Qc Qz Q12").simplices
 
     ia, ib, ic = tri[:, 0], tri[:, 1], tri[:, 2]  # indices of each of the triangles' points
     pa, pb, pc = points_list[ia], points_list[ib], points_list[ic]  # coordinates of each of the triangles' points

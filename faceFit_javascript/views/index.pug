@@ -14,10 +14,9 @@ block layout-content
             #middle.camView
                 canvas#canvas
                     image#ref_img(src='')
-                canvas#output1(width='100%')
-                canvas#output2(width='100%')
-                canvas#output3(width='100%')
+                //canvas#output1(width='100%') //canvas#output2(width='100%') //canvas#output3(width='100%')
                 video#webcam.invisible(autoplay="true" muted width="1280" height="960")
+                canvas#cam_canvas(width="1280" height="960")
                 //canvas#canvas
 
         #right.asnav1Class

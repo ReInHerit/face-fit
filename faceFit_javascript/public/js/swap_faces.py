@@ -1,6 +1,7 @@
 import cv2
 from json import load as load_json, dumps
-
+import fileinput
+import base64
 import os
 import numpy as np
 from shapely.geometry import MultiLineString
@@ -10,63 +11,10 @@ import sys
 from collections import Counter
 from itertools import combinations
 from flask import Flask, jsonify, request
+from PIL import Image
+import io
 
-
-
-app = Flask(__name__)
-#
-#
-# @app.route("/test", methods=["GET", "POST"])
-# def testfn():
-#     # GET request
-#     if request.method == 'GET':
-#         message = {'greeting':'Hello from Flask!'}
-#         return jsonify(message)  # serialize and use JSON headers
-#     # POST request
-#     if request.method == 'POST':
-#         print(request.get_json())  # parse as JSON
-#         return 'Sucesss', 200
-# # @app.route("/GET/<string:st>", methods=["GET"]) #  , methods=["GET", "POST"]
-# # def get_data(st):
-# #     # if request.method == "POST":
-# #     #     jsonData = request.get_json()
-# #     #     print(jsonData)
-# #     #     return {
-# #     #         'response': 'I am the response'
-# #     #     }
-# #     message = {'greeting': st}
-# #
-# #     response = jsonify(message)
-# #     response.headers.add('Access-Control-Allow-Origin', '*')
-# #
-# #     return response
-#
-@app.route('/info', methods=['POST','GET'])
-def process_json():
-    content_type = request.headers.get('Content-Type')
-    data = request.get_json()
-    # returned_data = request.json()
-    print('app.py print entered', data)
-    if content_type == 'application/json':
-        json = request.json
-        print('py json: ' + json)
-        return json.dumps(data)
-    else:
-        return 'Content-Type not supported!'
-#
-# # @app.route('/data', methods=['POST'])
-# # def data():
-# #     print('cazz')
-# #     print(request)
-# #     data = request.json
-# #     print(data)
-# #     return dumps(data)#jsonify(success=True)
-#
-#
-if __name__ == "__main__":
-    app.run(host='localhost', port=8050, debug=True)
-
-with open('../TRIANGULATION.json', 'r') as f:
+with open('C:/Users/arkfil/Desktop/FITFace/faceFit_javascript/public/TRIANGULATION.json', 'r') as f:
     media_pipes_tris = load_json(f)
 
 
@@ -136,7 +84,7 @@ def match_histograms(src_image, ref_image):
 def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
     # unless your points_list are integers. see http://www.qhull.org/html/qh-optq.htm
-    tri = Delaunay(points_list, qhull_options="Qc Qz Q12").vertices
+    tri = Delaunay(points_list, qhull_options="Qc Qz Q12").simplices
 
     ia, ib, ic = tri[:, 0], tri[:, 1], tri[:, 2]  # indices of each of the triangles' points
     pa, pb, pc = points_list[ia], points_list[ib], points_list[ic]  # coordinates of each of the triangles' points
@@ -190,18 +138,25 @@ def warp_triangle(img1, img2, t1, t2):
 
 
 def morph(c_obj, r_obj):
-    cam_image, cam_points, ref_image, ref_points = c_obj.image, c_obj.pix_points, r_obj.image, r_obj.pix_points
+    cam_image, cam_points,  ref_points = c_obj['image'], c_obj['points'], r_obj['points']
     mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
-    head, file_name = os.path.split(r_obj.source_path)
-    # COLOR CORRECTION
+    # head, file_name = os.path.split(r_obj['src'])
+    # # COLOR CORRECTION   ref_image,r_obj.image
+    # new_ref_address = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))+'\images\\'+file_name
+    ref_image = cv2.imread(r_obj['src'])
+    # cam_image
+    # cv2.imshow('0', ref_image)
+    # cv2.imshow('1', cam_image)
+    # print(r_obj['bb'])
+    # cv2.waitKey(0)
     ref_smoothed, noise = find_noise_scratches(ref_image)
-    r_roi = ref_smoothed[r_obj.bb_p1[1] - offset:r_obj.bb_p2[1] + offset,
-               r_obj.bb_p1[0] - offset:r_obj.bb_p2[0] + offset]
-    c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
-               c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
+    r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
+               r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
+    c_roi = cam_image[c_obj['bb']['yMin'] - offset:c_obj['bb']['yMax'] + offset,
+               c_obj['bb']['xMin'] - offset:c_obj['bb']['xMax'] + offset]
     cam_cc = match_histograms(c_roi, r_roi)
-    cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset, c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = \
-        cam_cc.astype('float64')
+    cam_image[c_obj['bb']['yMin'] - offset:c_obj['bb']['yMax'] + offset,
+               c_obj['bb']['xMin'] - offset:c_obj['bb']['xMax'] + offset] = cam_cc.astype('float64')
 
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
@@ -234,11 +189,54 @@ def morph(c_obj, r_obj):
 
     return output
 
-# Get the command line arguments and parse it to json
-data = load_json(sys.argv[1])
 
-c_obj =  data["c_face"]
-r_obj =  data["p_face"]
+def readb64(base64_string):
+    idx = base64_string.find('base64,')
+    base64_string = base64_string[idx+7:]
 
-output = morph(c_obj, r_obj)
-print(dumps(output))
+    sbuf = io.BytesIO()
+
+    sbuf.write(base64.b64decode(base64_string, ' /'))
+    pimg = Image.open(sbuf)
+    return cv2.cvtColor(np.array(pimg), cv2.COLOR_RGB2BGR)
+
+
+app = Flask(__name__)
+
+
+@app.route('/DATAtoPY', methods=['POST'])
+def hello():
+    print(request.method)
+    # POST request
+    if request.method == 'POST':
+        print('Incoming..')
+        data = request.get_json()
+        c_obj = data["c_face"]
+        r_obj = data["p_face"]
+
+        c_img = readb64(c_obj['image'])
+        c_obj['image'] = c_img
+        #
+        selected = r_obj['which']
+        head, file_name = os.path.split(r_obj['src'])
+        # COLOR CORRECTION   ref_image,r_obj.image
+
+        r_obj['src'] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
+        path_to = {"morphs": (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')}
+        output = morph(c_obj, r_obj)
+        # if output:
+        numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
+
+        path = path_to["morphs"] + 'morph_' + numb + '.png'
+        cv2.imwrite(path, output)
+        return path, 200
+
+    # GET request
+    else:
+        message = {'greeting': 'Hello from Flask!'}
+        return jsonify(message)  # serialize and use JSON headers
+
+
+if __name__ == "__main__":
+    app.run(host='localhost', port=8050, debug=True)
+print('qui')

@@ -3,15 +3,17 @@ const ref_img = document.getElementById("ref_img");
 const video = document.getElementById("webcam");
 const middle = document.getElementById("middle");
 const canvas = document.getElementById("canvas");
-const output1 = document.getElementById("output1");
-const output2 = document.getElementById("output2");
-const output3 = document.getElementById("output3");
+//const output1 = document.getElementById("output1");
+//const output2 = document.getElementById("output2");
+//const output3 = document.getElementById("output3");
+const cam_canvas = document.getElementById('cam_canvas');
+const ctx = cam_canvas.getContext('2d');
 const body = document.body
 let context, cam_face, detector, selected, cam_mat;
 let faces_arr = []
 const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
 const detectorConfig = {
-    runtime: 'mediapipe', // or 'tfjs'
+    runtime: 'mediapipe',
     solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
     min_tracking_confidence: 0.2
 }
@@ -73,8 +75,8 @@ if (leftSlick.length) {
 }
 
 function path_adjusted(url) {
-    if (!/^\w+\:/i.test(url)) {
-        url = url.replace(/^(\.?\/?)([\w\@])/, "$1js/$2")
+    if (!/^\w+:/i.test(url)) {
+        url = url.replace(/^(\.?\/?)([\w@])/, "$1js/$2")
     }
     return url
 }
@@ -138,7 +140,7 @@ async function init() {
 function Face(which, image) {
     this.which = which;
     this.image = image;
-    this.type = typeof(image);
+    this.type = typeof (image);
     this.src = image.src;
     this.w = image.naturalWidth;
     this.h = image.naturalHeight;
@@ -196,8 +198,7 @@ function calcHull(points) {
     }
 }
 
-function POINT_COMPARATOR(a, b) {
-    // console.log(a +' ' +b)
+function point_comparator(a, b) {
     if (a[0] < b[0])
         return -1;
     else if (a[0] > b[0])
@@ -241,7 +242,7 @@ function convex_hull(points, boundingbox) {
             _new_arr.push(poly[el])
         }
     }
-    _new_arr.sort(POINT_COMPARATOR);
+    _new_arr.sort(point_comparator);
     let hull = calcHull(_new_arr)
     let _hull = [];
     for (let h in hull) {
@@ -340,7 +341,9 @@ async function calc_lmrks(image, which) {
             let z = Math.round(keypoints[land].z);
             landmarks.push([x, y, z])
             points_2d.push([x, y])
+
         }
+//        console.log(landmarks)
         bb.xMin = Math.round(faces[0].box.xMin)
         bb.xMax = Math.round(faces[0].box.xMax)
         bb.yMin = Math.round(faces[0].box.yMin)
@@ -361,62 +364,61 @@ async function calc_lmrks(image, which) {
     return [landmarks, points_2d, bb, angles]
 }
 
-function distance(a, b) {
-    return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2))
-}
-
-function draw_landmarks(w, h, canvas_where, ctx, land_array) {
-
-    ctx.globalAlpha = 0.5
-    ctx.save()
-    ctx.clearRect(0, 0, w, h)
-    ctx.fillStyle = 'black'
-    ctx.fillRect(0, 0, w, h)
-    ctx.fillStyle = '#32EEDB';
-    ctx.strokeStyle = '#32EEDB';
-    ctx.lineWidth = 0.5;
-    for (let tris_indices in TRIANGULATION) {
-        const points_indices = [TRIANGULATION[tris_indices][0], TRIANGULATION[tris_indices][1],
-            TRIANGULATION[tris_indices][2]]
-        const points = [land_array[points_indices[0]], land_array[points_indices[1]],
-            land_array[points_indices[2]]]
-        const region = new Path2D();
-        region.moveTo(points[0][0], points[0][1]);
-        for (let i = 1; i < 3; i++) {
-            const point = points[i];
-            region.lineTo(point[0], point[1]);
-        }
-        region.closePath();
-
-        ctx.stroke(region);
-    }
-}
-
-function drawHull(image, idx) {
-    const w = canvas.width
-    const h = canvas.width
-    const this_picture = faces_arr[idx]
-    const points_indices = this_picture.hull;
-    let hull_points = [];
-    for (let el in points_indices) {
-        let id = points_indices[el];
-        let new_point = new cv.Point(this_picture.n_points[id][0] * w, this_picture.n_points[id][1] * h)
-        hull_points.push(new_point)
-    }
-    const mat = cv.imread(image)
-    let larger_mat = new cv.Mat()
-    const dsize = new cv.Size(w, h)
-    cv.resize(mat, larger_mat, dsize, 0, 0, cv.INTER_LINEAR);
-    for (let lin = 0; lin < hull_points.length - 1; lin++) {
-        let p1 = hull_points[lin];
-        let p2 = hull_points[lin + 1];
-        cv.line(larger_mat, p1, p2, [0, 255, 0, 255], 1)
-    }
-    cv.imshow(canvas, larger_mat);
-    mat.delete();
-    larger_mat.delete()
-
-}
+// function distance(a, b) {
+//     return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2))
+// }
+//
+// function draw_landmarks(w, h, canvas_where, ctx, land_array) {
+//     ctx.globalAlpha = 0.5
+//     ctx.save()
+//     ctx.clearRect(0, 0, w, h)
+//     ctx.fillStyle = 'black'
+//     ctx.fillRect(0, 0, w, h)
+//     ctx.fillStyle = '#32EEDB';
+//     ctx.strokeStyle = '#32EEDB';
+//     ctx.lineWidth = 0.5;
+//     for (let tris_indices in TRIANGULATION) {
+//         const points_indices = [TRIANGULATION[tris_indices][0], TRIANGULATION[tris_indices][1],
+//             TRIANGULATION[tris_indices][2]]
+//         const points = [land_array[points_indices[0]], land_array[points_indices[1]],
+//             land_array[points_indices[2]]]
+//         const region = new Path2D();
+//         region.moveTo(points[0][0], points[0][1]);
+//         for (let i = 1; i < 3; i++) {
+//             const point = points[i];
+//             region.lineTo(point[0], point[1]);
+//         }
+//         region.closePath();
+//
+//         ctx.stroke(region);
+//     }
+// }
+//
+// function drawHull(image, idx) {
+//     const w = canvas.width
+//     const h = canvas.width
+//     const this_picture = faces_arr[idx]
+//     const points_indices = this_picture.hull;
+//     let hull_points = [];
+//     for (let el in points_indices) {
+//         let id = points_indices[el];
+//         let new_point = new cv.Point(this_picture.n_points[id][0] * w, this_picture.n_points[id][1] * h)
+//         hull_points.push(new_point)
+//     }
+//     const mat = cv.imread(image)
+//     let larger_mat = new cv.Mat()
+//     const dsize = new cv.Size(w, h)
+//     cv.resize(mat, larger_mat, dsize, 0, 0, cv.INTER_LINEAR);
+//     for (let lin = 0; lin < hull_points.length - 1; lin++) {
+//         let p1 = hull_points[lin];
+//         let p2 = hull_points[lin + 1];
+//         cv.line(larger_mat, p1, p2, [0, 255, 0, 255], 1)
+//     }
+//     cv.imshow(canvas, larger_mat);
+//     mat.delete();
+//     larger_mat.delete()
+//
+// }
 
 function hull_mask() {
     let hull_points = [];
@@ -438,18 +440,18 @@ function hull_mask() {
     return convexHullMat
 }
 
-function mask_from_array(points, w, h) {
-
-    let mask_from_array_mat = cv.Mat.zeros(w, h, cv.CV_8UC3);
-    let points_to_mat = cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat())
-    let fake_vector = new cv.MatVector();
-    fake_vector.push_back(points_to_mat)
-    cv.drawContours(mask_from_array_mat, fake_vector, 0, [255, 255, 255, 0], -1, 8)
-    fake_vector.delete();
-    points_to_mat.delete()
-    // cv.imshow(canvas,mask_from_array_mat)
-    return mask_from_array_mat
-}
+// function mask_from_array(points, w, h) {
+//
+//     let mask_from_array_mat = cv.Mat.zeros(w, h, cv.CV_8UC3);
+//     let points_to_mat = cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat())
+//     let fake_vector = new cv.MatVector();
+//     fake_vector.push_back(points_to_mat)
+//     cv.drawContours(mask_from_array_mat, fake_vector, 0, [255, 255, 255, 0], -1, 8)
+//     fake_vector.delete();
+//     points_to_mat.delete()
+//     // cv.imshow(canvas,mask_from_array_mat)
+//     return mask_from_array_mat
+// }
 
 function draw_mask_on_ref() {
     cam_mat = new cv.Mat()
@@ -564,7 +566,7 @@ const accessCamera = () => {
             video.srcObject = stream;
         })
         .catch(function (error) {
-            console.log("Something went wrong!");
+            console.log("Something went wrong!", error);
         });
 };
 
@@ -581,21 +583,22 @@ function check_expression(landmarks) {
         return p4_p3 / p2_p1//, center
     }
 
-// l_eye
+    // l_eye
     let l_e, r_e, lips
     const l_division = calc_division(landmarks[362], landmarks[263], landmarks[386], landmarks[374])
 
     l_division <= 0.1 ? l_e = 'closed' : l_e = 'opened';
-// r_eye
+    // r_eye
     const r_division = calc_division(landmarks[33], landmarks[133], landmarks[159], landmarks[145])
     r_division <= 0.1 ? r_e = 'closed' : r_e = 'opened';
 
-// Mouth
+    // Mouth
     const lips_division = calc_division(landmarks[78], landmarks[308], landmarks[13], landmarks[14])
     lips_division < 0.15 ? lips = 'closed' : 0.15 <= lips_division < 0.4 ? lips = 'opened' : lips = 'full opened';
 
     return [l_e, r_e, lips]
 }
+
 
 function match(angles_cam, angles_ref) {
     draw_mask_on_ref()
@@ -606,34 +609,44 @@ function match(angles_cam, angles_ref) {
         console.log('match1')
         if (cam_face.expression.toString() === faces_arr[selected].expression.toString()) {
             console.log('match2')
-            let objs = {'p_face': faces_arr[selected], 'c_face': cam_face}
-            let data_json = JSON.stringify(objs)
-            let text = 'eccomi'
-            fetch("http://localhost/8050/info", {
-                method: 'GET',
-                mode: 'cors',
-                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
 
-            })
-            .then((response) =>  response.json())
+            setTimeout(() => {
+                ctx.drawImage(video, 0, 0, cam_face.w, cam_face.h);
+                let data_url = cam_canvas.toDataURL('image/jpeg', 0.5);
+                ctx.clearRect(0, 0, cam_face.w, cam_face.h);
+                cam_face.image = data_url
 
-            .then((data) => console.log(data)
-//            {
-//                    process.on('message', (msg) => {
-//                        const obj = objs;
-//                    }
-//                    process.send(obj);
-//                }
-                )
+                let objs = {'p_face': faces_arr[selected], 'c_face': cam_face}
+                let data_json = JSON.stringify(objs)
+                fetch("/info", {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log('main data:', data)
+                        fetch("/info", {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                            body: data_json//JSON.stringify(objs)
+                        }).then((res) => {
+                            res.body
+                            console.log('back', res)
+                        })
+                            .catch((err) => console.log(err))
+                    })
 
-            .catch((error) => {
-                    console.error('Error:', error)
-            })
+
+                    .catch((error) => {
+                        console.error('Error:', error)
+                    })
 
 //
 //            swap_face()
-            clearInterval(detect_interval)
-            selected = -1
+                clearInterval(detect_interval)
+                selected = -1
+            })
         }
     }
     const dsize = new cv.Size(cam_mat.cols / 10, cam_mat.rows / 10)
@@ -645,136 +658,12 @@ function match(angles_cam, angles_ref) {
     cam_mat = null
 }
 
-//function swap_face() {
-//    const mc = match_c(ref_img, cam_mat)
-//    let tris1 = [], tris2 = [];
-//    for (let i in TRIANGULATION) {
-//        let tri1 = [], tri2 = [];
-//        const tris_indices = TRIANGULATION[i]
-//        const tris_indices_mirror = TRIANGULATION_MIRROR[i]
-//        for (let j = 0; j < 3; j++) {
-//            tri1.push([cam_face.points[tris_indices_mirror[j]][0], cam_face.points[tris_indices_mirror[j]][1]])
-//            tri2.push([faces_arr[selected].points[tris_indices[j]][0], faces_arr[selected].points[tris_indices[j]][1]])
-//        }
-//        tris1.push(tri1)
-//        tris2.push(tri2)
-//    }
-//    let target_mat = cv.imread(ref_img)
-//    let cam_hist = calc_Hist(cam_mat)
-//    let ref_hist = calc_Hist(target_mat)
-//    // cam_mat = equalize_hist(cam_mat)
-//    for (let i in tris1) {
-//        let warp = warp_triangle(cam_mat, target_mat, tris1[i], tris2[i])
-//
-//        target_mat = warp.clone()
-//
-//        warp.delete()
-//    }
-//    cv.imshow(canvas, target_mat)
-//    // cam_mat = null
-//    tris1 = []
-//    tris2 = []
-//    target_mat.delete()
-//
-//}
-//
-//function warp_triangle(source_mat, target, t1, t2) {
-//    let bb1 = {
-//        minX: Math.min(t1[0][0], t1[1][0], t1[2][0]),
-//        minY: Math.min(t1[0][1], t1[1][1], t1[2][1]),
-//        maxX: Math.max(t1[0][0], t1[1][0], t1[2][0]),
-//        maxY: Math.max(t1[0][1], t1[1][1], t1[2][1]),
-//    }
-//    bb1.w = bb1.maxX - bb1.minX
-//    bb1.h = bb1.maxY - bb1.minY
-//
-//    let bb2 = {
-//        minX: Math.min(t2[0][0], t2[1][0], t2[2][0]),
-//        minY: Math.min(t2[0][1], t2[1][1], t2[2][1]),
-//        maxX: Math.max(t2[0][0], t2[1][0], t2[2][0]),
-//        maxY: Math.max(t2[0][1], t2[1][1], t2[2][1]),
-//    }
-//    bb2.w = bb2.maxX - bb2.minX
-//    bb2.h = bb2.maxY - bb2.minY
-//    if (bb1.w >> 0 || bb1.h >> 0 || bb2.w >> 0 || bb2.h >> 0) {
-//        const r1 = new cv.Rect(bb1.minX, bb1.minY, bb1.w, bb1.h);
-//        const r2 = new cv.Rect(bb2.minX, bb2.minY, bb2.w, bb2.h);
-//
-//        //normalize points , inverting x values in t1
-//        let n_t1 = [], n_t2 = []
-//        for (let i = 0; i < 3; i++) {
-//            let new_point1 = [Math.round((1 - (t1[i][0] - bb1.minX) / (bb1.maxX - bb1.minX)) * bb2.w), Math.round(((t1[i][1] - bb1.minY) / (bb1.maxY - bb1.minY)) * bb2.h)]
-//            n_t1.push(new_point1)
-//            let new_point2 = [Math.round(((t2[i][0] - bb2.minX) / (bb2.maxX - bb2.minX)) * bb2.w), Math.round(((t2[i][1] - bb2.minY) / (bb2.maxY - bb2.minY)) * bb2.h)]
-//            n_t2.push(new_point2)
-//        }
-//        let srcTri = cv.matFromArray(3, 1, cv.CV_32FC2, n_t1.flat());
-//        let dstTri = cv.matFromArray(3, 1, cv.CV_32FC2, n_t2.flat());
-//
-//        let M = cv.getAffineTransform(srcTri, dstTri);
-//        srcTri.delete();
-//        dstTri.delete();
-//        M.data64F[2] += (M.data64F[0] + M.data64F[1] - 1) / 2
-//        M.data64F[5] += (M.data64F[3] + M.data64F[4] - 1) / 2
-//
-//        let roi_t2 = target.roi(r2)
-//        let roi_t2_mask = new cv.Mat(roi_t2.rows, roi_t2.cols, cv.CV_8UC1)
-//        let warped = new cv.Mat()
-//        roi_t2.copyTo(warped, roi_t2_mask)
-//        roi_t2_mask.delete()
-//        let roi_t1 = source_mat.roi(r1)
-//        let dsize = new cv.Size(bb2.w, bb2.h);
-//        cv.resize(roi_t1, roi_t1, dsize, 0, 0, cv.INTER_AREA)
-//        cv.flip(roi_t1, roi_t1, 1)
-//        cv.warpAffine(roi_t1, warped, M, dsize, cv.INTER_AREA, cv.BORDER_DEFAULT, [0, 0, 0, 0]);// new cv.Scalar()
-//        M.delete();
-//        roi_t1.delete();
-//        let mask_t2 = mask_from_array(t2, target.cols, target.rows)
-//        let roi_mask_t2 = mask_t2.roi(r2);
-//        mask_t2.delete();
-//
-//        //convert to 1 channel gray
-//        cv.cvtColor(roi_mask_t2, roi_mask_t2, cv.COLOR_RGBA2GRAY, 0);
-//        // inverse Roi mask t2
-//        let roi_mask_t2_inv = new cv.Mat()
-//        cv.bitwise_not(roi_mask_t2, roi_mask_t2_inv)
-//        let mix = mask_img(roi_t2, warped, roi_mask_t2, roi_mask_t2_inv)
-//        roi_mask_t2.delete();
-//        roi_mask_t2_inv.delete();
-//        warped.delete();
-//        roi_t2.delete();
-//        let dst = target.clone();
-//        for (let i = 0; i < mix.rows; i++) {
-//            for (let j = 0; j < mix.cols; j++) {
-//                dst.ucharPtr(i + bb2.minY, j + bb2.minX)[0] = mix.ucharPtr(i, j)[0];
-//                dst.ucharPtr(i + bb2.minY, j + bb2.minX)[1] = mix.ucharPtr(i, j)[1];
-//                dst.ucharPtr(i + bb2.minY, j + bb2.minX)[2] = mix.ucharPtr(i, j)[2]
-//            }
-//        }
-//        mix.delete()
-//        return dst
-//    } else {
-//        console.log(bb1.w + ' ' + bb1.h + ' ' + bb2.w + ' ' + bb2.h)
-//    }
-//    // cv.fillConvexPoly(mask, new_triangle,t2,3, new cv.Scalar(1,1,1,1) )
-//}
-//
-//function mask_img(bg_img, fg_img, mask, mask_inv) {
-//    let imgBg = new cv.Mat(bg_img.cols, bg_img.rows, cv.CV_8UC4);
-//    let imgFg = new cv.Mat(bg_img.cols, bg_img.rows, cv.CV_8UC4);
-//    let sum = new cv.Mat();
-//    // Black-out the area of logo in ROI
-//    cv.bitwise_and(bg_img, bg_img, imgBg, mask_inv);
-//
-//    // Take only region of logo from logo image
-//    cv.bitwise_and(fg_img, fg_img, imgFg, mask);
-//
-//    // Put logo in ROI and modify the main image
-//    cv.add(imgBg, imgFg, sum);
-//    imgBg.delete();
-//    imgFg.delete();//bg_img.delete();fg_img.delete();mask_inv.delete();
-//    return sum
-//}
+// function extract_raw_image() { // this is the actual workhorse
+//     var type = "image/png"
+//     var data = video.get(0).toDataURL(type);
+//     data = data.replace('data:' + type + ';base64,', '');
+//     return data
+// }
 
 async function detectFaces() {
     cam_face = new Face('cam', video)
@@ -791,8 +680,8 @@ async function detectFaces() {
             cam_face.hull = convex_hull(value[1], value[2]);
             cam_face.n_points = cam_face.normalize_array(value[1])
             cam_face.expression = check_expression(value[1])
-            if (selected >= 0) {
 
+            if (selected >= 0) {
                 match(cam_face.angles, faces_arr[selected].angles)
             }
         })
@@ -803,8 +692,6 @@ async function detectFaces() {
 
 function resizeCanvas() {
     canvas_size(middle.offsetWidth)
-    // output.width =  middle.offsetWidth ;
-    // output.height = middle.offsetWidth ;
     /**
      * Your drawings need to be inside this function otherwise they will be reset when
      * you resize the browser window and the canvas goes will be cleared.
@@ -822,171 +709,7 @@ accessCamera();
 window.addEventListener('resize', resizeCanvas, false);
 video.addEventListener('loadeddata', function () {
     body.classList.add('loaded')
-
-    // setInterval(detectFaces, 100);
 })
 
-//function calc_Hist(src0) {
-//    let src = src0.clone()
-//    let rgbaPlanes = new cv.MatVector();
-//// Split the Mat
-//    cv.split(src, rgbaPlanes);
-//// Get R channel
-//    let R = rgbaPlanes.get(0);
-//    let G = rgbaPlanes.get(1);
-//    let B = rgbaPlanes.get(2);
-//    let A = rgbaPlanes.get(3);
-//    const channels = [R, G, B, A]
-//    const colors = [new cv.Scalar(255, 0, 0), new cv.Scalar(0, 255, 0), new cv.Scalar(0, 0, 255)]
-//    let rVec = new cv.MatVector();
-//    let gVec = new cv.MatVector();
-//    let bVec = new cv.MatVector();
-//    const vectors = [rVec, gVec, bVec]
-//    let hists = []
-//    let outputs = [output1, output2, output3]
-//    for (let i = 0; i < 3; i++) {
-//        vectors[i].push_back(channels[i]);
-//
-//        let accumulate = false;
-//        let channel = [0];
-//        let histSize = [256];
-//        let ranges = [0, 255];
-//        let hist = new cv.Mat();
-//        let mask = new cv.Mat();
-//        let color = colors[i];
-//        let scale = 2;
-//        // You can try more different parameters
-//        cv.calcHist(vectors[i], channel, mask, hist, histSize, ranges, accumulate);
-//        let hist_ = hist.clone()
-//        let result = cv.minMaxLoc(hist, mask);
-//        let max = result.maxVal;
-//        let dst = new cv.Mat.zeros(src.rows / 5, histSize[0] * scale,
-//            cv.CV_8UC3);
-//        // draw histogram
-//        for (let i = 0; i < histSize[0]; i++) {
-//            let binVal = hist.data32F[i] * src.rows / 5 / max;
-//            let point1 = new cv.Point(i * scale, src.rows / 5 - 1);
-//            let point2 = new cv.Point((i + 1) * scale - 1, src.rows / 5 - binVal);
-//            cv.rectangle(dst, point1, point2, color, cv.FILLED);
-//        }
-//        cv.imshow(outputs[i], dst);
-//        hists.push(hist_)
-//        mask.delete();
-//        hist.delete();
-//        dst.delete()
-//    }
-//
-//    rVec.delete();
-//    gVec.delete();
-//    bVec.delete();
-//    rgbaPlanes.delete();
-//    src.delete()
-//    return hists
-//}
-//
-//function calc_Hist_old(src0) {
-//    let src = src0.clone()
-//    cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
-//    let rVec = new cv.MatVector();
-//    rVec.push_back(src);
-//    let accumulate = false;
-//    let channels = [0];
-//    let histSize = [256];
-//    let ranges = [0, 255];
-//    let hist = new cv.Mat();
-//    let mask = new cv.Mat();
-//    let color = new cv.Scalar(255, 255, 255);
-//    let scale = 2;
-//    // You can try more different parameters
-//    cv.calcHist(rVec, channels, mask, hist, histSize, ranges, accumulate);
-//    let result = cv.minMaxLoc(hist, mask);
-//    let max = result.maxVal;
-//    let dst = new cv.Mat.zeros(src.rows, histSize[0] * scale,
-//        cv.CV_8UC3);
-//    // draw histogram
-//    for (let i = 0; i < histSize[0]; i++) {
-//        let binVal = hist.data32F[i] * src.rows / max;
-//        let point1 = new cv.Point(i * scale, src.rows - 1);
-//        let point2 = new cv.Point((i + 1) * scale - 1, src.rows - binVal);
-//        cv.rectangle(dst, point1, point2, color, cv.FILLED);
-//    }
-//    cv.imshow('output', dst);
-//    src.delete();
-//    dst.delete();
-//    rVec.delete();
-//    mask.delete();
-//    hist.delete();
-//}
-//
-//function equalize_hist(src) {
-//    // let imgElement = document.getElementById("ImgViewImage"); // img element with ImgViewImage id
-//    // let src = cv.imread(imgElement);
-//    console.log(src.channels())
-//    let dst = new cv.Mat();
-//    let hsvPlanes = new cv.MatVector();
-//    let mergedPlanes = new cv.MatVector();
-//    // cv.cvtColor(src, src, cv.COLOR_RGB2HSV, 0);
-//    cv.split(src, hsvPlanes);
-//    let H = hsvPlanes.get(0);
-//    let S = hsvPlanes.get(1);
-//    let V = hsvPlanes.get(2);
-//    cv.equalizeHist(V, V);
-//    mergedPlanes.push_back(H);
-//    mergedPlanes.push_back(S);
-//    mergedPlanes.push_back(V);
-//    cv.merge(mergedPlanes, src);
-//    // cv.cvtColor(src, dst, cv.COLOR_HSVRGBA, 0);
-//    // cv.imshow("canvasOutput", dst); // canavas element with canvasOutput id
-//    src.delete();
-//    // dst.delete();
-//    hsvPlanes.delete();
-//    mergedPlanes.delete();
-//    return dst
-//}
-//
-//
-//function python_match_hist() {
-//    function find_value_target(val, target_arr) {
-//        let key = np.where(target_arr == val)[0]
-//
-//        if (len(key) == 0) {
-//            key = find_value_target(val + 1, target_arr)
-//
-//            if (len(key) == 0) {
-//                key = find_value_target(val - 1, target_arr)
-//            }
-//        }
-//        let vvv = key[0]
-//        return vvv
-//    }
-//
-//
-//    function match_histogram(inp_img, hist_input, e_hist_input, e_hist_target, _print = True) {
-//        // map from e_inp_hist to 'target_hist
-//
-//        let en_img = np.zeros_like(inp_img)
-//        let tran_hist = np.zeros_like(e_hist_input)
-//        for (let i in range(len(e_hist_input))) {
-//            tran_hist[i] = find_value_target(val = e_hist_input[i], target_arr = e_hist_target)
-//        }
-//        // print_histogram(tran_hist, name = "trans_hist_", title = "Transferred Histogram")
-//        // enhance image as well:'
-//
-//        for (let x_pixel in (inp_img.cols)) {
-//            for (let y_pixel in inp_img.rows) {
-//                let pixel_val = Math.round(inp_img[x_pixel][y_pixel])
-//                en_img[x_pixel][y_pixel] = tran_hist[pixel_val]
-//            }
-//        }
-//        ''
-//        'creating new histogram'
-//        ''
-//        hist_img, _ = generate_histogram(en_img, print = False, index = 3)
-//        print_img(img = en_img, histo_new = hist_img, histo_old = hist_input, index = str(3), L = L)
-//    }
-//}
 
-
-
-////////////////////////////////////////
 

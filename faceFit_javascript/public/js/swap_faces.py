@@ -1,5 +1,5 @@
 import cv2
-from json import load as load_json, dumps
+from json import load as load_json, dumps, JSONEncoder
 import fileinput
 import base64
 import os
@@ -13,6 +13,25 @@ from itertools import combinations
 from flask import Flask, jsonify, request
 from PIL import Image
 import io
+import Face as F_obj
+from math import floor, ceil
+
+ref = []
+ref_dict =[]
+# face_dict = {'which': '',
+#             'landmarks': [],
+#             'f_landmarks': [],
+#             'points': [],
+#             'pix_points': [],
+#             'alpha': 0,
+#             'beta': 0,
+#             'gamma': 0,
+#             'delta_x': 0,
+#             'delta_y': 0,
+#             'bb_p1': (0, 0),
+#             'bb_p2': (0, 0),
+#             'status': {'l_e': '', 'r_e': '', 'lips': ''}
+#              }
 
 with open('C:/Users/arkfil/Desktop/FITFace/faceFit_javascript/public/TRIANGULATION.json', 'r') as f:
     media_pipes_tris = load_json(f)
@@ -138,11 +157,15 @@ def warp_triangle(img1, img2, t1, t2):
 
 
 def morph(c_obj, r_obj):
-    cam_image, cam_points,  ref_points = c_obj['image'], c_obj['points'], r_obj['points']
+    cam_image, ref_points = c_obj['image'], r_obj['pix_points']
     mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
     # head, file_name = os.path.split(r_obj['src'])
     # # COLOR CORRECTION   ref_image,r_obj.image
-    # new_ref_address = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))+'\images\\'+file_name
+    cam_image = cv2.flip(cam_image, 1)
+    new_c_obj = F_obj.Face('cam')
+    new_c_obj.get_landmarks(cam_image)
+    cam_points = new_c_obj.pix_points
+    # # new_ref_address = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))+'\images\\'+file_name
     ref_image = cv2.imread(r_obj['src'])
     # cam_image
     # cv2.imshow('0', ref_image)
@@ -152,16 +175,15 @@ def morph(c_obj, r_obj):
     ref_smoothed, noise = find_noise_scratches(ref_image)
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
                r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
-    c_roi = cam_image[c_obj['bb']['yMin'] - offset:c_obj['bb']['yMax'] + offset,
-               c_obj['bb']['xMin'] - offset:c_obj['bb']['xMax'] + offset]
+    c_roi = cam_image[new_c_obj.bb_p1[1] - offset:new_c_obj.bb_p2[1] + offset,
+               new_c_obj.bb_p1[0] - offset:new_c_obj.bb_p2[0] + offset]
     cam_cc = match_histograms(c_roi, r_roi)
-    cam_image[c_obj['bb']['yMin'] - offset:c_obj['bb']['yMax'] + offset,
-               c_obj['bb']['xMin'] - offset:c_obj['bb']['xMax'] + offset] = cam_cc.astype('float64')
+    cam_image[new_c_obj.bb_p1[1] - offset:new_c_obj.bb_p2[1] + offset,
+               new_c_obj.bb_p1[0] - offset:new_c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
 
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris  # triangles
-
     tris1 = [[cam_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
     tris2 = [[ref_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
@@ -200,28 +222,68 @@ def readb64(base64_string):
     pimg = Image.open(sbuf)
     return cv2.cvtColor(np.array(pimg), cv2.COLOR_RGB2BGR)
 
+def round_num(value):
+    x = floor(value)
+    if (value - x) < .50:
+        return x
+    else:
+        return ceil(value)
+
 
 app = Flask(__name__)
 
 
+@app.route('/INIT_PAINTINGS', methods=['POST'])
+def init():
+    print(request.method)
+    # POST request
+    if request.method == 'POST':
+        global ref_dict
+        print('INIT Incoming..')
+        data = request.get_json()
+        ref_dict = []
+        for idx, file in enumerate(data):
+            path_on_server = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '/' + file
+
+            ref_img = cv2.imread(path_on_server)
+            p_face = F_obj.Face('ref')
+            p_face.get_landmarks(ref_img)
+            face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
+                         'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
+                         'pix_points': p_face.pix_points, 'angles': [p_face.alpha + 90, p_face.beta + 90, p_face.gamma],
+                         'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
+                                'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
+                                'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
+                                           p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]}}
+
+            ref_dict.append(face_dict)
+        return jsonify(ref_dict), 200
+
+    else:
+        message = {'greeting': 'Hello from Flask!'}
+        return jsonify(message)
+
 @app.route('/DATAtoPY', methods=['POST'])
-def hello():
+def sendData():
     print(request.method)
     # POST request
     if request.method == 'POST':
         print('Incoming..')
+        # print(ref_dict)
         data = request.get_json()
         c_obj = data["c_face"]
-        r_obj = data["p_face"]
+        selected = data["selected"]
+        r_obj = ref_dict[selected]
 
         c_img = readb64(c_obj['image'])
         c_obj['image'] = c_img
         #
-        selected = r_obj['which']
+        # selected = r_obj['which']
         head, file_name = os.path.split(r_obj['src'])
-        # COLOR CORRECTION   ref_image,r_obj.image
+
 
         r_obj['src'] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
+        print(r_obj['src'])
         path_to = {"morphs": (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')}
         output = morph(c_obj, r_obj)
         # if output:

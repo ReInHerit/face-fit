@@ -11,6 +11,7 @@ const ctx = cam_canvas.getContext('2d');
 const body = document.body
 let context, cam_face, detector, selected, cam_mat;
 let faces_arr = []
+let face_arr = []
 const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
 const detectorConfig = {
     runtime: 'mediapipe',
@@ -18,6 +19,7 @@ const detectorConfig = {
     min_tracking_confidence: 0.2
 }
 let detect_interval
+let morphed = ''
 
 function canvas_size(value) {
     if (value <= 600) {
@@ -41,7 +43,7 @@ if (leftSlick.length) {
         speed: 300,
         focusOnSelect: false,
         slidesToShow: 3.5,
-        slidesToScroll: 2,
+        slidesToScroll: 3,
         vertical: true,
         // arrows: false,
         draggable: true,
@@ -52,11 +54,11 @@ if (leftSlick.length) {
     });
     rightSlick.slick({
         dots: false,
-        infinite: true,
+        infinite: false,
         speed: 300,
         focusOnSelect: false,
         slidesToShow: 3.5,
-        slidesToScroll: 2,
+        slidesToScroll: 3,
         vertical: true,
         // arrows: false,
         draggable: true,
@@ -80,7 +82,16 @@ function path_adjusted(url) {
     }
     return url
 }
-
+function extract_index(path){
+    const fileName = path.split('/').pop()
+    const replaced = fileName.replace(/\D/g, ''); // 👉️ '123'
+    console.log(replaced);
+    let num;
+    if (replaced !== '') {
+      num = Number(replaced)-1; // 👉️ 123
+    }
+    return num
+}
 async function init() {
     let btns, all_btns;
     let all_btns_indices = [];
@@ -92,48 +103,98 @@ async function init() {
     fetch(path_adjusted('../TRIANGULATION2inverted.json')).then(response => response.json()).then(data => {
         TRIANGULATION_MIRROR = data
     });
+
     let container = document.querySelector("#left");
     btns = container.querySelectorAll("div.select_ch.slick-slide:not(.slick-cloned) >button");
     all_btns = container.querySelectorAll("div.slick-slide >button");
     const prop = 'data-slick-index'
-
+    console.log(face_arr)
     all_btns.forEach(function (item, index, arr) {
         all_btns_indices.push(arr[index].parentNode.getAttribute(prop))
     })
-
+    paintings = {'start': 'paintings'}
+    await fetch("/init", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    body: JSON.stringify(paintings)
+                })
+                .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error: ${res.status}`);
+                }
+                console.log(res.json)
+                return res.json();
+            })
+                .then((json) => {
+                console.log(json)
+                face_arr = json.body
+            })
     const img_length = btns.length
-    for (let imm_num = 0; imm_num < img_length; imm_num++) {
-        let f = new Face(imm_num, btns[imm_num].firstChild);
-        const values = await calc_lmrks(f.image, f.which)
-        f.lmrks = values[0]
-        f.points = values[1];
-        f.n_points = f.normalize_array(values[1])
-        f.bb = values[2];
-        f.angles = values[3];
-        f.hull = convex_hull(values[1], values[2]);
-        f.expression = check_expression(values[1])
-        faces_arr.push(f)
-    }
+    // calc painting landmarks
+//    for (let imm_num = 0; imm_num < img_length; imm_num++) {
+//        let f = new Face(imm_num, btns[imm_num].firstChild);
+//        const values = await calc_lmrks(f.image, f.which)
+//        f.lmrks = values[0]
+//        f.points = values[1];
+//        f.n_points = f.normalize_array(values[1])
+//        f.bb = values[2];
+//        f.angles = values[3];
+//        f.hull = convex_hull(values[1], values[2]);
+//        f.expression = check_expression(values[1])
+//        faces_arr.push(f)
+//    }
+    console.log(face_arr)
     for (let j = 0; j < all_btns.length; j++) {
         all_btns[j].onclick = function () {
             let _this = this;
             slide_id = all_btns_indices[j]
-            faces_arr.forEach(function (item, index, arr) {
-                if (_this.firstChild.src === arr[index].src) {
-                    selected = index
-                    ref_img.src = arr[index].src;
+            console.log(slide_id)
+            console.log(extract_index(_this.firstChild.src))
+            selected = extract_index(_this.firstChild.src)
+            source = 'http://localhost:8000/' + face_arr[selected]['src']
+            console.log(source)
+            ref_img.src = source;
 
-                    ref_img.onload = function () {
+            ref_img.onload = function () {
+                console.log(selected)
 
-                        detect_interval = setInterval(detectFaces, 100);
-                        // drawHull(ref_img, selected)
-                        // draw_landmarks(ref_img.width, ref_img.height,canvas,context,item.lmrks)
-                    }
-                } else {
-                    // console.log('btn' + this + ' not matching')
+                if (selected !== -1){
+                morphed = ''
+                detect_interval = setInterval(detectFaces, 100);
+                console.log('start interval')
                 }
-            })
-        }
+//                        else if (morphed !== ''){
+//                            console.log('wait')}
+//                        else {
+
+                    }
+//            face_arr.forEach(function (item, index, arr) {
+//                console.log( arr[index].src)
+//                if (_this.firstChild.src === arr[index].src) {
+//                    selected = index
+//                    ref_img.src = arr[index].src;
+//
+//                    ref_img.onload = function () {
+//                        console.log(selected)
+//
+//                        if (selected !== -1){
+//                        morphed = ''
+//                        detect_interval = setInterval(detectFaces, 100);
+//                        console.log('start interval')
+//                        }
+////                        else if (morphed !== ''){
+////                            console.log('wait')}
+////                        else {
+//
+//                            }
+////                        }
+//                        // drawHull(ref_img, selected)
+//                        // draw_landmarks(ref_img.width, ref_img.height,canvas,context,item.lmrks)
+//
+//                } else { // console.log('btn' + this + ' not matching')
+//                }
+            }
+//        }
     }
 }
 
@@ -279,7 +340,7 @@ function pointInPolygon(polygon, point) {
     return odd;
 }
 
-async function getHeadAngles(keypoints) {
+async function getHeadAngles(keypoints, which) {
     // V: 10, 152; H: 226, 446
     this.faceVerticalCentralPoint = [
         0,
@@ -310,8 +371,12 @@ async function getHeadAngles(keypoints) {
         horizontalOpposite,
     ]);
     const horizontalCos = horizontalAdjacent / horizontalHypotenuse;
-    const first = Math.acos(verticalCos) * (180 / Math.PI);
-    const second = Math.acos(horizontalCos) * (180 / Math.PI);
+    let first = Math.acos(verticalCos) *(180 / Math.PI);
+    let second = Math.acos(horizontalCos) * (180 / Math.PI);
+    if (which === 'cam') {
+            first = Math.round(normalize(first, {'actual': {'lower': 55, 'upper': 115}, 'desired': {'lower': 82, 'upper': 95}}))
+            second = Math.round(normalize(second, {'actual': {'lower': 50, 'upper': 120}, 'desired': {'lower': 120, 'upper': 69}}))
+    }
     let pleft = keypoints[133]
     let pright = keypoints[362]
     let third = Math.atan2(pright[1] - pleft[1], pright[0] - pleft[0]) * (180 / Math.PI)
@@ -325,7 +390,12 @@ function l2Norm(vec) {
     }
     return Math.sqrt(norm);
 }
-
+function normalize(value, bounds){
+    new_value = bounds['desired']['lower'] + (value - bounds['actual']['lower']) *
+    (bounds['desired']['upper'] - bounds['desired']['lower']) /
+    (bounds['actual']['upper'] - bounds['actual']['lower'])
+    return new_value
+}
 async function calc_lmrks(image, which) {
     // console.log('calcolo FACE '+ which)
     let landmarks = []
@@ -355,7 +425,7 @@ async function calc_lmrks(image, which) {
 
         if (landmarks !== []) {
             // console.log('not none')
-            angles = await getHeadAngles(landmarks)
+            angles = await getHeadAngles(landmarks, which)
         }
     } else {
         console.log('non ce la faccio a calcolare le faces dell\'imm ' + which)
@@ -364,61 +434,6 @@ async function calc_lmrks(image, which) {
     return [landmarks, points_2d, bb, angles]
 }
 
-// function distance(a, b) {
-//     return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2))
-// }
-//
-// function draw_landmarks(w, h, canvas_where, ctx, land_array) {
-//     ctx.globalAlpha = 0.5
-//     ctx.save()
-//     ctx.clearRect(0, 0, w, h)
-//     ctx.fillStyle = 'black'
-//     ctx.fillRect(0, 0, w, h)
-//     ctx.fillStyle = '#32EEDB';
-//     ctx.strokeStyle = '#32EEDB';
-//     ctx.lineWidth = 0.5;
-//     for (let tris_indices in TRIANGULATION) {
-//         const points_indices = [TRIANGULATION[tris_indices][0], TRIANGULATION[tris_indices][1],
-//             TRIANGULATION[tris_indices][2]]
-//         const points = [land_array[points_indices[0]], land_array[points_indices[1]],
-//             land_array[points_indices[2]]]
-//         const region = new Path2D();
-//         region.moveTo(points[0][0], points[0][1]);
-//         for (let i = 1; i < 3; i++) {
-//             const point = points[i];
-//             region.lineTo(point[0], point[1]);
-//         }
-//         region.closePath();
-//
-//         ctx.stroke(region);
-//     }
-// }
-//
-// function drawHull(image, idx) {
-//     const w = canvas.width
-//     const h = canvas.width
-//     const this_picture = faces_arr[idx]
-//     const points_indices = this_picture.hull;
-//     let hull_points = [];
-//     for (let el in points_indices) {
-//         let id = points_indices[el];
-//         let new_point = new cv.Point(this_picture.n_points[id][0] * w, this_picture.n_points[id][1] * h)
-//         hull_points.push(new_point)
-//     }
-//     const mat = cv.imread(image)
-//     let larger_mat = new cv.Mat()
-//     const dsize = new cv.Size(w, h)
-//     cv.resize(mat, larger_mat, dsize, 0, 0, cv.INTER_LINEAR);
-//     for (let lin = 0; lin < hull_points.length - 1; lin++) {
-//         let p1 = hull_points[lin];
-//         let p2 = hull_points[lin + 1];
-//         cv.line(larger_mat, p1, p2, [0, 255, 0, 255], 1)
-//     }
-//     cv.imshow(canvas, larger_mat);
-//     mat.delete();
-//     larger_mat.delete()
-//
-// }
 
 function hull_mask() {
     let hull_points = [];
@@ -440,22 +455,11 @@ function hull_mask() {
     return convexHullMat
 }
 
-// function mask_from_array(points, w, h) {
-//
-//     let mask_from_array_mat = cv.Mat.zeros(w, h, cv.CV_8UC3);
-//     let points_to_mat = cv.matFromArray(points.length, 1, cv.CV_32SC2, points.flat())
-//     let fake_vector = new cv.MatVector();
-//     fake_vector.push_back(points_to_mat)
-//     cv.drawContours(mask_from_array_mat, fake_vector, 0, [255, 255, 255, 0], -1, 8)
-//     fake_vector.delete();
-//     points_to_mat.delete()
-//     // cv.imshow(canvas,mask_from_array_mat)
-//     return mask_from_array_mat
-// }
 
 function draw_mask_on_ref() {
     cam_mat = new cv.Mat()
-    const ref_bb = faces_arr[selected].bb
+    const ref_bb = face_arr[selected].bb
+    console.log(face_arr[selected])
     const bb_cam_rect = new cv.Rect(cam_face.bb.xMin, cam_face.bb.yMin, cam_face.bb.width, cam_face.bb.height)
     const bb_ref_rect = new cv.Rect(ref_bb.xMin, ref_bb.yMin, ref_bb.width, ref_bb.height);
     let cap = new cv.VideoCapture(video);
@@ -463,9 +467,7 @@ function draw_mask_on_ref() {
     cap.read(cam_source)
     let temp_mask = new cv.Mat(video.height, video.width, cv.CV_8UC1)
     let cam_roi = cam_source.roi(bb_cam_rect)
-
     const ref = cv.imread(ref_img)
-
     const ref_roi = ref.roi(bb_ref_rect);
     cam_mat = cam_source.clone()
     cam_source.delete();
@@ -480,7 +482,6 @@ function draw_mask_on_ref() {
 
     let cam_roi_gray = new cv.Mat()
     cv.cvtColor(cam_roi, cam_roi_gray, cv.COLOR_RGBA2GRAY, 0)
-
 
     let cam_laplacian = laplacian(cam_roi, cam_roi.cols, cam_roi.rows)
     cam_roi.delete();
@@ -556,20 +557,6 @@ function laplacian(src, height, width) {
     return dstC1;
 }
 
-const accessCamera = () => {
-    navigator.mediaDevices
-        .getUserMedia({
-            video: {width: 1280, height: 960},
-            audio: false,
-        })
-        .then((stream) => {
-            video.srcObject = stream;
-        })
-        .catch(function (error) {
-            console.log("Something went wrong!", error);
-        });
-};
-
 function check_expression(landmarks) {
     function calc_division(land_id1, land_id2, land_id3, land_id4) {
         const p1 = [land_id1[0], land_id1[1], 0]
@@ -599,57 +586,80 @@ function check_expression(landmarks) {
     return [l_e, r_e, lips]
 }
 
+async function match(angles_cam, angles_ref) {
+//    draw_mask_on_ref()
 
-function match(angles_cam, angles_ref) {
-    draw_mask_on_ref()
     const delta = 8;
+    console.log(angles_cam[0], angles_ref[0])
+    console.log(angles_cam[1], angles_ref[1])
+    console.log(angles_cam[2], angles_ref[2])
     if ((angles_cam[0] >= angles_ref[0] - delta && angles_cam[0] <= angles_ref[0] + delta) &&
-        (angles_cam[1] >= 180 - angles_ref[1] - delta && angles_cam[1] <= 180 - angles_ref[1] + delta) &&
-        (angles_cam[2] >= -angles_ref[2] - delta / 2 && angles_cam[2] <= -angles_ref[2] + delta / 2)) {
+        (angles_cam[1] >= angles_ref[1] - delta && angles_cam[1] <= angles_ref[1] + delta) &&
+        (angles_cam[2] >= angles_ref[2] - delta / 2 && angles_cam[2] <= angles_ref[2] + delta / 2)) {
         console.log('match1')
-        if (cam_face.expression.toString() === faces_arr[selected].expression.toString()) {
+        if (cam_face.expression.toString() === face_arr[selected].expression.toString()) {
             console.log('match2')
+            // setTimeout(() => {
+            morphed = ''
+            ctx.drawImage(video, 0, 0, cam_face.w, cam_face.h);
+            let data_url = cam_canvas.toDataURL('image/jpeg', 0.5);
+            ctx.clearRect(0, 0, cam_face.w, cam_face.h);
+            cam_face.image = data_url
 
-            setTimeout(() => {
-                ctx.drawImage(video, 0, 0, cam_face.w, cam_face.h);
-                let data_url = cam_canvas.toDataURL('image/jpeg', 0.5);
-                ctx.clearRect(0, 0, cam_face.w, cam_face.h);
-                cam_face.image = data_url
+            let objs = {'selected': selected, 'c_face': cam_face}//'p_face': face_arr[selected],
+            let data_json = JSON.stringify(objs)
+            selected = -1
 
-                let objs = {'p_face': faces_arr[selected], 'c_face': cam_face}
-                let data_json = JSON.stringify(objs)
-                fetch("/info", {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                })
-                    .then((response) => response.json())
-                    .then((data) => {
-                        console.log('main data:', data)
-                        fetch("/info", {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                            body: data_json//JSON.stringify(objs)
-                        }).then((res) => {
-                            res.body
-                            console.log('back', res)
-                        })
-                            .catch((err) => console.log(err))
-                    })
-
-
-                    .catch((error) => {
-                        console.error('Error:', error)
-                    })
-
-//
-//            swap_face()
-                clearInterval(detect_interval)
-                selected = -1
+            await fetch("/info", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                body: data_json//JSON.stringify(objs)
             })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error: ${res.status}`);
+                }
+                console.log(res.json)
+                return res.json();
+            })
+            .then((json) => {
+//                console.log(json)
+                let rel_path = json.relative_path
+//                console.log(ref_img.width)
+                morphed = rel_path
+//                console.log(ref_img.src)
+                let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+                ref_img.src = morphed
+
+                ref_img.onload = function () {
+                    morph = cv.imread(ref_img)
+                    console.log(morphed, morph)
+                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+                    cv.imshow(canvas, morph);
+                    console.log('loaded')
+                    clearInterval(detect_interval)
+                    }
+
+
+
+            })
+            .catch((err) => console.error(`Fetch problem: ${err.message}`));
+
         }
     }
-    const dsize = new cv.Size(cam_mat.cols / 10, cam_mat.rows / 10)
+    console.log(selected, morphed)
+//    if (morphed !== ""){
+//        let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+//        ref_img.src = morphed
+//        morph = cv.imread(ref_img)
+//        cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+//        cv.imshow(canvas, morph);
+//        ref_img.onload = function () {
+//            console.log('loaded')
+//            clearInterval(detect_interval)
+//            }
+//        }
+//    const dsize = new cv.Size(cam_mat.cols / 10, cam_mat.rows / 10)
     // if (cam_mat){
     //     cv.resize(cam_mat, cam_mat, dsize, 0, 0, cv.INTER_LINEAR )
     //     cv.imshow(output, cam_mat)
@@ -666,6 +676,9 @@ function match(angles_cam, angles_ref) {
 // }
 
 async function detectFaces() {
+if (selected >= 0) {
+
+    console.log('detect cycle:', selected)
     cam_face = new Face('cam', video)
     cam_face.w = video.width;
     cam_face.h = video.height;
@@ -680,15 +693,65 @@ async function detectFaces() {
             cam_face.hull = convex_hull(value[1], value[2]);
             cam_face.n_points = cam_face.normalize_array(value[1])
             cam_face.expression = check_expression(value[1])
+//            while (selected !== -1) {
+//                if (morphed !== ''){
+//                    console.log('break')
+//                    break;
+//                    }
+//                    console.log('in while')
+//                draw_mask_on_ref()
+//                match(cam_face.angles, faces_arr[selected].angles)
+//                }
+//            console.log('out')
+//            let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+//                    ref_img.src = morphed
+//                    morph = cv.imread(ref_img)
+//                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+//                    cv.imshow(canvas, morph);
+//                    clearInterval(detect_interval);
+//            if (selected >= 0) {
+                console.log('in if:',morphed)
+                draw_mask_on_ref()
+                match(cam_face.angles, face_arr[selected].angles)
 
-            if (selected >= 0) {
-                match(cam_face.angles, faces_arr[selected].angles)
-            }
+
+//            }
+//            else if (morphed === ''){
+//                console.log('wait morphed', morphed)
+//            }
+//            else {
+//                console.log ('fuori', morphed)
+//                let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+//                ref_img.src = morphed
+//                morph = cv.imread(ref_img)
+//                cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+//                cv.imshow(canvas, morph);
+//                ref_img.onload = function () {
+//                    console.log('loaded')
+//                    clearInterval(detect_interval)
+//                    }
+//            }
+
+
+//            else {
+//                if (morphed !== ''){
+//                    console.log('fuori', morphed)
+//                    let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+//                    ref_img.src = morphed
+//                    morph = cv.imread(ref_img)
+//                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+//                    cv.imshow(canvas, morph);
+//                    ref_img.onload = function () {
+//                    console.log('loaded')
+//                    clearInterval(detect_interval)}/// morphed='' ???????????????
+//                    }
+//                else {console.log('wait', morphed)}
+//            }
         })
         .catch((err) => {
             console.log(err);
         });
-}
+}}
 
 function resizeCanvas() {
     canvas_size(middle.offsetWidth)
@@ -701,6 +764,23 @@ function resizeCanvas() {
         // drawHull(ref_img, selected);
     }
 }
+
+
+const accessCamera = () => {
+    navigator.mediaDevices
+        .getUserMedia({
+            video: {width: 1280, height: 960},
+            audio: false,
+        })
+        .then((stream) => {
+            video.srcObject = stream;
+//            video.style.webkitTransform = "scaleX(1)";
+//            video.style.transform       = "scaleX(1)";
+        })
+        .catch(function (error) {
+            console.log("Something went wrong!", error);
+        });
+};
 
 init();
 accessCamera();

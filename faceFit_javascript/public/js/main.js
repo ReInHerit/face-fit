@@ -3,14 +3,23 @@ const ref_img = document.getElementById("ref_img");
 const video = document.getElementById("webcam");
 const middle = document.getElementById("middle");
 const canvas = document.getElementById("canvas");
-//const output1 = document.getElementById("output1");
-//const output2 = document.getElementById("output2");
-//const output3 = document.getElementById("output3");
+const perc_x = document.getElementById("pb_x");
+const perc_y = document.getElementById("pb_y");
+const perc_z = document.getElementById("pb_z");
+const ref_x = document.getElementById("ref_x");
+const ref_y = document.getElementById("ref_y");
+const ref_z = document.getElementById("ref_z");
+const cam_x = document.getElementById("cam_x");
+const cam_y = document.getElementById("cam_y");
+const cam_z = document.getElementById("cam_z");
+const container = document.getElementsByClassName("container")[0]
+let container_left = document.querySelector("#left");
+let container_right = document.querySelector("#right")
+let container_center = document.querySelector("#demos")
 const cam_canvas = document.getElementById('cam_canvas');
 const ctx = cam_canvas.getContext('2d');
 const body = document.body
 let context, cam_face, detector, selected, cam_mat;
-let faces_arr = []
 let face_arr = []
 const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
 const detectorConfig = {
@@ -18,21 +27,12 @@ const detectorConfig = {
     solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
     min_tracking_confidence: 0.2
 }
+const default_view = '../images/Thumbs/default_view.jpg'
+const start_view = 'http://localhost:8000/images/Thumbs/start_view.jpg'
+
 let detect_interval
 let morphed = ''
-
-function canvas_size(value) {
-    if (value <= 600) {
-        canvas.width = value;
-        canvas.height = value;
-    } else {
-        canvas.width = 600;
-        canvas.height = 600;
-    }
-}
-
-canvas_size(middle.offsetWidth)
-context = canvas.getContext("2d");
+let m_all_btns
 const leftSlick = $("#left");
 const rightSlick = $("#right")
 
@@ -76,25 +76,72 @@ if (leftSlick.length) {
     });
 }
 
+function canvas_size(value) {
+
+    if (value <= 600) {
+
+        canvas.width = value;
+        canvas.height = value;
+    } else {
+        canvas.width = 600;
+        canvas.height = 600;
+    }
+}
+function window_size(){
+    console.log(container.offsetWidth)
+    console.log(container.offsetHeight)
+    if(container.offsetWidth <= 800){
+
+        canvas.height = container.offsetWidth * 0.6;
+        canvas.width = canvas.height;
+//        container.style.gridTemplate = '[header-left] "view" 1fr [header-right] [main-left] "ref_btns"  30px [main-right] [footer-left] "morph_btns" 30px [footer-right]/ 120px 1fr;'
+        container.style.gridTemplateAreas=   '"view" "ref_btns" "morph_btns"';
+        container.style.gridTemplateColumns = '1fr';
+        container.style.gridTemplateRows = '60% 10% 10%';
+        leftSlick.slick['vertical'] = false;
+        rightSlick.slick['vertical'] = false;
+    }
+    else {
+//    container.style.gridTemplate ='[header-left] "ref_btns view morph_btns" 30px [header-right]/ 120px 1fr;'
+        container.style.gridTemplateAreas=  'ref_btns view morph_btns';
+
+        container.style.gridTemplateColumns = '20% 60% 20%';
+        container.style.gridTemplateRows = '100%';
+        leftSlick.slick['vertical'] = true;
+        rightSlick.slick['vertical'] = true;
+        canvas.width = 600;
+        canvas.height = 600;
+    }
+}
+
+//canvas_size(middle.offsetWidth)
+window_size()
+context = canvas.getContext("2d");
+
 function path_adjusted(url) {
     if (!/^\w+:/i.test(url)) {
         url = url.replace(/^(\.?\/?)([\w@])/, "$1js/$2")
     }
     return url
 }
+
 function extract_index(path){
     const fileName = path.split('/').pop()
     const replaced = fileName.replace(/\D/g, ''); // 👉️ '123'
-    console.log(replaced);
     let num;
     if (replaced !== '') {
       num = Number(replaced)-1; // 👉️ 123
     }
     return num
 }
+
 async function init() {
-    let btns, all_btns;
+    let btns, m_btns, all_btns;
     let all_btns_indices = [];
+    ref_img.src = start_view
+    ref_img.onload = function(){
+        load_on_ref_canvas(ref_img)
+    }
 
     detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
     fetch(path_adjusted('../TRIANGULATION2.json')).then(response => response.json()).then(data => {
@@ -104,11 +151,11 @@ async function init() {
         TRIANGULATION_MIRROR = data
     });
 
-    let container = document.querySelector("#left");
-    btns = container.querySelectorAll("div.select_ch.slick-slide:not(.slick-cloned) >button");
-    all_btns = container.querySelectorAll("div.slick-slide >button");
+    btns = container_left.querySelectorAll("div.select_ch.slick-slide:not(.slick-cloned) >button");
+    all_btns = container_left.querySelectorAll("div.slick-slide >button");
+    m_btns = container_right.querySelectorAll("div.select_ch.slick-slide:not(.slick-cloned) >button");
+    m_all_btns = container_right.querySelectorAll("div.slick-slide >button");
     const prop = 'data-slick-index'
-    console.log(face_arr)
     all_btns.forEach(function (item, index, arr) {
         all_btns_indices.push(arr[index].parentNode.getAttribute(prop))
     })
@@ -130,26 +177,11 @@ async function init() {
                 face_arr = json.body
             })
     const img_length = btns.length
-    // calc painting landmarks
-//    for (let imm_num = 0; imm_num < img_length; imm_num++) {
-//        let f = new Face(imm_num, btns[imm_num].firstChild);
-//        const values = await calc_lmrks(f.image, f.which)
-//        f.lmrks = values[0]
-//        f.points = values[1];
-//        f.n_points = f.normalize_array(values[1])
-//        f.bb = values[2];
-//        f.angles = values[3];
-//        f.hull = convex_hull(values[1], values[2]);
-//        f.expression = check_expression(values[1])
-//        faces_arr.push(f)
-//    }
-    console.log(face_arr)
+
     for (let j = 0; j < all_btns.length; j++) {
         all_btns[j].onclick = function () {
             let _this = this;
             slide_id = all_btns_indices[j]
-            console.log(slide_id)
-            console.log(extract_index(_this.firstChild.src))
             selected = extract_index(_this.firstChild.src)
             source = 'http://localhost:8000/' + face_arr[selected]['src']
             console.log(source)
@@ -157,44 +189,31 @@ async function init() {
 
             ref_img.onload = function () {
                 console.log(selected)
-
                 if (selected !== -1){
                 morphed = ''
-                detect_interval = setInterval(detectFaces, 100);
+                detect_interval = setInterval(detectFaces, 1000/30);
                 console.log('start interval')
                 }
-//                        else if (morphed !== ''){
-//                            console.log('wait')}
-//                        else {
-
-                    }
-//            face_arr.forEach(function (item, index, arr) {
-//                console.log( arr[index].src)
-//                if (_this.firstChild.src === arr[index].src) {
-//                    selected = index
-//                    ref_img.src = arr[index].src;
-//
-//                    ref_img.onload = function () {
-//                        console.log(selected)
-//
-//                        if (selected !== -1){
-//                        morphed = ''
-//                        detect_interval = setInterval(detectFaces, 100);
-//                        console.log('start interval')
-//                        }
-////                        else if (morphed !== ''){
-////                            console.log('wait')}
-////                        else {
-//
-//                            }
-////                        }
-//                        // drawHull(ref_img, selected)
-//                        // draw_landmarks(ref_img.width, ref_img.height,canvas,context,item.lmrks)
-//
-//                } else { // console.log('btn' + this + ' not matching')
-//                }
             }
-//        }
+        }
+
+        m_all_btns[j].onclick = function () {
+            let _this = this;
+            slide_id = all_btns_indices[j]
+            m_selected = extract_index(_this.firstChild.src)
+            if (m_selected !== '' && slide_id != extract_index(ref_img.src)){
+                ref_img.src = _this.firstChild.src
+
+            }
+//            else if (selected >= 0) {
+//                clearInterval(detect_interval)
+//                ref_img.src = _this.firstChild.src
+//            }
+            else {
+                ref_img.src = default_view
+            }
+
+        }
     }
 }
 
@@ -380,7 +399,7 @@ async function getHeadAngles(keypoints, which) {
     let pleft = keypoints[133]
     let pright = keypoints[362]
     let third = Math.atan2(pright[1] - pleft[1], pright[0] - pleft[0]) * (180 / Math.PI)
-    return [first, second, third];
+    return [first, second, Math.round(third)];
 }
 
 function l2Norm(vec) {
@@ -390,12 +409,14 @@ function l2Norm(vec) {
     }
     return Math.sqrt(norm);
 }
+
 function normalize(value, bounds){
     new_value = bounds['desired']['lower'] + (value - bounds['actual']['lower']) *
     (bounds['desired']['upper'] - bounds['desired']['lower']) /
     (bounds['actual']['upper'] - bounds['actual']['lower'])
     return new_value
 }
+
 async function calc_lmrks(image, which) {
     // console.log('calcolo FACE '+ which)
     let landmarks = []
@@ -475,7 +496,8 @@ function draw_mask_on_ref() {
     // sizes
     const dsize = new cv.Size(cam_roi.cols, cam_roi.rows)
     const dsize_back = new cv.Size(ref_roi.cols, ref_roi.rows)
-    canvas_size(middle.offsetWidth)
+//    canvas_size(middle.offsetWidth)
+    window_size()
     const last_size = new cv.Size(canvas.width, canvas.height)
 
     cv.GaussianBlur(cam_roi, cam_roi, new cv.Size(1, 1), 0, 0, cv.BORDER_DEFAULT)
@@ -587,8 +609,6 @@ function check_expression(landmarks) {
 }
 
 async function match(angles_cam, angles_ref) {
-//    draw_mask_on_ref()
-
     const delta = 8;
     console.log(angles_cam[0], angles_ref[0])
     console.log(angles_cam[1], angles_ref[1])
@@ -606,14 +626,14 @@ async function match(angles_cam, angles_ref) {
             ctx.clearRect(0, 0, cam_face.w, cam_face.h);
             cam_face.image = data_url
 
-            let objs = {'selected': selected, 'c_face': cam_face}//'p_face': face_arr[selected],
+            let objs = {'selected': selected, 'c_face': cam_face.image}//'p_face': face_arr[selected],
             let data_json = JSON.stringify(objs)
-            selected = -1
+
 
             await fetch("/info", {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                body: data_json//JSON.stringify(objs)
+                body: data_json
             })
             .then((res) => {
                 if (!res.ok) {
@@ -623,23 +643,27 @@ async function match(angles_cam, angles_ref) {
                 return res.json();
             })
             .then((json) => {
-//                console.log(json)
                 let rel_path = json.relative_path
-//                console.log(ref_img.width)
-                morphed = rel_path
-//                console.log(ref_img.src)
-                let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+                morphed = rel_path + '?' + Math.random()
+                id = extract_index(rel_path)
+//                let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+                m_all_btns[id].firstChild.src = morphed
                 ref_img.src = morphed
-
                 ref_img.onload = function () {
-                    morph = cv.imread(ref_img)
-                    console.log(morphed, morph)
-                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
-                    cv.imshow(canvas, morph);
+                    load_on_ref_canvas(ref_img)
+//                    morph = cv.imread(ref_img)
+//                    console.log(morphed, morph)
+//                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
+//                    cv.imshow(canvas, morph);
                     console.log('loaded')
                     clearInterval(detect_interval)
-                    }
 
+                    }
+//                ref_img.src = ref_img.src
+
+                
+                reset_bar()
+                selected = -1
 
 
             })
@@ -648,34 +672,61 @@ async function match(angles_cam, angles_ref) {
         }
     }
     console.log(selected, morphed)
-//    if (morphed !== ""){
-//        let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
-//        ref_img.src = morphed
-//        morph = cv.imread(ref_img)
-//        cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
-//        cv.imshow(canvas, morph);
-//        ref_img.onload = function () {
-//            console.log('loaded')
-//            clearInterval(detect_interval)
-//            }
-//        }
-//    const dsize = new cv.Size(cam_mat.cols / 10, cam_mat.rows / 10)
-    // if (cam_mat){
-    //     cv.resize(cam_mat, cam_mat, dsize, 0, 0, cv.INTER_LINEAR )
-    //     cv.imshow(output, cam_mat)
-    // }
 
     cam_mat = null
 }
+function load_on_ref_canvas(image) {
+    let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
+//    m_all_btns[id].firstChild.src = morphed
+//    ref_img.src = morphed
+//    ref_img.onload = function () {
+    img = cv.imread(image)
+//    console.log(morphed, morph)
+    cv.resize(img, img, dsize, 0, 0, cv.INTER_AREA);
+    cv.imshow(canvas, img);
+    }
+function reset_bar(){
+    ref_x.innerHTML = '-'
+    ref_y.innerHTML = '-'
+    ref_z.innerHTML = '-'
+    cam_x.innerHTML = '-'
+    cam_y.innerHTML = '-'
+    cam_z.innerHTML = '-'
+    perc_x.style.width = 1 + '%';
+    perc_x.innerHTML = ''
+    perc_y.style.width = 1 + '%';;
+    perc_y.innerHTML = ''
+    perc_z.style.width = 1 + '%';;
+    perc_z.innerHTML = ''
+}
+function update_bar() {
 
-// function extract_raw_image() { // this is the actual workhorse
-//     var type = "image/png"
-//     var data = video.get(0).toDataURL(type);
-//     data = data.replace('data:' + type + ';base64,', '');
-//     return data
-// }
+    let percent_x = 100 - Math.abs(face_arr[selected].angles[0] - cam_face.angles[0])
+    let percent_y = 100 - Math.abs(face_arr[selected].angles[1] - cam_face.angles[1])
+    let percent_z = 100 - Math.abs(face_arr[selected].angles[2] - cam_face.angles[2])
+//    var identity = setInterval(scene, 1000/30);
+//    function scene() {
+        if (morphed != '') {
+//            clearInterval(identity);
+        } else {
+            ref_x.innerHTML = face_arr[selected].angles[0]
+            ref_y.innerHTML = face_arr[selected].angles[1]
+            ref_z.innerHTML = face_arr[selected].angles[2]
+            cam_x.innerHTML = cam_face.angles[0]
+            cam_y.innerHTML = cam_face.angles[1]
+            cam_z.innerHTML = cam_face.angles[2]
+            perc_x.style.width = percent_x + '%';
+            perc_x.innerHTML = percent_x + '%'
+            perc_y.style.width = percent_y + '%';
+            perc_y.innerHTML = percent_y + '%'
+            perc_z.style.width = percent_z + '%';
+            perc_z.innerHTML = percent_z + '%'
+//        }
+    }
+}
 
 async function detectFaces() {
+//accessCamera();
 if (selected >= 0) {
 
     console.log('detect cycle:', selected)
@@ -693,60 +744,12 @@ if (selected >= 0) {
             cam_face.hull = convex_hull(value[1], value[2]);
             cam_face.n_points = cam_face.normalize_array(value[1])
             cam_face.expression = check_expression(value[1])
-//            while (selected !== -1) {
-//                if (morphed !== ''){
-//                    console.log('break')
-//                    break;
-//                    }
-//                    console.log('in while')
-//                draw_mask_on_ref()
-//                match(cam_face.angles, faces_arr[selected].angles)
-//                }
-//            console.log('out')
-//            let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
-//                    ref_img.src = morphed
-//                    morph = cv.imread(ref_img)
-//                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
-//                    cv.imshow(canvas, morph);
-//                    clearInterval(detect_interval);
-//            if (selected >= 0) {
-                console.log('in if:',morphed)
-                draw_mask_on_ref()
-                match(cam_face.angles, face_arr[selected].angles)
 
+            update_bar()
 
-//            }
-//            else if (morphed === ''){
-//                console.log('wait morphed', morphed)
-//            }
-//            else {
-//                console.log ('fuori', morphed)
-//                let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
-//                ref_img.src = morphed
-//                morph = cv.imread(ref_img)
-//                cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
-//                cv.imshow(canvas, morph);
-//                ref_img.onload = function () {
-//                    console.log('loaded')
-//                    clearInterval(detect_interval)
-//                    }
-//            }
+            draw_mask_on_ref()
+            match(cam_face.angles, face_arr[selected].angles)
 
-
-//            else {
-//                if (morphed !== ''){
-//                    console.log('fuori', morphed)
-//                    let dsize = new cv.Size(middle.offsetWidth, middle.offsetWidth);
-//                    ref_img.src = morphed
-//                    morph = cv.imread(ref_img)
-//                    cv.resize(morph, morph, dsize, 0, 0, cv.INTER_AREA);
-//                    cv.imshow(canvas, morph);
-//                    ref_img.onload = function () {
-//                    console.log('loaded')
-//                    clearInterval(detect_interval)}/// morphed='' ???????????????
-//                    }
-//                else {console.log('wait', morphed)}
-//            }
         })
         .catch((err) => {
             console.log(err);
@@ -754,11 +757,14 @@ if (selected >= 0) {
 }}
 
 function resizeCanvas() {
-    canvas_size(middle.offsetWidth)
+    console.log('resize')
+//    canvas_size(middle.offsetWidth)
+    window_size()
     /**
      * Your drawings need to be inside this function otherwise they will be reset when
      * you resize the browser window and the canvas goes will be cleared.
      */
+    ref_img.src = ref_img.src
     if (selected >= 0) {
         draw_mask_on_ref()
         // drawHull(ref_img, selected);
@@ -781,9 +787,10 @@ const accessCamera = () => {
             console.log("Something went wrong!", error);
         });
 };
-
-init();
-accessCamera();
+function opencvIsReady(){
+    init();
+    accessCamera();
+}
 
 
 window.addEventListener('resize', resizeCanvas, false);

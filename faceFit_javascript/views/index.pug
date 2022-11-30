@@ -10,21 +10,41 @@ block layout-content
                     button.ref_btn(type='button')
                         img.img_ref(src=file, crossorigin="anonymous")
 
-        section#demos
-            #middle.camView
-                canvas#canvas
-                    image#ref_img(src='')
-                //canvas#output1(width='100%') //canvas#output2(width='100%') //canvas#output3(width='100%')
-                video#webcam.invisible(autoplay="true" muted width="1280" height="960")
-                canvas#cam_canvas(width="1280" height="960")
-                //canvas#canvas
-
+        #middle.camView
+            #hints_section
+                table(style='width:100%')
+                    tr
+                        th(style='width:15%') HINTS
+                        th(style='width:10%') painting
+                        th(style='width:10%') camera
+                        th(style='width:65%') progress
+                    tr
+                        td rot x
+                        td#ref_x
+                        td#cam_x
+                        td
+                            #pb_x
+                    tr
+                        td rot y
+                        td#ref_y
+                        td#cam_y
+                        td
+                            #pb_y
+                    tr
+                        td rot z
+                        td#ref_z
+                        td#cam_z
+                        td
+                            #pb_z
+            canvas#canvas
+                image#ref_img(src='')
+        video#webcam.invisible(autoplay="true" muted width="1280" height="960")
+        canvas#cam_canvas(width="1280" height="960")
         #right.asnav1Class
             each n in data
                 .show_morph
                     button.morph_btn(type='button')
                         img.img_morph(src='images/Thumbs/morph_thumb.jpg')
-            canvas
 
 
     script(type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js')
@@ -36,4 +56,6 @@ block layout-content
 
 
     script(src="./js/main.js")
+    script(async='' src='/js/opencv.js' type="text/javascript" defer='' onload="opencvIsReady()")
+
 

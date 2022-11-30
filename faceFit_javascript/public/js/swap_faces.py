@@ -157,29 +157,20 @@ def warp_triangle(img1, img2, t1, t2):
 
 
 def morph(c_obj, r_obj):
-    cam_image, ref_points = c_obj['image'], r_obj['pix_points']
+    cam_image, cam_points, ref_points = c_obj.image, c_obj.pix_points, r_obj['pix_points']
     mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
-    # head, file_name = os.path.split(r_obj['src'])
-    # # COLOR CORRECTION   ref_image,r_obj.image
-    cam_image = cv2.flip(cam_image, 1)
-    new_c_obj = F_obj.Face('cam')
-    new_c_obj.get_landmarks(cam_image)
-    cam_points = new_c_obj.pix_points
-    # # new_ref_address = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))+'\images\\'+file_name
+
     ref_image = cv2.imread(r_obj['src'])
-    # cam_image
-    # cv2.imshow('0', ref_image)
-    # cv2.imshow('1', cam_image)
-    # print(r_obj['bb'])
-    # cv2.waitKey(0)
+
     ref_smoothed, noise = find_noise_scratches(ref_image)
+
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
                r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
-    c_roi = cam_image[new_c_obj.bb_p1[1] - offset:new_c_obj.bb_p2[1] + offset,
-               new_c_obj.bb_p1[0] - offset:new_c_obj.bb_p2[0] + offset]
+    c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
+               c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
     cam_cc = match_histograms(c_roi, r_roi)
-    cam_image[new_c_obj.bb_p1[1] - offset:new_c_obj.bb_p2[1] + offset,
-               new_c_obj.bb_p1[0] - offset:new_c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
+    cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
+               c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
 
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
@@ -250,7 +241,8 @@ def init():
             p_face.get_landmarks(ref_img)
             face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
                          'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
-                         'pix_points': p_face.pix_points, 'angles': [p_face.alpha + 90, p_face.beta + 90, p_face.gamma],
+                         'pix_points': p_face.pix_points,
+                         'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
                          'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
                                 'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
                                 'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
@@ -271,27 +263,22 @@ def sendData():
         print('Incoming..')
         # print(ref_dict)
         data = request.get_json()
-        c_obj = data["c_face"]
+        c_image = readb64(data["c_face"])
         selected = data["selected"]
         r_obj = ref_dict[selected]
+        c_image = cv2.flip(c_image, 1)
+        c_obj = F_obj.Face('cam')
+        c_obj.get_landmarks(c_image)
 
-        c_img = readb64(c_obj['image'])
-        c_obj['image'] = c_img
-        #
-        # selected = r_obj['which']
         head, file_name = os.path.split(r_obj['src'])
-
-
         r_obj['src'] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
-        print(r_obj['src'])
         path_to = {"morphs": (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')}
         output = morph(c_obj, r_obj)
-        # if output:
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
-
         path = path_to["morphs"] + 'morph_' + numb + '.png'
-        cv2.imwrite(path, output)
-        return path, 200
+        write = cv2.imwrite(path, output)
+        if write:
+            return path, 200
 
     # GET request
     else:

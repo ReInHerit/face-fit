@@ -11,7 +11,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "browser-sync": "^2.27.10",
+    "browser-sync": "^2.11.2",
     "nodemon": "^2.0.20"
   },
   "dependencies": {
@@ -20,6 +20,7 @@
     "@tensorflow-models/face-landmarks-detection": "^1.0.1",
     "@tensorflow/tfjs": "^3.18.0",
     "@tensorflow/tfjs-node": "^3.18.0",
+    "emailjs": "^4.0.1",
     "express": "^4.18.1",
     "facemesh": "^0.6.6",
     "http-proxy-middleware": "^2.0.6",
@@ -29,6 +30,7 @@
     "jsdom": "^19.0.0",
     "node-fetch": "^3.2.10",
     "node-webcam": "^0.8.0",
+    "nodemailer": "^6.8.0",
     "opencv.js": "^1.2.1",
     "pug": "^3.0.2",
     "request-promise": "^4.2.6",

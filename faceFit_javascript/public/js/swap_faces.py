@@ -33,7 +33,7 @@ ref_dict =[]
 #             'status': {'l_e': '', 'r_e': '', 'lips': ''}
 #              }
 
-with open('C:/Users/arkfil/Desktop/FITFace/faceFit_javascript/public/TRIANGULATION.json', 'r') as f:
+with open('C:/Users/arkfil/Desktop/FITFace/faceFit_javascript/public/json/TRIANGULATION.json', 'r') as f:
     media_pipes_tris = load_json(f)
 
 

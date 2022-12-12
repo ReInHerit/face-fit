@@ -1,49 +1,43 @@
 extends layout
 
 block layout-content
-    // - let new_img = 'images/FACE_16_thumb.jpg'
-
     main.container
-        #left.asnav2Class
+        // Popup Window
+        #popup-window(style='display: none;')
+          #popup-content
+              h3 Enter your email:
+              input#email-input(type='email')
+              button#send-email-button Send Email
+        #ref_btns.asnav2Class
             each file in data
                 .select_ch
-                    button.ref_btn(type='button')
+                    button.ref_btn
                         img.img_ref(src=file, crossorigin="anonymous")
 
-        #middle.camView
+        #main_view.camView
             #hints_section
+                label#hints_title HINTS
                 table(style='width:100%')
                     tr
-                        th(style='width:15%') HINTS
-                        th(style='width:10%') painting
-                        th(style='width:10%') camera
-                        th(style='width:65%') progress
-                    tr
-                        td rot x
-                        td#ref_x
-                        td#cam_x
-                        td
+                        td(style='width:15%') Jaw
+                        td(style='width:85%')
                             #pb_x
                     tr
-                        td rot y
-                        td#ref_y
-                        td#cam_y
+                        td Pitch
                         td
                             #pb_y
                     tr
-                        td rot z
-                        td#ref_z
-                        td#cam_z
+                        td Roll
                         td
                             #pb_z
             canvas#canvas
-                image#ref_img(src='')
+                image#ref_img(src='' alt='Welcome to Face-Fit')
         video#webcam.invisible(autoplay="true" muted width="1280" height="960")
         canvas#cam_canvas(width="1280" height="960")
-        #right.asnav1Class
+        #morph_btns.asnav1Class
             each n in data
                 .show_morph
-                    button.morph_btn(type='button')
+                    button.morph_btn
                         img.img_morph(src='images/Thumbs/morph_thumb.jpg')
 
 
@@ -52,8 +46,6 @@ block layout-content
     script(src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh')
     script(src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core')
     script(src='https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.1/dist/face-landmarks-detection.min.js')
-    script(src="https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js")
-
 
     script(src="./js/main.js")
     script(async='' src='/js/opencv.js' type="text/javascript" defer='' onload="opencvIsReady()")

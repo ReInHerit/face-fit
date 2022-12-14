@@ -1,24 +1,26 @@
+import os
+from collections import Counter
+from glob import iglob
+from itertools import combinations
+from json import load as load_json
+from re import search
+
 import cv2
 import numpy as np
-from glob import iglob
-from json import load as load_json
-import os
-from re import search
-from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 from kivy.app import App
-from kivy.uix.widget import Widget
-from kivy.uix.image import Image
-from kivy.uix.behaviors import ToggleButtonBehavior
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
-from kivy.core.window import Window
-import Face as F_obj
-from send_mail import send as send_mail
+from kivy.properties import ObjectProperty, StringProperty, NumericProperty
+from kivy.uix.behaviors import ToggleButtonBehavior
+from kivy.uix.image import Image
+from kivy.uix.widget import Widget
+from scipy.spatial import Delaunay
 from shapely.geometry import MultiLineString
 from shapely.ops import unary_union, polygonize
-from scipy.spatial import Delaunay
-from collections import Counter
-from itertools import combinations
+
+import Face as F_obj
+from send_mail import send as send_mail
+
 selected = reset = morph_selected = last_match = -1
 delta = 7
 ref, ref_files, buttons, morphed_buttons = [], [], [], []
@@ -146,7 +148,7 @@ class MyCamera(Image):
                         # reset values
                         cam_obj = F_obj.Face('cam')
                         btn_change(buttons[selected], 'normal', 150, 'same')
-                        last_morphed = cv2.imread(path)  # FIX create directories if does not exist
+                        last_morphed = cv2.imread(path)  # FIX create directories if that does not exist
                         for i in range(0, 3):
                             c_rot[i], r_rot[i], pb_rots[i] = '-', '-', 0
                         # create result texture and apply to view and morph button
@@ -211,7 +213,7 @@ class MainLayout(Widget):
         self.build()
 
     def build(self):
-        global view, r_rot, c_rot, pb_rots, view_source, email_alert # progress_bars,
+        global view, r_rot, c_rot, pb_rots, view_source, email_alert
         grid1 = ids['l_box_grid']
         grid2 = ids['r_box_grid']
         grid1.bind(minimum_height=grid1.setter('height'))
@@ -418,7 +420,9 @@ def cut_paste_user_mask(r_obj, c_obj):
     # find Mask edges and apply
     edged = find_edges(c_new_roi, 3, 1, 1, 3)
     copied = r_img[new_min_y:new_max_y, new_min_x:new_max_x]
-    if copied.shape == edged.shape: copied = cv2.addWeighted(copied, 1, edged, .99, 1)
+    # if copied.shape == edged.shape:
+    #     copied = cv2.addWeighted(copied, 1, edged, .99, 1)
+    copied = cv2.addWeighted(copied, 1, edged, .99, 1) if copied.shape == edged.shape else copied
     r_img[new_min_y:new_max_y, new_min_x:new_max_x] = copied
     return r_img
 

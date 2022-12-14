@@ -1,8 +1,8 @@
-from smtplib import SMTP_SSL
-from imghdr import what
-from os.path import split as split_path
-from json import load as load_json
 from email.message import EmailMessage
+from imghdr import what
+from json import load as load_json
+from os.path import split as split_path
+from smtplib import SMTP_SSL
 
 with open('password_gmail.json', 'r') as f:
     gmail = load_json(f)

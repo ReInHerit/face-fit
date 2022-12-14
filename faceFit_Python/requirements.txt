@@ -1,7 +1,7 @@
-opencv-python>=4.5.5.64
 mediapipe>=0.8.10
 numpy>=1.22.3
 kivy>=2.1.0
 tensorflow>=2.9.0
 shapely>=1.7.1
 scipy>=1.8.1
+opencv-python~=4.5.5.64

@@ -1,7 +1,8 @@
 from math import degrees, atan2
+
 import cv2
-from mediapipe import solutions as mp_solutions
 import numpy as np
+from mediapipe import solutions as mp_solutions
 
 # Mediapipe
 

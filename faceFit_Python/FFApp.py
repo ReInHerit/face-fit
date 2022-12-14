@@ -383,6 +383,7 @@ def match():
             else:
                 return False
 
+
 def cut_paste_user_mask(r_obj, c_obj):
     img1, img2 = r_obj.image, c_obj.image
     r_img, c_img = img1.copy(), img2.copy()

@@ -36,7 +36,7 @@ const detectorConfig = {
     solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
     min_tracking_confidence: 0.2
 }
-
+const morphs_path = '../morphs'
 const default_view = '../images/Thumbs/default_view.jpg'
 const default_morph = '../images/Thumbs/morph_thumb.jpg'
 const send_logo = '../images/Thumbs/send.png'
@@ -185,38 +185,65 @@ async function init() {
     init_slicks()
     window_size()
     drawOnCanvas(start_view)
-
+    console.log('UI INITIALIZED')
     /* INITIALIZE SEND EMAIL POPUP */
+    const validRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
     popupButton.firstChild.src = send_logo
     popupButton.addEventListener('click', () => {popupWindow.style.display = 'block';});
     sendEmailButton.addEventListener('click', () => {
         // Get the email address from the input field
         const mailToAddress = emailInput.value;
+        // const files = fs.promises.readdir(morphs_path);
+        if (mailToAddress.match(validRegex)) {
+            fetch("/morphs_to_send", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                body: JSON.stringify({'mail': mailToAddress}),
+            })
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then((json) => {
+                    drawOnCanvas(start_view);
+                    setMorphsButtons(default_morph);
+                })
+                .catch((err) => console.error(`Fetch problem: ${err.message}`));
 
-        // const filesList = [];
-        // const validImages = ['.jpg', '.jpeg', '.png']; // list of valid image file types
-        fetch("/morphs_to_send", {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            body: JSON.stringify({'mail': mailToAddress}),
-        })
-        .then((res) => {
-            if (!res.ok) {
-                throw new Error(`HTTP error: ${res.status}`);
+            // Close the popup window
+            popupWindow.style.display = 'none';
+        }
+        else {
+            if(confirm("Your input is not a valid email address.\n" +
+                "Press Cancel to retry or Ok to reset the game!")){
+
+                fetch("/delete_morphs", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    body: JSON.stringify({'morphs': 'delete'}),
+                })
+                    .then((res) => {
+                        if (!res.ok) {
+                            throw new Error(`HTTP error: ${res.status}`);
+                        }
+                        return res.json();
+                    })
+                    .then((json) => {
+                        drawOnCanvas(start_view);
+                        setMorphsButtons(default_morph);
+                    })
+                    .catch((err) => console.error(`Fetch problem: ${err.message}`));
+                popupWindow.style.display = 'none';
+            } else{
+                console.log('Retry')
             }
-            return res.json();
-        })
-        .then((json) => {
-            console.log(json.answer);
-            drawOnCanvas(start_view);
-            setMorphsButtons(default_morph);
-        })
-        .catch((err) => console.error(`Fetch problem: ${err.message}`));
+    return false;
 
-        // Close the popup window
-        popupWindow.style.display = 'none';
+  }
     });
-
+    console.log('EMAIL INITIALIZED')
     /* INITIALIZE PAINTINGS' FACE OBJECTS */
     let start_message = {'start': 'paintings'}
     await fetch("/init", {
@@ -229,11 +256,12 @@ async function init() {
                         throw new Error(`HTTP error: ${res.status}`);
                     }
                     return res.json();
+
                 })
                 .then((json) => {
                     face_arr = json.body
                 })
-
+    console.log('PAINTINGS OBJ INITIALIZED')
     /* INITIALIZE SLICKs BUTTONS AND INTERACTION */
     let all_btns = container_left.querySelectorAll("div.slick-slide >button");
     m_all_btns = container_right.querySelectorAll("div.slick-slide >button");
@@ -247,7 +275,7 @@ async function init() {
             let _this = this;
             selected = extract_index(_this.firstChild.src)
             ref_img.src = 'http://localhost:8000/' + face_arr[selected]['src']
-
+            // drawOnCanvas(ref_img.src)
             ref_img.onload = function () {
                 if (selected !== -1){
                     morphed = ''
@@ -270,6 +298,7 @@ async function init() {
             drawOnCanvas(ref_img.src)
         })
     }
+    console.log('INTERACTION INITIALIZED')
 }
 
 function reset_bar() {
@@ -342,7 +371,7 @@ async function calc_lmrks(image, which) {
             angles = await getHeadAngles(landmarks, which)
         }
     } else {
-        console.log('non ce la faccio a calcolare le faces dell\'imm ' + which)
+        console.log('Cannot calculate landmarks of image ' + which)
     }
     return [landmarks, points_2d, bb, angles]
 }
@@ -614,7 +643,6 @@ async function match_faces() {
                 cam_face.hull = convex_hull(value[1], value[2]);
                 cam_face.n_points = cam_face.normalize_array(value[1])
                 cam_face.expression = check_expression(value[1])
-                console.log(selected)
                 update_bar()
 
                 draw_mask_on_ref()
@@ -657,7 +685,7 @@ async function check_and_swap(angles_cam, angles_ref) {
             })
             .then((json) => {
                 let rel_path = json.relative_path
-                morphed = rel_path + '?' + Math.random()
+                morphed = rel_path //+ '?' + Math.random()
                 let id = extract_index(rel_path)
                 m_all_btns[id].firstChild.src = morphed
                 drawOnCanvas(morphed)
@@ -666,7 +694,6 @@ async function check_and_swap(angles_cam, angles_ref) {
             })
             .catch((err) => console.error(`Fetch problem: ${err.message}`));
         }
-//    cam_mat = null
     }
 }
 
@@ -711,7 +738,8 @@ const accessCamera = () => {
         });
 };
 function opencvIsReady(){
-    init().then(r => console.log('initialized', r));
+    console.log('OPENCV.JS READY')
+    init().then(r => console.log('ALL IS INITIALIZED'));
     accessCamera();
 }
 

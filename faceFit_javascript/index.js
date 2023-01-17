@@ -13,7 +13,7 @@ const request = require('request-promise')
  */
 const app = express();
 const port = process.env.PORT || 8000;
-const host = "localhost";
+const host = process.env.HOST || "localhost";
 
 let ref_images = [];
 
@@ -109,19 +109,26 @@ async function send_mail(send_to){
         }
     });
 }
+async function delete_morphs(){
+    const files = await fs.promises.readdir(morphs_path);
+
+    files.forEach(file => {
+        const filePath = `${morphs_path}/${file}`;
+        fs.promises.unlink(filePath);
+    })
+}
 /**
  * Routes Definitions
  */
 app.get('/info', (req, res) => {
     res.send({'start': 'swap'});
-    res.on('message', obj => {
-      console.log(obj)
-    })
+    // res.on('message', obj => {
+    //   console.log('obj')
+    // })
 });
 
 app.post('/morphs_to_send', function(req, res){
     const user_input = req.body
-    console.log(user_input['mail'])
     send_mail(user_input['mail']).then(r =>{
         res.send({'answer': 'sent'})
     })
@@ -130,21 +137,23 @@ app.post('/morphs_to_send', function(req, res){
 
 app.post('/init', function(req, res){ //chiedi il body da main e invialo a python
     const paintings = req.body
-    request.post('http://localhost:8050/INIT_PAINTINGS', {json: ref_images}, async function (error, response, body) {
-            if (!error && response.statusCode === 200) {
-                console.log('init server',body);
+
+    request.post(`http://${host}:8050/INIT_PAINTINGS`, {json: ref_images}, async function (error, response, body) {
+
+        if (!error && response.statusCode === 200) {
+                console.log('init server');
             }
         res.send({'body': body});
         });
 })
 app.post('/info', function(req, res, next){
     const objs = req.body
-    request.post('http://localhost:8050/DATAtoPY',{json: objs}, async function (error, response, body) {
+    request.post(`http://${host}:8050/DATAtoPY`,{json: objs}, async function (error, response, body) {
         let abs_morphed_path, file_name, rel_morphed_path;
         if (!error && response.statusCode === 200) {
             abs_morphed_path = body
             file_name = path.parse(body).base
-            rel_morphed_path = 'http://' + host + ':' + port + '/morphs/' + file_name
+            rel_morphed_path = `http://localhost:${port}/morphs/${file_name}`
         }
         res.send({
             'relative_path': rel_morphed_path,
@@ -153,7 +162,12 @@ app.post('/info', function(req, res, next){
         });
     });
 })
-
+app.post('/delete_morphs', function(req, res) {
+    const user_input = req.body
+    delete_morphs().then(r => {
+        res.send({'morphs': 'deleted'})
+    })
+})
 /**
  * Server Activation
  */

@@ -1,13 +1,11 @@
 import cv2
 from json import load as load_json, dumps, JSONEncoder
-import fileinput
 import base64
 import os
 import numpy as np
 from shapely.geometry import MultiLineString
 from shapely.ops import unary_union, polygonize
 from scipy.spatial import Delaunay
-import sys
 from collections import Counter
 from itertools import combinations
 from flask import Flask, jsonify, request
@@ -17,23 +15,22 @@ import Face as F_obj
 from math import floor, ceil
 
 ref = []
-ref_dict =[]
-# face_dict = {'which': '',
-#             'landmarks': [],
-#             'f_landmarks': [],
-#             'points': [],
-#             'pix_points': [],
-#             'alpha': 0,
-#             'beta': 0,
-#             'gamma': 0,
-#             'delta_x': 0,
-#             'delta_y': 0,
-#             'bb_p1': (0, 0),
-#             'bb_p2': (0, 0),
-#             'status': {'l_e': '', 'r_e': '', 'lips': ''}
-#              }
+ref_dict = []
 
-with open('C:/Users/arkfil/Desktop/FITFace/faceFit_javascript/public/json/TRIANGULATION.json', 'r') as f:
+if os.getenv('HOST'):
+    HOST = os.getenv('HOST')
+else:
+    HOST = 'localhost'
+
+ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+
+# if os.getenv('VOLUME'):
+#     where_morphs_stay = os.getenv('VOLUME')
+# else:
+#     where_morphs_stay = os.path.join(ROOT_DIR, 'public', 'morphs')
+triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
+
+with open(triangulation_json_path, 'r') as f:
     media_pipes_tris = load_json(f)
 
 
@@ -226,7 +223,6 @@ app = Flask(__name__)
 
 @app.route('/INIT_PAINTINGS', methods=['POST'])
 def init():
-    print(request.method)
     # POST request
     if request.method == 'POST':
         global ref_dict
@@ -234,7 +230,8 @@ def init():
         data = request.get_json()
         ref_dict = []
         for idx, file in enumerate(data):
-            path_on_server = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '/' + file
+
+            path_on_server = os.path.join(ROOT_DIR, file)
 
             ref_img = cv2.imread(path_on_server)
             p_face = F_obj.Face('ref')
@@ -257,11 +254,9 @@ def init():
 
 @app.route('/DATAtoPY', methods=['POST'])
 def sendData():
-    print(request.method)
     # POST request
     if request.method == 'POST':
         print('Incoming..')
-        # print(ref_dict)
         data = request.get_json()
         c_image = readb64(data["c_face"])
         selected = data["selected"]
@@ -271,11 +266,14 @@ def sendData():
         c_obj.get_landmarks(c_image)
 
         head, file_name = os.path.split(r_obj['src'])
-        r_obj['src'] = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
-        path_to = {"morphs": (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')}
+        r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)  # os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
+        # path_to = {"morphs": os.path.join(ROOT_DIR, 'morphs')}  # (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
-        path = path_to["morphs"] + 'morph_' + numb + '.png'
+        morphed_file_name = 'morph_' + numb + '.png'
+
+        path = os.path.join(ROOT_DIR, 'morphs', morphed_file_name)  # path_to["morphs"] + 'morph_' + numb + '.png'
+
         write = cv2.imwrite(path, output)
         if write:
             return path, 200
@@ -287,5 +285,4 @@ def sendData():
 
 
 if __name__ == "__main__":
-    app.run(host='localhost', port=8050, debug=True)
-print('qui')
+    app.run(host=HOST, port=8050, debug=True)

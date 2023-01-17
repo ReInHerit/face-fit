@@ -7,6 +7,9 @@ from re import search
 
 import cv2
 import numpy as np
+os.environ['KIVY_GL_BACKEND'] = 'sdl2'
+# from kivy import Config
+# Config.set('graphics', 'multisamples', '0')
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
@@ -71,9 +74,11 @@ def images_in_folder(folder):
 
 
 def create_texture(image):
+    b, g, r = cv2.split(image)
+    image = cv2.merge((r, g, b))
     buf = cv2.flip(image, 0).tobytes()
-    my_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='bgr')
-    my_texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+    my_texture = Texture.create(size=(image.shape[1], image.shape[0]), colorfmt='rgb')
+    my_texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
     return my_texture
 
 
@@ -94,6 +99,9 @@ class MyButton(ToggleButtonBehavior, Image):
 
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
+        print(im.shape)
+
+        # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         if off:
             im = cv2.rectangle(im, (1, 1), (im.shape[1] - 1, im.shape[0] - 1), (255, 255, 255), 10)
         image_texture = create_texture(im)
@@ -110,7 +118,7 @@ class MyCamera(Image):
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
         self.fps = self.capture.get(cv2.CAP_PROP_FPS)
-        Clock.schedule_interval(self.update, 1.0 / self.fps)  # Set drawing interval / 30
+        Clock.schedule_interval(self.update, 1.0 / 30)  # Set drawing interval / 30
 
     def update(self, dt):
         global selected, view, pb_rots, view_source, last_match, morph_texture, cam_obj, morph_selected
@@ -250,6 +258,7 @@ class MainLayout(Widget):
                 r_rot[1] = str(int(ref[b].beta))
                 r_rot[2] = str(int(ref[b].gamma))
                 selected = b
+                print(selected)
                 reset = 0
                 btn_change(buttons[selected], 'down', 200, texture='same')
                 if morph_selected != -1:

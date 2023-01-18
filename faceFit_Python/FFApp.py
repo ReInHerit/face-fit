@@ -99,9 +99,6 @@ class MyButton(ToggleButtonBehavior, Image):
 
     def button_texture(self, data, off=False):
         im = cv2.imread(data)
-        print(im.shape)
-
-        # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         if off:
             im = cv2.rectangle(im, (1, 1), (im.shape[1] - 1, im.shape[0] - 1), (255, 255, 255), 10)
         image_texture = create_texture(im)

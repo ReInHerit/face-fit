@@ -7,3 +7,6 @@ faceFit_Python/.idea/modules.xml
 faceFit_Python/.idea/vcs.xml
 faceFit_Python/__pycache__/
 faceFit_Python/images/final_morphs/
+/faceFit_javascript/node_modules/
+/faceFit_Python/Tools/
+

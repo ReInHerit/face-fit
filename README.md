@@ -1,5 +1,7 @@
 # ReInHerit Face-fit
 
+This application is part of the **ReInHerit Toolkit**.
+
 **Gamification** is the process of exploiting strategies and game dynamics into scenarios that are not a game. 
 It has already been proved to be useful to enhance skills and competences in a variety of domains such as marketing, industry training and entertainment.
 Also cultural heritage can benefit from a gamification approach which represents an opportunity to **engage visitors** to museums contents through the design of more entertaining, social and challenging digital learning scenarios, to help museums to move from the traditional “look and do not touch” toward a “play and interact” approach. 
@@ -44,4 +46,6 @@ If you use this software in your work please cite:
 ```
 
 
+## Acknowledgements
+This work was partially supported by the European Commission under European Horizon 2020 Programme, grant number 101004545 - [ReInHerit](https://www.reinherit.eu).
 

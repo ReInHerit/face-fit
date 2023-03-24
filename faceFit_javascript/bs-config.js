@@ -1,5 +1,5 @@
 module.exports = {
-    proxy: "localhost:8000",
+    proxy: `${process.env.HOST || 'localhost'}:${process.env.PORT || 8000}`,
     files: ["**/*.css", "**/*.pug", "**/*.js"],
     ignore: ["node_modules"],
     reloadDelay: 10,

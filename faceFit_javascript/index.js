@@ -153,7 +153,7 @@ app.post('/info', function(req, res, next){
         if (!error && response.statusCode === 200) {
             abs_morphed_path = body
             file_name = path.parse(body).base
-            rel_morphed_path = `http://localhost:${port}/morphs/${file_name}`
+            rel_morphed_path = `http://${host}:${port}/morphs/${file_name}`
         }
         res.send({
             'relative_path': rel_morphed_path,

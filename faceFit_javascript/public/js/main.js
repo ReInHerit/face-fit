@@ -27,6 +27,9 @@ const popupWindow = document.getElementById('popup-window');
 const emailInput = document.getElementById('email-input');
 const sendEmailButton = document.getElementById('send-email-button');
 
+const port = window.location.port;
+const host = window.location.hostname;
+
 let cam_face, detector, selected, detect_interval, m_all_btns;
 let face_arr = []
 let morphed = ''
@@ -274,7 +277,7 @@ async function init() {
         setButtonClick(all_btns[j], function () {
             let _this = this;
             selected = extract_index(_this.firstChild.src)
-            ref_img.src = 'http://localhost:8000/' + face_arr[selected]['src']
+            ref_img.src = 'http://' + host +':' + port +'/' + face_arr[selected]['src']
             // drawOnCanvas(ref_img.src)
             ref_img.onload = function () {
                 if (selected !== -1){

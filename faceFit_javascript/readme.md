@@ -30,6 +30,7 @@ Once you have generated the App Password, you will need to enter it, along with 
 Once ready with the reference images and email setup you can create and launch the docker image.
 #### Prerequisites
 To get started, you will need to set up and run Docker on your operating system. If you are not familiar with Docker, please refer to the official documentation [here](https://docs.docker.com/).
+Check that `public/js/start.sh` has executable rights on macOS/Linux machines.
 #### Create your docker container image 
 To build the image using the Dockerfile, open a terminal, navigate to the folder containing the Dockerfile and type:  
 ```

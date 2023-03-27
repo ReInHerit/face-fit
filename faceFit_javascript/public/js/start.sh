@@ -1,11 +1,11 @@
 #!/bin/bash
-echo 'starting python sever'
+echo 'starting python server'
 # turn on bash's job control
 #set -m
 python /app/public/js/swap_faces.py runserver &
 #P1=$?
 sleep 5
-echo 'starting nodejs sever'
+echo 'starting nodejs server'
 node /app/index.js
 #P2=$!
 #wait $P1 $P2

@@ -249,7 +249,7 @@ def init():
         return jsonify(ref_dict), 200
 
     else:
-        message = {'greeting': 'Hello from Flask!'}
+        message = {'greeting': 'Hello from Face-Fit Flask server!'}
         return jsonify(message)
 
 @app.route('/DATAtoPY', methods=['POST'])

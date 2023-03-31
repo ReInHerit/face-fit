@@ -29,6 +29,7 @@ const sendEmailButton = document.getElementById('send-email-button');
 
 const port = window.location.port;
 const host = window.location.hostname;
+const protocol = window.location.protocol;
 
 let cam_face, detector, selected, detect_interval, m_all_btns;
 let face_arr = []
@@ -277,7 +278,12 @@ async function init() {
         setButtonClick(all_btns[j], function () {
             let _this = this;
             selected = extract_index(_this.firstChild.src)
-            ref_img.src = 'http://' + host +':' + port +'/' + face_arr[selected]['src']
+            var url = protocol + '//' + host;
+            if (port) {
+                url += ':' + port;
+            }
+            url += '/' + face_arr[selected]['src'];
+            ref_img.src = url;
             // drawOnCanvas(ref_img.src)
             ref_img.onload = function () {
                 if (selected !== -1){
@@ -688,7 +694,11 @@ async function check_and_swap(angles_cam, angles_ref) {
             })
             .then((json) => {
                 let rel_path = json.relative_path
-                morphed = rel_path //+ '?' + Math.random()
+                if (port === '') {
+                    morphed = protocol + '//' + host + rel_path; //+ '?' + Math.random()
+                } else {
+                    morphed = protocol + '//' + host + ':' + port + rel_path //+ '?' + Math.random()
+                }
                 let id = extract_index(rel_path)
                 m_all_btns[id].firstChild.src = morphed
                 drawOnCanvas(morphed)

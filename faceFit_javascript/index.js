@@ -14,6 +14,7 @@ const request = require('request-promise')
 const app = express();
 const port = process.env.PORT || 8000;
 const host = process.env.HOST || "localhost";
+const protocol = process.env.PROTOCOL || "http";
 
 let ref_images = [];
 
@@ -153,7 +154,8 @@ app.post('/info', function(req, res, next){
         if (!error && response.statusCode === 200) {
             abs_morphed_path = body
             file_name = path.parse(body).base
-            rel_morphed_path = `http://${host}:${port}/morphs/${file_name}`
+            rel_morphed_path = '/morphs/' + file_name;
+            //rel_morphed_path = `http://${host}:${port}/morphs/${file_name}`
         }
         res.send({
             'relative_path': rel_morphed_path,

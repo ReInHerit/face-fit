@@ -210,6 +210,7 @@ def readb64(base64_string):
     pimg = Image.open(sbuf)
     return cv2.cvtColor(np.array(pimg), cv2.COLOR_RGB2BGR)
 
+
 def round_num(value):
     x = floor(value)
     if (value - x) < .50:
@@ -258,21 +259,22 @@ def sendData():
     if request.method == 'POST':
         print('Incoming..')
         data = request.get_json()
-        c_image = readb64(data["c_face"])
-        selected = data["selected"]
+        data_img= data['objs']
+        user = data['user_id']
+        c_image = readb64(data_img["c_face"])
+        selected = data_img["selected"]
         r_obj = ref_dict[selected]
         c_image = cv2.flip(c_image, 1)
         c_obj = F_obj.Face('cam')
         c_obj.get_landmarks(c_image)
 
         head, file_name = os.path.split(r_obj['src'])
-        r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)  # os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\images\\' + file_name
-        # path_to = {"morphs": os.path.join(ROOT_DIR, 'morphs')}  # (os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) + '\morphs\\')
+        r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
         morphed_file_name = 'morph_' + numb + '.png'
 
-        path = os.path.join(ROOT_DIR, 'morphs', morphed_file_name)  # path_to["morphs"] + 'morph_' + numb + '.png'
+        path = os.path.join(ROOT_DIR, 'temp', user, 'morphs', morphed_file_name)  # path_to["morphs"] + 'morph_' + numb + '.png'
 
         write = cv2.imwrite(path, output)
         if write:

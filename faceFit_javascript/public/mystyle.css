@@ -15,17 +15,24 @@ h1 {
     padding: 10px;
     z-index: 0;
 }
-#popup-button{
+#popup-button, #reset-button {
     position: absolute;
     width: 50px;
     left: calc(100vw - 30px);
     top: 30px;
     border-color: transparent;
     background-color: transparent;
-    transform: translate(-50%, 0px);
     z-index: 8;
 }
-#send_logo{
+#popup-button {
+    left: calc(100vw - 80px);
+    transform: translate(-50%, 0px);
+}
+#reset-button {
+    left: calc(100vw - 30px);
+    transform: translate(-50%, 0px);
+}
+#send_logo, #reset_logo {
     width: 100%;
     height: 100%;
     position: relative;

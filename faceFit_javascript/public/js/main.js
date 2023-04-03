@@ -23,6 +23,7 @@ const context = canvas.getContext("2d");
 
 /* POPUP */
 const popupButton = document.getElementById('popup-button');
+const resetButton = document.getElementById('reset-button');
 const popupWindow = document.getElementById('popup-window');
 const emailInput = document.getElementById('email-input');
 const sendEmailButton = document.getElementById('send-email-button');
@@ -40,33 +41,34 @@ const detectorConfig = {
     solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
     min_tracking_confidence: 0.2
 }
-const morphs_path = '../morphs'
+// const morphs_path = '../morphs'
 const default_view = '../images/Thumbs/default_view.jpg'
 const default_morph = '../images/Thumbs/morph_thumb.jpg'
 const send_logo = '../images/Thumbs/send.png'
+const reset_logo = '../images/Thumbs/reset.png'
 const start_view = '../images/Thumbs/start_view.jpg'
 
 /* UI FUNCTIONS*/
 const leftSlick = $("#ref_btns");
 const rightSlick = $("#morph_btns")
 
-function set_slick(orientation, slides, arrows){
-    let prev_string = '<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_' + arrows[0] +'.png" alt="PREV"></button>';
+function set_slick(orientation, slides, arrows) {
+    let prev_string = '<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_' + arrows[0] + '.png" alt="PREV"></button>';
     let next_string = '<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_' + arrows[1] + '.png" alt="NEXT"></button>';
 
-    leftSlick.slick('slickSetOption','slidesToShow', slides);
-    rightSlick.slick('slickSetOption','slidesToShow', slides);
-    leftSlick.slick('slickSetOption','vertical', orientation);
-    rightSlick.slick('slickSetOption','vertical', orientation);
-    leftSlick.slick('slickSetOption','prevArrow', prev_string)
-    leftSlick.slick('slickSetOption','nextArrow', next_string)
-    rightSlick.slick('slickSetOption','prevArrow', prev_string)
-    rightSlick.slick('slickSetOption','nextArrow', next_string)
-    leftSlick.slick( 'refresh' );
-    rightSlick.slick( 'refresh' );
+    leftSlick.slick('slickSetOption', 'slidesToShow', slides);
+    rightSlick.slick('slickSetOption', 'slidesToShow', slides);
+    leftSlick.slick('slickSetOption', 'vertical', orientation);
+    rightSlick.slick('slickSetOption', 'vertical', orientation);
+    leftSlick.slick('slickSetOption', 'prevArrow', prev_string)
+    leftSlick.slick('slickSetOption', 'nextArrow', next_string)
+    rightSlick.slick('slickSetOption', 'prevArrow', prev_string)
+    rightSlick.slick('slickSetOption', 'nextArrow', next_string)
+    leftSlick.slick('refresh');
+    rightSlick.slick('refresh');
 }
 
-function init_slicks(){
+function init_slicks() {
     if (leftSlick.length) {
         leftSlick.slick({
             dots: false,
@@ -91,7 +93,7 @@ function init_slicks(){
             slidesToShow: 3.5,
             slidesToScroll: 3,
             vertical: true,
-    //        arrows: true,
+            //        arrows: true,
             draggable: true,
             asNavFor: '.asnav2Class',
             prevArrow: "<button type='button' class='ref_btn'><img src='/images/Thumbs/arrow_up.png' alt='UP'></button>",
@@ -108,29 +110,28 @@ function init_slicks(){
     }
 }
 
-function window_size(){
+function window_size() {
     let orientation, arrows, areas, columns, rows;
-    const width =  container.offsetWidth
-    let slides = (width <= 700 && width >= 600) ? 6 : (width < 600 && width >= 450) ? 5 : (width < 450 ) ? 4 : 3.5
-    if(width <= 700){
+    const width = container.offsetWidth
+    let slides = (width <= 700 && width >= 600) ? 6 : (width < 600 && width >= 450) ? 5 : (width < 450) ? 4 : 3.5
+    if (width <= 700) {
         areas = '"main_view main_view main_view main_view" "ref_btns ref_btns ref_btns ref_btns" "morph_btns morph_btns morph_btns morph_btns"';
         columns = '25% 25% 25% 25%';
         rows = '70% 15% 15%';
         container_center.style.width = container_center.style.maxHeight = Math.round(container.offsetHeight * 0.7 - hints.offsetHeight - 40) + 'px';
-         // container_center.style.maxHeight;
+        // container_center.style.maxHeight;
         container_right.style.maxHeight = container_left.style.maxHeight = Math.round(container.offsetHeight * 0.2) + 'px';
         container_left.style.display = 'inline-flex'
         container_right.style.display = 'inline-flex'
         arrows = ['left', 'right']
         orientation = false
 
-    }
-    else {
+    } else {
         areas = '"ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns"';
         columns = '20% 30% 30% 20%';
         rows = '40% 40% 20%';
         container_center.style.maxHeight = Math.round(container.offsetHeight - hints.offsetHeight - 40) + 'px';
-        container_center.style.width = Math.round(container.offsetWidth * 0.6 -20) + 'px';
+        container_center.style.width = Math.round(container.offsetWidth * 0.6 - 20) + 'px';
         container_left.style.display = container_right.style.display = 'block';
         arrows = ['up', 'down'];
         orientation = true
@@ -141,7 +142,7 @@ function window_size(){
     container.style.gridTemplateRows = rows;
 
     container_center.style.maxWidth = Math.round(container.offsetWidth - 20) + 'px';
-    set_slick(orientation ,slides, arrows)
+    set_slick(orientation, slides, arrows)
 }
 
 function path_adjusted(url) {
@@ -151,25 +152,25 @@ function path_adjusted(url) {
     return url
 }
 
-function extract_index(path){
+function extract_index(path) {
     const fileName = path.split('/').pop()
     const replaced = fileName.replace(/\D/g, ''); // 👉️ '123'
     let num;
     if (replaced !== '') {
-      num = Number(replaced)-1; // 👉️ 123
+        num = Number(replaced) - 1; // 👉️ 123
     }
     return num
 }
 
-function setMorphsButtons(img){
+function setMorphsButtons(img) {
     for (let i = 0; i < m_all_btns.length; i++) {
         m_all_btns[i].firstChild.src = img;
-  }
+    }
 }
 
-function drawOnCanvas(my_img){
+function drawOnCanvas(my_img) {
     ref_img.src = my_img;
-    ref_img.onload = function(){
+    ref_img.onload = function () {
         let dsize = new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
         let img = cv.imread(ref_img)
         cv.resize(img, img, dsize, 0, 0, cv.INTER_AREA);
@@ -178,8 +179,9 @@ function drawOnCanvas(my_img){
 }
 
 function setButtonClick(button, action) {
-  button.onclick = action;
+    button.onclick = action;
 }
+
 async function init() {
     let all_btns_indices = [];
     /* INITIALIZE FACE LANDMARK DETECTOR */
@@ -193,7 +195,29 @@ async function init() {
     /* INITIALIZE SEND EMAIL POPUP */
     const validRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
     popupButton.firstChild.src = send_logo
-    popupButton.addEventListener('click', () => {popupWindow.style.display = 'block';});
+    resetButton.firstChild.src = reset_logo
+    resetButton.addEventListener('click', () => {
+        fetch("/delete_morphs", {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+                    body: JSON.stringify({'morphs': 'delete'}),
+                })
+                    .then((res) => {
+                        if (!res.ok) {
+                            throw new Error(`HTTP error: ${res.status}`);
+                        }
+                        return res.json();
+                    })
+                    .then((json) => {
+                        drawOnCanvas(start_view);
+                        setMorphsButtons(default_morph);
+                    })
+                    .catch((err) => console.error(`Fetch problem: ${err.message}`));
+                popupWindow.style.display = 'none';
+    })
+    popupButton.addEventListener('click', () => {
+        popupWindow.style.display = 'block';
+    });
     sendEmailButton.addEventListener('click', () => {
         // Get the email address from the input field
         const mailToAddress = emailInput.value;
@@ -218,10 +242,9 @@ async function init() {
 
             // Close the popup window
             popupWindow.style.display = 'none';
-        }
-        else {
-            if(confirm("Your input is not a valid email address.\n" +
-                "Press Cancel to retry or Ok to reset the game!")){
+        } else {
+            if (confirm("Your input is not a valid email address.\n" +
+                "Press Cancel to retry or Ok to reset the game!")) {
 
                 fetch("/delete_morphs", {
                     method: 'POST',
@@ -240,36 +263,36 @@ async function init() {
                     })
                     .catch((err) => console.error(`Fetch problem: ${err.message}`));
                 popupWindow.style.display = 'none';
-            } else{
+            } else {
                 console.log('Retry')
             }
-    return false;
+            return false;
 
-  }
+        }
     });
     console.log('EMAIL INITIALIZED')
     /* INITIALIZE PAINTINGS' FACE OBJECTS */
     let start_message = {'start': 'paintings'}
     await fetch("/init", {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    body: JSON.stringify(start_message)
-                })
-                .then((res) => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error: ${res.status}`);
-                    }
-                    return res.json();
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
+        body: JSON.stringify(start_message)
+    })
+        .then((res) => {
+            if (!res.ok) {
+                throw new Error(`HTTP error: ${res.status}`);
+            }
+            return res.json();
 
-                })
-                .then((json) => {
-                    face_arr = json.body
-                })
+        })
+        .then((json) => {
+            face_arr = json.body
+        })
     console.log('PAINTINGS OBJ INITIALIZED')
     /* INITIALIZE SLICKs BUTTONS AND INTERACTION */
     let all_btns = container_left.querySelectorAll("div.slick-slide >button");
     m_all_btns = container_right.querySelectorAll("div.slick-slide >button");
-    
+
     all_btns.forEach(function (item, index, arr) {
         all_btns_indices.push(arr[index].parentNode.getAttribute('data-slick-index'))
     })
@@ -286,9 +309,9 @@ async function init() {
             ref_img.src = url;
             // drawOnCanvas(ref_img.src)
             ref_img.onload = function () {
-                if (selected !== -1){
+                if (selected !== -1) {
                     morphed = ''
-                    detect_interval = setInterval(match_faces, 1000/30);
+                    detect_interval = setInterval(match_faces, 1000 / 30);
                     console.log('start interval')
                 }
             }
@@ -299,10 +322,10 @@ async function init() {
             let _this = this;
             let slide_id = all_btns_indices[j]
             const m_selected = extract_index(_this.firstChild.src)
-            if (detect_interval){
+            if (detect_interval) {
                 clearInterval(detect_interval)
                 reset_bar()
-                }
+            }
             ref_img.src = (isNaN(m_selected) === false && slide_id !== extract_index(ref_img.src)) ? _this.firstChild.src : default_view;
             drawOnCanvas(ref_img.src)
         })
@@ -311,24 +334,24 @@ async function init() {
 }
 
 function reset_bar() {
-  [percent_x, percent_y, percent_z].forEach(bar => {
-    bar.style.width = bar.innerHTML = '';
-  });
+    [percent_x, percent_y, percent_z].forEach(bar => {
+        bar.style.width = bar.innerHTML = '';
+    });
 }
 
 function update_bar() {
-  if (morphed === '') {
-    let matchings = [
-      100 - Math.abs(face_arr[selected].angles[0] - cam_face.angles[0]),
-      100 - Math.abs(face_arr[selected].angles[1] - cam_face.angles[1]),
-      100 - Math.abs(face_arr[selected].angles[2] - cam_face.angles[2])
-    ];
+    if (morphed === '') {
+        let matchings = [
+            100 - Math.abs(face_arr[selected].angles[0] - cam_face.angles[0]),
+            100 - Math.abs(face_arr[selected].angles[1] - cam_face.angles[1]),
+            100 - Math.abs(face_arr[selected].angles[2] - cam_face.angles[2])
+        ];
 
-    [percent_x, percent_y, percent_z].forEach((element, index) => {
-      element.style.width = matchings[index] + '%';
-      element.innerHTML = matchings[index] + '%';
-    });
-  }
+        [percent_x, percent_y, percent_z].forEach((element, index) => {
+            element.style.width = matchings[index] + '%';
+            element.innerHTML = matchings[index] + '%';
+        });
+    }
 }
 
 /* FACE DATA CALCULATIONS */
@@ -358,7 +381,7 @@ async function calc_lmrks(image, which) {
     let points_2d = []
     let bb = {}
     let angles
-    let faces = await detector.estimateFaces(image);
+    let faces = await detector.estimateFaces(image, {flipHorizontal: false});
     if (faces.length >> 0) {
         const keypoints = faces[0].keypoints;
         for (let land = 0; land < keypoints.length; land++) {
@@ -485,11 +508,17 @@ async function getHeadAngles(keypoints, which) {
         horizontalOpposite,
     ]);
     const horizontalCos = horizontalAdjacent / horizontalHypotenuse;
-    let first = Math.acos(verticalCos) *(180 / Math.PI);
+    let first = Math.acos(verticalCos) * (180 / Math.PI);
     let second = Math.acos(horizontalCos) * (180 / Math.PI);
     if (which === 'cam') {
-            first = Math.round(normalize(first, {'actual': {'lower': 55, 'upper': 115}, 'desired': {'lower': 82, 'upper': 95}}))
-            second = Math.round(normalize(second, {'actual': {'lower': 50, 'upper': 120}, 'desired': {'lower': 120, 'upper': 69}}))
+        first = Math.round(normalize(first, {
+            'actual': {'lower': 55, 'upper': 115},
+            'desired': {'lower': 82, 'upper': 95}
+        }))
+        second = Math.round(normalize(second, {
+            'actual': {'lower': 50, 'upper': 120},
+            'desired': {'lower': 120, 'upper': 69}
+        }))
     }
     let pleft = keypoints[133]
     let pright = keypoints[362]
@@ -518,7 +547,7 @@ function l2Norm(vec) {
     return Math.sqrt(norm);
 }
 
-function normalize(value, bounds){
+function normalize(value, bounds) {
     return bounds['desired']['lower'] + (value - bounds['actual']['lower']) *
         (bounds['desired']['upper'] - bounds['desired']['lower']) /
         (bounds['actual']['upper'] - bounds['actual']['lower'])
@@ -557,7 +586,7 @@ function draw_mask_on_ref() {
     const dsize = new cv.Size(cam_roi.cols, cam_roi.rows)
     const dsize_back = new cv.Size(ref_roi.cols, ref_roi.rows)
     const last_size = new cv.Size(canvas.width, canvas.height)
-    
+
     // create ghost mask
     cv.GaussianBlur(cam_roi, cam_roi, ...[new cv.Size(1, 1), 0, 0, cv.BORDER_DEFAULT])
 
@@ -572,11 +601,13 @@ function draw_mask_on_ref() {
     cv.Sobel(cam_roi_gray, cam_sobel, cv.CV_8U, 1, 0, 3, 1, 0, cv.BORDER_DEFAULT)
     cv.Sobel(cam_roi_gray, abs_cam_sobel, cv.CV_64F, 1, 0, 3, 1, 0, cv.BORDER_DEFAULT)
     cv.convertScaleAbs(abs_cam_sobel, abs_cam_sobel, 1, 0);
-    cam_roi_gray.delete(); cam_sobel.delete();
+    cam_roi_gray.delete();
+    cam_sobel.delete();
 
     let mask = new cv.Mat()
     cv.addWeighted(cam_laplacian, 1, abs_cam_sobel, 1, 0, mask);
-    cam_laplacian.delete(); abs_cam_sobel.delete();
+    cam_laplacian.delete();
+    abs_cam_sobel.delete();
 
     let convexHullMat = hull_mask()
     let cam_mask = convexHullMat.roi(bb_cam_rect);
@@ -584,7 +615,8 @@ function draw_mask_on_ref() {
     cv.cvtColor(cam_mask, cam_mask, cv.COLOR_RGBA2GRAY, 0)
     let ghost_mask_gray = new cv.Mat()
     cv.bitwise_and(mask, mask, ghost_mask_gray, cam_mask)
-    cam_mask.delete(); mask.delete();
+    cam_mask.delete();
+    mask.delete();
 
     cv.flip(ghost_mask_gray, ghost_mask_gray, 1)
 
@@ -592,7 +624,7 @@ function draw_mask_on_ref() {
     cv.cvtColor(ghost_mask_gray, ghost_mask, cv.COLOR_GRAY2RGB, 0)
     ghost_mask_gray.delete();
     cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_RGB2RGBA, 0)
-    
+
     // apply ghost mask over ref_image
     cv.resize(ref_roi, ref_roi, dsize, 0, 0, cv.INTER_LINEAR);
     let sum = new cv.Mat();
@@ -613,7 +645,7 @@ function draw_mask_on_ref() {
 }
 
 function hull_mask() {
-    const hull_points = cam_face.hull.map((id) => [ cam_face.n_points[id][0] * cam_face.w,
+    const hull_points = cam_face.hull.map((id) => [cam_face.n_points[id][0] * cam_face.w,
         cam_face.n_points[id][1] * cam_face.h,]);
     let hullMat = cv.matFromArray(hull_points.length, 1, cv.CV_32SC2, hull_points.flat());
     let hulls = new cv.MatVector();
@@ -686,37 +718,46 @@ async function check_and_swap(angles_cam, angles_ref) {
                 headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                 body: data_json
             })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then((json) => {
-                let rel_path = json.relative_path
-                if (port === '') {
-                    morphed = protocol + '//' + host + rel_path; //+ '?' + Math.random()
-                } else {
-                    morphed = protocol + '//' + host + ':' + port + rel_path //+ '?' + Math.random()
-                }
-                let id = extract_index(rel_path)
-                m_all_btns[id].firstChild.src = morphed
-                drawOnCanvas(morphed)
-                reset_bar()
-                selected = -1
-            })
-            .catch((err) => console.error(`Fetch problem: ${err.message}`));
+                .then((res) => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then((json) => {
+                    let rel_path = json.relative_path
+                    let abs_path = json.absolute_path
+                    let user_id = json.user_id
+                    const folder = 'public'
+                    const folder_id = abs_path.indexOf(folder)
+                    const sub_path = abs_path.slice(folder_id + folder.length)
+                    console.log(sub_path)
+                    if (port === '') {
+                        morphed = protocol + '//' + host + sub_path //'//temp//' + user_id + rel_path; + '?' + Math.random()
+                    } else {
+                        morphed = protocol + '//' + host + ':' + port + sub_path //'//temp//' + user_id +  rel_path + '?' + Math.random()
+                    }
+                    console.log(morphed)
+                    let id = extract_index(rel_path)
+                    m_all_btns[id].firstChild.src = morphed
+                    drawOnCanvas(morphed)
+                    reset_bar()
+                    selected = -1
+                })
+                .catch((err) => console.error(`Fetch problem: ${err.message}`));
         }
     }
 }
 
 function check_expression(landmarks) {
     let l_e, r_e, lips
+
     function calc_division(p1, p2, p3, p4) {
         const p4_p3 = ((p4[0] - p3[0]) ** 2 + (p4[1] - p3[1]) ** 2) ** 0.5
         const p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
         return p4_p3 / p2_p1
     }
+
     // l_eye
     const l_division = calc_division(landmarks[362], landmarks[263], landmarks[386], landmarks[374])
     l_division <= 0.1 ? l_e = 'closed' : l_e = 'opened';
@@ -740,7 +781,7 @@ function resize_all() {
 const accessCamera = () => {
     navigator.mediaDevices
         .getUserMedia({
-            video: {width: 1280, height: 960},
+            video: {facingMode: 'user', width: 1280, height: 960},
             audio: false,
         })
         .then((stream) => {
@@ -750,7 +791,8 @@ const accessCamera = () => {
             console.log("Something went wrong!", error);
         });
 };
-function opencvIsReady(){
+
+function opencvIsReady() {
     console.log('OPENCV.JS READY')
     init().then(r => console.log('ALL IS INITIALIZED'));
     accessCamera();
@@ -760,6 +802,31 @@ window.addEventListener('resize', resize_all, false);
 video.addEventListener('loadeddata', function () {
     body.classList.add('loaded')
 })
-
+window.addEventListener('beforeunload', function (event) {
+  const confirmationMessage = 'Are you sure you want to delete the folder?';
+  event.preventDefault();
+  event.returnValue = confirmationMessage;
+  setTimeout(function () {
+    if (!event.returnValue) {
+      // The user clicked the "Cancel" button
+      console.log('User canceled the action');
+    } else {
+      // The user clicked the "OK" button
+      console.log('User confirmed the action');
+      // Send a request to the server to delete the folder
+      fetch('/folder', {
+        method: 'DELETE'
+      }).then(response => {
+        if (response.ok) {
+          console.log('Folder deleted successfully');
+        } else {
+          console.error('Error deleting folder');
+        }
+      }).catch(error => {
+        console.error(error);
+      });
+    }
+  }, 0);
+});
 
 

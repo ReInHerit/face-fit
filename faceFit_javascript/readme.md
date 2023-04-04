@@ -26,6 +26,10 @@ Example:
 ## Setup email address and password
 To send emails with the morphed results, you will need to use (or set up) a Gmail account. Then, you will need to generate an App Password by following the instructions provided in the first point on this link: https://www.interviewqs.com/blog/py-email.
 Once you have generated the App Password, you will need to enter it, along with your email address, into the ___public/json/password_gmail.json___ file. 
+## Setup Google Analytics
+To use Google Analytics, you will need to create a google analytics account and get the tracking ID. 
+Then, you will need to enter it into the ___.env_template___ file and remove the **_template** part of the file name.
+
 ## How to manage docker
 Once ready with the reference images and email setup you can create and launch the docker image.
 #### Prerequisites

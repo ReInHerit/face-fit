@@ -9,7 +9,7 @@ const bodyParser = require("body-parser");
 const request = require('request-promise')
 const uuid = require('uuid');
 const fs_extra = require('fs-extra');
-
+require('dotenv').config();
 /**
  * App Variables
  */
@@ -64,7 +64,7 @@ fs.readdir(directoryPath, function (err, files) {
         }
     });
     app.get("/", (req, res) => {
-        res.render("index", { title: "FACE-FIT", data: ref_images});
+        res.render("index", { title: "FACE-FIT", data: ref_images, ga_key: process.env.GA_KEY});
     });
 });
 

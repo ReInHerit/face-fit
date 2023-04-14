@@ -133,7 +133,7 @@ app.get('/info', (req, res) => {
 // Route for deleting the folder
 app.delete('/folder', (req, res) => {
     const folderPath = path.join(__dirname, 'public/temp', userId);
-    fs.rmdir(folderPath, { recursive: true }, (err) => {
+    fs.rm(folderPath, { recursive: true }, (err) => {
     if (err) {
       console.error(err);
       res.status(500).send('Error deleting folder');

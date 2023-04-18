@@ -1,3 +1,5 @@
+import math
+
 import cv2
 from json import load as load_json, dumps, JSONEncoder
 import base64
@@ -29,10 +31,12 @@ ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 # else:
 #     where_morphs_stay = os.path.join(ROOT_DIR, 'public', 'morphs')
 triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
+triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
 
 with open(triangulation_json_path, 'r') as f:
     media_pipes_tris = load_json(f)
-
+with open(triangulation2_json_path, 'r') as f:
+    media_pipes_tris2 = load_json(f)
 
 def find_noise_scratches(img):  # De-noising
     dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
@@ -59,6 +63,7 @@ def calculate_lookup(src_cdf, ref_cdf):
             if ref_cdf[ref_pixel_val] >= src_cdf[src_pixel_val]:
                 lookup_val = ref_pixel_val
                 break
+        print(src_pixel_val, ref_pixel_val)
         lookup_table[src_pixel_val] = lookup_val
     return lookup_table
 
@@ -152,6 +157,116 @@ def warp_triangle(img1, img2, t1, t2):
     # Copy triangular region of the rectangular patch to the output image
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask) + img2_rect
 
+# def check_uncovered(obj, shape, TRIANGULATIONS):
+#     POINTS = obj['points']
+#
+#     w, h, c = shape
+#     covered_triangles = []
+#     points_list_int = [(int(x * w), int(y * h), int(z* obj['bb']['width']/2)) for x, y, z in POINTS]
+#     points_list_int = list(map(lambda x: (int(x[0]), int(x[1]), int(x[2])), points_list_int))
+#     # print(points_list_int)
+#     for tri_idx in range(len(TRIANGULATIONS)):
+#         tri_verts = [points_list_int[TRIANGULATIONS[tri_idx][i]] for i in range(3)]
+#         # print('verts: ',tri_verts)
+#         tri_area = compute_triangle_area(tri_verts)
+#         is_covered = False
+#
+#         for other_tri_idx in range(len(TRIANGULATIONS)):
+#             if other_tri_idx == tri_idx:
+#                 continue
+#
+#             other_tri_verts = [points_list_int[TRIANGULATIONS[other_tri_idx][i]] for i in range(3)]
+#             other_tri_area = compute_triangle_area(other_tri_verts)
+#             # print(len(other_tri_verts), len(tri_verts), len(points_list_int))
+#             if is_triangle_covered(tri_verts, other_tri_verts, points_list_int):
+#                 if tri_area <= other_tri_area:
+#                     is_covered = True
+#                     break
+#                 else:
+#                     tri_area -= other_tri_area
+#
+#         if not is_covered:
+#             covered_triangles.append(tri_idx)
+#     return covered_triangles
+#
+# def is_triangle_covered(triangle, triangles, points):
+#     """Check if a triangle is fully covered by other triangles."""
+#     # Get the z-coordinates of the triangle points
+#     zs = [point[2] for point in triangle]
+#
+#     # Check if the triangle is above other triangle
+#     zmax = max(point[2] for point in triangles)
+#     if all(z > zmax for z in zs):
+#         return False
+#
+#     # Check if the triangle is fully covered by other triangles
+#     # for other_tri in triangles:
+#     # if triangles == triangle or set(triangle).issubset(set(triangles)):
+#     #     continue
+#     if not is_triangle_above(triangle, triangles) and not is_triangle_below(triangle, triangles):
+#         return False
+#
+#     return True
+#
+#
+# def compute_triangle_area(points):
+#     points = np.array(points)
+#     a = np.linalg.norm(points[1] - points[0])
+#     b = np.linalg.norm(points[2] - points[1])
+#     c = np.linalg.norm(points[0] - points[2])
+#     s = (a + b + c) / 2
+#     return np.sqrt(s * (s - a) * (s - b) * (s - c))
+# def is_triangle_above(triangle1, triangle2):
+#     """Check if triangle1 is above triangle2."""
+#     # Compute the normal vectors of the two triangles
+#
+#     normal1 = np.cross(np.array(triangle1[1]) - np.array(triangle1[0]),
+#                        np.array(triangle1[2]) - np.array(triangle1[0]))
+#     normal2 = np.cross(np.array(triangle2[1]) - np.array(triangle2[0]),
+#                        np.array(triangle2[2]) - np.array(triangle2[0]))
+#
+#     # Check if the normal vectors are parallel
+#     if np.allclose(np.dot(normal1, normal2), 0):
+#         return False
+#
+#     # Compute the centroid of each triangle
+#     centroid1 = np.mean(np.array(triangle1), axis=0)
+#     centroid2 = np.mean(np.array(triangle2), axis=0)
+#
+#     # Compute the vector from the centroid of triangle1 to the centroid of triangle2
+#     vec = centroid2 - centroid1
+#
+#     # Check if the vector is in the direction of the normal vectors
+#     if np.all(np.dot(vec, normal1) * np.dot(vec, normal2) >= 0):
+#         return True
+#     else:
+#         return False
+#
+#
+# def is_triangle_below(triangle1, triangle2):
+#     """Check if triangle1 is below triangle2."""
+#     return is_triangle_above(triangle2, triangle1)
+def distance(point1, point2):
+    # Calculate the distance between two 3D points
+    return math.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2 + (point2[2] - point1[2])**2)
+
+def sort_triangles_by_distance(triangles, viewer_pos, triangles_points):
+    # Calculate the distance between the viewer and each triangle
+    distances = []
+    for triangle in triangles:
+        point1 = triangles_points[triangle[0]]
+        point2 = triangles_points[triangle[1]]
+        point3 = triangles_points[triangle[2]]
+        # Calculate the distance between the viewer and the centroid of the triangle
+        centroid = ((point1[0] + point2[0] + point3[0]) / 3,
+                    (point1[1] + point2[1] + point3[1]) / 3,
+                    (point1[2] + point2[2] + point3[2]) / 3)
+        distances.append(distance(viewer_pos, centroid))
+
+    # Sort the triangles by distance
+    sorted_triangles = [triangle for _, triangle in sorted(zip(distances, triangles), reverse=True)]
+
+    return sorted_triangles
 
 def morph(c_obj, r_obj):
     cam_image, cam_points, ref_points = c_obj.image, c_obj.pix_points, r_obj['pix_points']
@@ -166,14 +281,16 @@ def morph(c_obj, r_obj):
     c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
     cam_cc = match_histograms(c_roi, r_roi)
+
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
-
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
-    dt = media_pipes_tris  # triangles
-    tris1 = [[cam_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
-    tris2 = [[ref_points[dt[i][j]] for j in range(3)]for i in range(len(dt))]
+    dt = media_pipes_tris2  # triangles
+
+    new_dt = sort_triangles_by_distance(dt, (0, 0, -20), c_obj.points)
+    tris1 = [[cam_points[new_dt[i][j]] for j in range(3)]for i in range(len(new_dt))]
+    tris2 = [[ref_points[new_dt[i][j]] for j in range(3)]for i in range(len(new_dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
 
@@ -191,6 +308,10 @@ def morph(c_obj, r_obj):
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255
+    # cv2.imshow('cam_roi', c_roi)
+    # cv2.imshow('ref_img', ref_image)
+    # cv2.imshow('cam_cc', cam_cc)
+    # cv2.waitKey(0)
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
     out = cv2.add(out, noise)
@@ -259,17 +380,20 @@ def sendData():
     if request.method == 'POST':
         print('Incoming..')
         data = request.get_json()
-        data_img= data['objs']
+        data_img = data['objs']
         user = data['user_id']
         c_image = readb64(data_img["c_face"])
         selected = data_img["selected"]
+
         r_obj = ref_dict[selected]
         c_image = cv2.flip(c_image, 1)
+        # Create Frame Face Object
         c_obj = F_obj.Face('cam')
         c_obj.get_landmarks(c_image)
-
+        # Select Reference Image Face Object
         head, file_name = os.path.split(r_obj['src'])
         r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)
+        #Morph the faces
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
         morphed_file_name = 'morph_' + numb + '.png'

@@ -1014,7 +1014,7 @@ function check_expression(landmarks) {
     r_division <= 0.1 ? r_e = 'closed' : r_e = 'opened';
     // Mouth
     const lips_division = calc_division(landmarks[78], landmarks[308], landmarks[13], landmarks[14])
-    lips_division < 0.15 ? lips = 'closed' : 0.15 <= lips_division < 0.4 ? lips = 'opened' : lips = 'full opened';
+    lips_division < 0.1 ? lips = 'closed' : lips_division > 0.5 ? lips = 'full opened' : lips = 'opened';
     return [l_e, r_e, lips]
 }
 

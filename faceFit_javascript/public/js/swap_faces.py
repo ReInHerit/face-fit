@@ -280,6 +280,39 @@ def morph(c_obj, r_obj):
                r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
     c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
+    # # Convert the regions to grayscale
+    # r_gray = cv2.cvtColor(r_roi, cv2.COLOR_BGR2GRAY)
+    # c_gray = cv2.cvtColor(c_roi, cv2.COLOR_BGR2GRAY)
+    #
+    # # Reshape the grayscale images to 1D arrays
+    # r_data = r_gray.reshape(-1, 1)
+    # c_data = c_gray.reshape(-1, 1)
+    #
+    # # Compute the PCA of the grayscale images
+    # mean, eigenvectors = cv2.PCACompute(r_data, mean=None, maxComponents=3)
+    # mean_t, eigenvectors_t = cv2.PCACompute(c_data, mean=None, maxComponents=3)
+    # print('Means and eigenvectors:')
+    # print(mean.shape, eigenvectors.shape, mean_t.shape, eigenvectors_t.shape)
+    # print(mean.size, eigenvectors.size, mean_t.size, eigenvectors_t.size)
+    # print(mean, eigenvectors, mean_t, eigenvectors_t)
+    # # Reshape the eigenvector matrices to match the shape of the data
+    # eigenvectors = eigenvectors.reshape(-1, 1)
+    # eigenvectors_t = eigenvectors_t.reshape(-1, 1)
+    # print('eigenvector',eigenvectors.shape, eigenvectors_t.shape)
+    # # Compute the transfer function
+    # transfer_function = (eigenvectors.dot(eigenvectors_t.T))
+    # cv2.cvtColor(transfer_function, cv2.COLOR_GRAY2BGR)
+    # print(transfer_function.shape, transfer_function.size, ref_image.shape, ref_image.size)
+    # # Reshape the reference image to a 2D array of pixels
+    # ref_data = ref_image.reshape(-1, 3)
+    #
+    #
+    # print(ref_data.shape, ref_data.size)
+    # # Apply the transfer function to the reference image
+    # cam_relight = (ref_data.dot(transfer_function)).reshape(cam_image.shape)
+
+    # cv2.imshow('cam_relight', cam_relight)
+    # cv2.waitKey(0)
     cam_cc = match_histograms(c_roi, r_roi)
 
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
@@ -311,7 +344,7 @@ def morph(c_obj, r_obj):
     # cv2.imshow('cam_roi', c_roi)
     # cv2.imshow('ref_img', ref_image)
     # cv2.imshow('cam_cc', cam_cc)
-    # cv2.waitKey(0)
+    # cv2.waitkey(0)
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
     out = cv2.add(out, noise)

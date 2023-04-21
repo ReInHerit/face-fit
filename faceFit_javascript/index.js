@@ -172,10 +172,10 @@ app.post('/info', function(req, res, next){
             //rel_morphed_path = `http://${host}:${port}/morphs/${file_name}`
         }
         res.send({
-            'relative_path': rel_morphed_path,
-            'absolute_path': abs_morphed_path,
+            'user_id': userId,
             'file_name': file_name,
-            'user_id': userId
+            'absolute_path': abs_morphed_path,
+            'relative_path': rel_morphed_path
         });
     });
 })

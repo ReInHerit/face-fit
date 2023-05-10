@@ -63,7 +63,7 @@ body, html {
 }
 
 .container {
-    width: 100%;
+    width: calc(100% - 10px);
     height: 100vh;
     min-width: 300px;
     max-height: calc(100vh - 60px);
@@ -88,13 +88,18 @@ body, html {
 
 #ref_btns {
     grid-area: ref_btns;
-    z-index: 1;
-}
+
+    }
 
 #morph_btns {
     grid-area: morph_btns;
+}
+#ref_btns, #morph_btns {
+    display: flex;
+    align-items: center;
     z-index: 1;
 }
+
 #hints_section, #canvas{
     position: inherit;
     left: 50%;
@@ -104,12 +109,7 @@ body, html {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    margin: 10px 0 10px 0;
-}
-
-table{
-    border-spacing: 5px;
-    margin-left: 20px;
+    margin: 0;
 }
 
 th, td, #hints_title {
@@ -151,8 +151,8 @@ td {
 
 #webcam {
     width: 100%;
-    min-width: 320px;
-    max-width: 640px;
+    min-width: 120px;
+    max-width: 330px;
     height: auto;
     visibility: hidden;
     display: block;
@@ -166,18 +166,22 @@ td {
 }
 
 .ref_btn, .morph_btn{
-    padding: 0;
+    padding: 0 1px;
     border: 0;
     background: transparent;
-    display: block;
-    margin: 10px auto;
+    /*display: flex;*/
+    /*margin: 10px auto;*/
     cursor: pointer;
 }
-
+.slick-slider{
+    display: flex;
+    /*flex-direction: column;*/
+}
 .img_ref, .img_morph{
     position: initial;
     width: 100%;
     max-width:  150px;
+    height: auto;
     display: block;
     margin-left: auto;
     margin-right: auto;

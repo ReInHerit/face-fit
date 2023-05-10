@@ -14,7 +14,7 @@ const container = document.getElementsByClassName("container")[0]
 const container_left = document.getElementById("ref_btns");
 const container_right = document.getElementById("morph_btns")
 const container_center = document.getElementById("main_view")
-
+const btn_imgs = document.querySelectorAll('img_morph, img_ref')
 /* CANVAS */
 const canvas = document.getElementById("canvas");
 const cam_canvas = document.getElementById('cam_canvas');
@@ -120,32 +120,47 @@ function init_slicks() {
 }
 
 function window_size() {
-    let orientation, arrows, areas, columns, rows;
+    let orientation, arrows, areas, columns, rows, slides;
     const width = container.offsetWidth
-    let slides = (width <= 700 && width >= 600) ? 6 : (width < 600 && width >= 450) ? 5 : (width < 450) ? 4 : 3.5
-    if (width <= 700) {
+    const height = container.offsetHeight
+    const aspect = width / height
+
+    if (aspect <= 1) { // VERTICAL
+        slides = (aspect > 0.6 ) ? 5 : 4
+
         areas = '"main_view main_view main_view main_view" "ref_btns ref_btns ref_btns ref_btns" "morph_btns morph_btns morph_btns morph_btns"';
         columns = '25% 25% 25% 25%';
         rows = '70% 15% 15%';
-        container_center.style.width = container_center.style.maxHeight = Math.round(container.offsetHeight * 0.7 - hints.offsetHeight - 40) + 'px';
-        // container_center.style.maxHeight;
-        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(container.offsetHeight * 0.2) + 'px';
-        container_left.style.display = 'inline-flex'
-        container_right.style.display = 'inline-flex'
+        container_center.style.width = container_center.style.maxHeight = Math.round(height * 0.7 - hints.offsetHeight - 40) + 'px';
+                    container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height * 0.2) + 'px';
+        container_right.style.flexDirection = container_left.style.flexDirection = 'row'
+        canvas.style.maxHeight = hints.style.maxWidth = container_center.style.maxHeight
+
+        btn_imgs.forEach(el => {
+            el.style.height = '100%'
+            el.style.width = 'auto'
+        })
         arrows = ['left', 'right']
         orientation = false
+    } else { // HORIZONTAL
+        slides = (aspect > 1.5) ? ((width > 1000)? 3 : 4):5
 
-    } else {
         areas = '"ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns"';
         columns = '20% 30% 30% 20%';
         rows = '40% 40% 20%';
         container_center.style.maxHeight = Math.round(container.offsetHeight - hints.offsetHeight - 40) + 'px';
+        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height) + 'px';
         container_center.style.width = Math.round(container.offsetWidth * 0.6 - 20) + 'px';
-        container_left.style.display = container_right.style.display = 'block';
+        canvas.style.maxHeight = hints.style.maxWidth = (container.offsetHeight - hints.offsetHeight) + 'px';
+        btn_imgs.forEach(el => {
+            el.style.height = '100%'
+            el.style.width = 'auto'
+        })
+        container_right.style.flexDirection = container_left.style.flexDirection = 'column'
         arrows = ['up', 'down'];
         orientation = true
     }
-    canvas.style.maxHeight = hints.style.maxWidth = container_center.style.maxHeight
+
     container.style.gridTemplateAreas = areas
     container.style.gridTemplateColumns = columns;
     container.style.gridTemplateRows = rows;
@@ -190,8 +205,6 @@ function drawOnCanvas(my_img) {
 function setButtonClick(button, action) {
     button.onclick = action;
 }
-
-
 
 
 function onResults() {

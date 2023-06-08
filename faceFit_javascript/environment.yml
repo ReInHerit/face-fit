@@ -14,3 +14,4 @@ dependencies:
   - scipy==1.9.3
   - flask==2.2.2
   - pillow==9.3.0
+  - color-matcher==0.1.0

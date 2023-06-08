@@ -97,7 +97,14 @@ body, html {
 #ref_btns, #morph_btns {
     display: flex;
     align-items: center;
+    justify-content: center;
     z-index: 1;
+}
+.ref_btn, .morph_btn{
+    padding: 0 1px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
 }
 
 #hints_section, #canvas{
@@ -165,18 +172,15 @@ td {
     z-index: 0;
 }
 
-.ref_btn, .morph_btn{
-    padding: 0 1px;
-    border: 0;
-    background: transparent;
-    /*display: flex;*/
-    /*margin: 10px auto;*/
-    cursor: pointer;
-}
-.slick-slider{
-    display: flex;
-    /*flex-direction: column;*/
-}
+
+/*.slick-slider{*/
+/*    display: flex;*/
+/*    !*flex-direction: column;*!*/
+/*}*/
+/*.slick-track{*/
+/*    display: flex;*/
+/*    align-items: center;*/
+/*}*/
 .img_ref, .img_morph{
     position: initial;
     width: 100%;

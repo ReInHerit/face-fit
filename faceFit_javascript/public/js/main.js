@@ -154,6 +154,7 @@ function window_size() {
         canvas.style.maxHeight = hints.style.maxWidth = (container.offsetHeight - hints.offsetHeight) + 'px';
         btn_imgs.forEach(el => {
             el.style.height = '100%'
+            // el.style.maxWidth = calc(btn_imgs[0].offsetHeight * 0.8) + 'px'
             el.style.width = 'auto'
         })
         container_right.style.flexDirection = container_left.style.flexDirection = 'column'

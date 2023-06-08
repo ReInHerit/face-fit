@@ -1,12 +1,16 @@
 block variables
 doctype html
 html
+    header
+        h1 Face-Fit
+        button#popup-button(type='button', title='Send Mail')
+            img#send_logo
     head
         meta(charset="utf-8")
         meta(name="viewport" content="width=device-width, initial-scale=1.0")
         title #{title} | Face Mesh Implementation
-        link(rel="stylesheet" type="text/css" href="/mystyle.css")
-        link(rel="stylesheet" type="text/css" href="/plugins/slick/slick.css")
+        link(rel="stylesheet" type="text/css" href="/CSS/mystyle.css")
+        link(rel="stylesheet" type="text/css" href="/CSS/custom_slicks.css")
         //script(src="https://cdn.skypack.dev/device-detector-js@2.2.10")
         script(async src=`https://www.googletagmanager.com/gtag/js?id=${ga_key}`)
         script.
@@ -14,13 +18,9 @@ html
             function gtag() { dataLayer.push(arguments); }
             gtag('js', new Date());
             gtag('config', "#{ga_key}");
-    header
-        h1 Face-Fit
-        button#popup-button(type='button', title='Send Mail')
-            img#send_logo
+
         button#reset-button(type='button', title='Reset All')
             img#reset_logo
-
     body
         #loader-wrapper
             #loader

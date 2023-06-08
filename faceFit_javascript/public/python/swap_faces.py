@@ -1,4 +1,5 @@
 import math
+import time
 import sys
 import cv2
 from json import load as load_json, dumps, JSONEncoder
@@ -15,6 +16,8 @@ from PIL import Image
 import io
 import Face as F_obj
 from math import floor, ceil
+from match_color import matching_color, find_noise_scratches
+
 
 ref = []
 ref_dict = []
@@ -29,75 +32,12 @@ ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
 triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
 
-with open(triangulation_json_path, 'r') as f:
-    media_pipes_tris = load_json(f)
+# with open(triangulation_json_path, 'r') as f:
+#     media_pipes_tris = load_json(f)
 with open(triangulation2_json_path, 'r') as f:
     media_pipes_tris2 = load_json(f)
 
-def find_noise_scratches(img):  # De-noising
-    dst = cv2.fastNlMeansDenoisingColored(img, None, 5, 5, 5, 15)
-    noise = cv2.subtract(img, dst)
-    return dst, noise
 
-
-# COLOR CORRECTION functions
-def calculate_cdf(histogram):
-    """ This method calculates the cumulative distribution function """
-    # Get the cumulative sum of the elements
-    cdf = histogram.cumsum()
-    # Normalize the cdf
-    normalized_cdf = cdf / float(cdf.max())
-    return normalized_cdf
-
-
-def calculate_lookup(src_cdf, ref_cdf):
-    """ This method creates the lookup table """
-    lookup_table = np.zeros(256)
-    lookup_val = 0
-    for src_pixel_val in range(len(src_cdf)):
-        for ref_pixel_val in range(len(ref_cdf)):
-            if ref_cdf[ref_pixel_val] >= src_cdf[src_pixel_val]:
-                lookup_val = ref_pixel_val
-                break
-        print(src_pixel_val, ref_pixel_val)
-        lookup_table[src_pixel_val] = lookup_val
-    return lookup_table
-
-
-def match_histograms(src_image, ref_image):
-    """ This method matches the source image histogram to the reference signal """
-    # Split the images into the different color channels
-    src_b, src_g, src_r = cv2.split(src_image)
-    ref_b, ref_g, ref_r = cv2.split(ref_image)
-    # Compute the b, g, and r histograms separately
-    src_hist_blue, bin_0 = np.histogram(src_b.flatten(), 256, [0, 256])
-    src_hist_green, bin_1 = np.histogram(src_g.flatten(), 256, [0, 256])
-    src_hist_red, bin_2 = np.histogram(src_r.flatten(), 256, [0, 256])
-    ref_hist_blue, bin_3 = np.histogram(ref_b.flatten(), 256, [0, 256])
-    ref_hist_green, bin_4 = np.histogram(ref_g.flatten(), 256, [0, 256])
-    ref_hist_red, bin_5 = np.histogram(ref_r.flatten(), 256, [0, 256])
-    # Compute the normalized cdf for the source and reference image
-    src_cdf_blue = calculate_cdf(src_hist_blue)
-    src_cdf_green = calculate_cdf(src_hist_green)
-    src_cdf_red = calculate_cdf(src_hist_red)
-    ref_cdf_blue = calculate_cdf(ref_hist_blue)
-    ref_cdf_green = calculate_cdf(ref_hist_green)
-    ref_cdf_red = calculate_cdf(ref_hist_red)
-    # Make a separate lookup table for each color
-    blue_lookup_table = calculate_lookup(src_cdf_blue, ref_cdf_blue)
-    green_lookup_table = calculate_lookup(src_cdf_green, ref_cdf_green)
-    red_lookup_table = calculate_lookup(src_cdf_red, ref_cdf_red)
-    # Use the lookup function to transform the colors of the original source image
-    blue_after_transform = cv2.LUT(src_b, blue_lookup_table)
-    green_after_transform = cv2.LUT(src_g, green_lookup_table)
-    red_after_transform = cv2.LUT(src_r, red_lookup_table)
-    # Put the image back together
-    image_after_matching = cv2.merge([blue_after_transform, green_after_transform, red_after_transform])
-    image_after_matching = cv2.convertScaleAbs(image_after_matching)
-    return image_after_matching
-
-
-# Morph Functions
 def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
     # unless your points_list are integers. see http://www.qhull.org/html/qh-optq.htm
@@ -189,7 +129,8 @@ def morph(c_obj, r_obj):
     c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
 
-    cam_cc = match_histograms(c_roi, r_roi)
+    cam_cc = matching_color(r_roi, c_roi)
+
 
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
                c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
@@ -213,11 +154,9 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(concave_mask)  # Find Centroid
     center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
-    # center = [x - y for x, y in zip(center, painting_data[file_name]["center_delta"])]
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255
-
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
     out = cv2.add(out, noise)

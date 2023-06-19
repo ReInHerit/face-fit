@@ -10,6 +10,7 @@ const request = require('request-promise')
 const uuid = require('uuid');
 const fs_extra = require('fs-extra');
 require('dotenv').config();
+
 /**
  * App Variables
  */
@@ -27,7 +28,7 @@ const json_path = path.join(__dirname, 'public/json');
 const directoryPath = path.join(__dirname, 'public/images');
 const temp_path = path.join(__dirname, 'public/temp');
 // fs_extra.removeSync(temp_path);
-// checkPath(temp_path);
+checkPath(temp_path);
 let morphs_path
 const painting_data_file = json_path + '/painting_data.json'
 const gmail_data_file = json_path + '/password_gmail.json'

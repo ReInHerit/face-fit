@@ -14,10 +14,9 @@ from itertools import combinations
 from flask import Flask, jsonify, request
 from PIL import Image
 import io
-import Face as F_obj
+import Face_Maker as F_obj
 from math import floor, ceil
 from match_color import matching_color, find_noise_scratches
-
 
 ref = []
 ref_dict = []
@@ -29,11 +28,9 @@ else:
 
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
-triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
+# triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
 triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
 
-# with open(triangulation_json_path, 'r') as f:
-#     media_pipes_tris = load_json(f)
 with open(triangulation2_json_path, 'r') as f:
     media_pipes_tris2 = load_json(f)
 
@@ -54,8 +51,7 @@ def get_concave_hull(points_list):  # points_list is a 2D numpy array
     area = np.sqrt(s * (s - a) * (s - b) * (s - c))  # Area of triangle by Heron's formula
     edge_filter = (a * b * c / (4.0 * area) < 50)  # Radius Filter based
     edges = tri[edge_filter]  # Filter the edges
-    # in the list below both (i, j) and (j, i) pairs are counted. The reasoning is that boundary edges appear only once
-    # while interior edges twice
+
     edges = [tuple(sorted(combo)) for e in edges for combo in combinations(e, 2)]
 
     count = Counter(edges)  # count occurrences of each edge
@@ -88,33 +84,100 @@ def warp_triangle(img1, img2, t1, t2):
     # Affine Transformation
     warp_mat = cv2.getAffineTransform(np.float32(t1_rect), np.float32(t2_rect))
     img2_rect = cv2.warpAffine(img1_rect, warp_mat, (size[0], size[1]), None, flags=cv2.INTER_LINEAR,
-                         borderMode=cv2.BORDER_REFLECT_101)
+                               borderMode=cv2.BORDER_REFLECT_101)
     img2_rect = img2_rect * mask
     # Copy triangular region of the rectangular patch to the output image
     img2[y2:y2 + h2, x2:x2 + w2] = img2[y2:y2 + h2, x2:x2 + w2] * ((1.0, 1.0, 1.0) - mask) + img2_rect
 
 
-def distance(point1, point2):
-    # Calculate the distance between two 3D points
-    return math.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2 + (point2[2] - point1[2])**2)
-
 def sort_triangles_by_distance(triangles, viewer_pos, triangles_points):
-    # Calculate the distance between the viewer and each triangle
-    distances = []
-    for triangle in triangles:
-        point1 = triangles_points[triangle[0]]
-        point2 = triangles_points[triangle[1]]
-        point3 = triangles_points[triangle[2]]
+    def calculate_distance(triangle):
         # Calculate the distance between the viewer and the centroid of the triangle
-        centroid = ((point1[0] + point2[0] + point3[0]) / 3,
-                    (point1[1] + point2[1] + point3[1]) / 3,
-                    (point1[2] + point2[2] + point3[2]) / 3)
-        distances.append(distance(viewer_pos, centroid))
+        point1, point2, point3 = [triangles_points[vertex] for vertex in triangle]
+        centroid = (
+            (point1[0] + point2[0] + point3[0]) / 3,
+            (point1[1] + point2[1] + point3[1]) / 3,
+            (point1[2] + point2[2] + point3[2]) / 3
+        )
+        return distance(viewer_pos, centroid)
 
-    # Sort the triangles by distance
-    sorted_triangles = [triangle for _, triangle in sorted(zip(distances, triangles), reverse=True)]
+    def is_clockwise(vertices):
+        # Check if the vertices of a triangle are specified in clockwise order
+        v0, v1, v2 = vertices
+        return ((v1[0] - v0[0]) * (v2[1] - v0[1]) - (v1[1] - v0[1]) * (v2[0] - v0[0])) < 0
+
+    def is_front_facing(vertices, eye_pos):
+        # Check if the triangle is front-facing with respect to the viewer
+        v0, v1, v2 = vertices
+        normal = calculate_triangle_normal(v0, v1, v2)
+        view_direction = (eye_pos[0] - v0[0], eye_pos[1] - v0[1], eye_pos[2] - v0[2])
+        # dot_product = normal[0] * view_direction[0] + normal[1] * view_direction[1] + normal[2] * view_direction[2]
+        return dot_product(normal, view_direction) >= 0
+
+    def calculate_triangle_normal(v0, v1, v2):
+        # Calculate the normal vector of a triangle
+        ux, uy, uz = v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]
+        vx, vy, vz = v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]
+        nx = uy * vz - uz * vy
+        ny = uz * vx - ux * vz
+        nz = ux * vy - uy * vx
+        return nx, ny, nz
+
+    def is_inside_triangle(point, triangle):
+        # Check if a point is inside a 2D triangle using barycentric coordinates
+        v0, v1, v2 = triangle
+        d00 = dot_product(v0, v0)
+        d01 = dot_product(v0, v1)
+        d11 = dot_product(v1, v1)
+        d20 = dot_product(v2, v0)
+        d21 = dot_product(v2, v1)
+        inv_denom = 1 / (d00 * d11 - d01 * d01)
+        u = (d11 * (point[0] - v0[0]) - d01 * (point[1] - v0[1])) * inv_denom
+        v = (d00 * (point[1] - v0[1]) - d01 * (point[0] - v0[0])) * inv_denom
+        return (u >= 0) and (v >= 0) and (u + v <= 1)
+
+    # def get_triangle_vertices(triangle):
+    #     # Get the vertices of a triangle using their indices
+    #     return [triangles_points[vertex] for vertex in triangle]
+
+    def triangle_covers(triangle1, triangle2):
+        triangle1_vertices = [triangles_points[vertex] for vertex in triangle1] #get_triangle_vertices(triangle1)
+        triangle2_vertices = [triangles_points[vertex] for vertex in triangle2] #get_triangle_vertices(triangle2)
+
+        if is_clockwise(triangle1_vertices) or not is_front_facing(triangle1_vertices, viewer_pos):
+            # Triangle1 is facing away from the viewer, it cannot visually cover triangle2
+            return False
+
+        for vertex in triangle2_vertices:
+            if is_inside_triangle(vertex, triangle1_vertices):
+                # One of the vertices of triangle2 is inside triangle1, triangle1 visually covers triangle2
+                return True
+        return False
+
+    def check_adjacent_triangles(triangle1, triangle2):
+        common_vertices = set(triangle1) & set(triangle2)
+        if len(common_vertices) == 2:
+            if triangle_covers(triangle1, triangle2):
+                return -1
+            else:
+                return 1
+        return 0
+
+    sorted_triangles = sorted(triangles, key=calculate_distance, reverse=True)
+
+    for i, triangle1 in enumerate(sorted_triangles):
+        for j in range(i+1, len(sorted_triangles)):
+            triangle2 = sorted_triangles[j]
+
+            result = check_adjacent_triangles(triangle1, triangle2)
+            if result == -1:
+                sorted_triangles[i], sorted_triangles[j] = sorted_triangles[j], sorted_triangles[i]
+                break
+            elif result == 1:
+                break
 
     return sorted_triangles
+
 
 def morph(c_obj, r_obj):
     cam_image, cam_points, ref_points = c_obj.image, c_obj.pix_points, r_obj['pix_points']
@@ -125,22 +188,21 @@ def morph(c_obj, r_obj):
     ref_smoothed, noise = find_noise_scratches(ref_image)
 
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
-               r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
+            r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
     c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
-               c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
+            c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
 
     cam_cc = matching_color(r_roi, c_roi)
 
-
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
-               c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
+    c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris2  # triangles
 
-    new_dt = sort_triangles_by_distance(dt, (0, 0, -20), c_obj.points)
-    tris1 = [[cam_points[new_dt[i][j]] for j in range(3)]for i in range(len(new_dt))]
-    tris2 = [[ref_points[new_dt[i][j]] for j in range(3)]for i in range(len(new_dt))]
+    new_dt = sort_triangles_by_distance(dt, (0, 0, -5), c_obj.points)
+    tris1 = [[cam_points[new_dt[i][j]] for j in range(3)] for i in range(len(new_dt))]
+    tris2 = [[ref_points[new_dt[i][j]] for j in range(3)] for i in range(len(new_dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
 
@@ -166,9 +228,19 @@ def morph(c_obj, r_obj):
     return output
 
 
+# ------------------ UTILS ------------------
+def distance(point1, point2):
+    return math.sqrt((point2[0] - point1[0]) ** 2 + (point2[1] - point1[1]) ** 2 + (point2[2] - point1[2]) ** 2)
+
+
+def dot_product(v1, v2):
+    # Compute the dot product of two vectors
+    return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2]
+
+
 def readb64(base64_string):
     idx = base64_string.find('base64,')
-    base64_string = base64_string[idx+7:]
+    base64_string = base64_string[idx + 7:]
 
     sbuf = io.BytesIO()
 
@@ -188,6 +260,7 @@ def round_num(value):
 app = Flask(__name__)
 
 
+# ------------------ ROUTES ------------------
 @app.route('/INIT_PAINTINGS', methods=['POST'])
 def init():
     # POST request
@@ -197,10 +270,7 @@ def init():
         data = request.get_json()
         ref_dict = []
         for idx, file in enumerate(data):
-
-            path_on_server = os.path.join(ROOT_DIR, file)
-
-            ref_img = cv2.imread(path_on_server)
+            ref_img = cv2.imread(os.path.join(ROOT_DIR, file))
             p_face = F_obj.Face('ref')
             p_face.get_landmarks(ref_img)
             face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
@@ -211,13 +281,14 @@ def init():
                                 'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
                                 'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
                                            p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]}}
-
             ref_dict.append(face_dict)
+        print('REFERENCES INIT DONE')
         return jsonify(ref_dict), 200
 
     else:
         message = {'greeting': 'Hello from Face-Fit Flask server!'}
         return jsonify(message)
+
 
 @app.route('/DATAtoPY', methods=['POST'])
 def sendData():
@@ -238,21 +309,18 @@ def sendData():
         # Select Reference Image Face Object
         head, file_name = os.path.split(r_obj['src'])
         r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)
-        #Morph the faces
+        # Morph the faces
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
         morphed_file_name = 'morph_' + numb + '.png'
-
-        path = os.path.join(ROOT_DIR, 'temp', user, 'morphs', morphed_file_name)  # path_to["morphs"] + 'morph_' + numb + '.png'
-
+        path = os.path.join(ROOT_DIR, 'temp', user, 'morphs', morphed_file_name)
         write = cv2.imwrite(path, output)
         if write:
             return path, 200
-
     # GET request
     else:
         message = {'greeting': 'Hello from Flask!'}
-        return jsonify(message)  # serialize and use JSON headers
+        return jsonify(message)
 
 
 if __name__ == "__main__":

@@ -125,6 +125,18 @@
 .slick-arrow.slick-hidden {
     display: none;
 }
+.slick-prev, .slick-next{
+    opacity: 1;
+    padding: 0 5px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+.slick-prev.slick-disabled,
+.slick-next.slick-disabled {
+  opacity: 0.1;
+  cursor: not-allowed;
+}
 /*.asnav2Class .slick-slide {*/
 /*  flex: 0 0 auto; !* Remove the fixed width *!*/
 /*  width: 100%; !* Occupy the full width of the slide *!*/

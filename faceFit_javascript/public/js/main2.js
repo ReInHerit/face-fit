@@ -67,8 +67,8 @@ function init_slicks(window_aspect_ratio) {
     const isVertical = window_aspect_ratio === 'vertical'
     console.log('init_slicks', isVertical, window_aspect_ratio)
     let arrows = isVertical ? ['left', 'right'] : ['up', 'down'];
-    const prev_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
-    const next_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
+    const prev_string = `<button type="button" class="slick-prev"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
+    const next_string = `<button type="button" class="slick-next"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
     const slides_and_width = calculateSlideWidthAndCount(isVertical);
     let slides = slides_and_width[0];
     let value = slides_and_width[1];
@@ -80,7 +80,7 @@ function init_slicks(window_aspect_ratio) {
             if (!isVertical) {
                 slider.find('.button-image img').css('max-height', (value - 5) + 'px');
             }
-    }).slick({
+        }).slick({
             infinite: false,
             autoplay: false,
             slidesToShow: slides,
@@ -91,6 +91,41 @@ function init_slicks(window_aspect_ratio) {
             asNavFor: `.asnav${index + 1}Class`,
             prevArrow: prev_string,
             nextArrow: next_string
+        });
+
+        slider.on('beforeChange', function (event, slick, currentSlide, nextSlide) {
+            let prev_arrows = [];
+            let next_arrows = [];
+            sliders.forEach((slider, index) => {
+                var $prevArrow = $(slick.$prevArrow);
+                var $nextArrow = $(slick.$nextArrow);
+                prev_arrows.push($prevArrow);
+                next_arrows.push($nextArrow);
+            });
+
+            // Disable the previous arrow when reaching the start of the slider
+            if (nextSlide === 0) {
+                prev_arrows.forEach((arrow) => {
+                    arrow.addClass('disabled');
+                })
+            } else {
+                prev_arrows.forEach((arrow) => {
+                    arrow.removeClass('disabled');
+                })
+            }
+
+            // Disable the next arrow when reaching the end of the slider
+            if (nextSlide === slick.slideCount - 1) {
+                next_arrows.forEach((arrow) => {
+                    arrow.addClass('disabled');
+                })
+                // $nextArrow.addClass('disabled');
+            } else {
+                next_arrows.forEach((arrow) => {
+                    arrow.removeClass('disabled');
+                })
+                // $nextArrow.removeClass('disabled');
+            }
         });
     });
 
@@ -115,7 +150,8 @@ function updateSlider() {
         rows = '70% 15% 15%';
 
         container_center.style.width = container_center.style.maxHeight = Math.round(height * 0.7 - hints.offsetHeight - 40) + 'px';
-        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height * 0.2); + 'px';
+        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height * 0.2);
+        +'px';
         container_right.style.flexDirection = container_left.style.flexDirection = 'row';
         canvas.style.maxHeight = hints.style.maxWidth = container_center.style.maxHeight;
 
@@ -140,8 +176,8 @@ function updateSlider() {
     container.style.gridTemplateRows = rows;
     container_center.style.maxWidth = Math.round(width - 20) + 'px';
 
-    const prev_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
-    const next_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
+    const prev_string = `<button type="button" class="slick-prev"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
+    const next_string = `<button type="button" class="slick-next"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
 
     [leftSlick, rightSlick].forEach((slider) => {
         slider.slick('slickSetOption', {
@@ -153,9 +189,10 @@ function updateSlider() {
         });
 
         slider.find('.button-image img').css('width', (value - 5) + 'px');
-            if (!isVertical) {
-                slider.find('.button-image img').css('max-height', (value - 5) + 'px');
-            };
+        if (!isVertical) {
+            slider.find('.button-image img').css('max-height', (value - 5) + 'px');
+        }
+        ;
         slider.slick('refresh');
     });
 }
@@ -168,7 +205,9 @@ function calculateSlideWidthAndCount(vertical) {
 
     let value = vertical ? Math.floor(height * 0.15) - 5 : Math.floor(width * 0.2) - 5;
     console.log('c', vertical, value, width, height)
-    if (value> 150){value = 150}
+    if (value > 150) {
+        value = 150
+    }
     if (vertical) {
         const slidesMaxWidth = width - arrow_clutter * 2 - 10;
         slides = Math.floor(slidesMaxWidth / value);
@@ -670,7 +709,7 @@ function draw_mask_on_ref() {
 
     // Flip mask horizontally and convert to RGB and RGBA formats
     cv.flip(ghost_mask, ghost_mask, 1)
-    cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_GRAY2RGBA , 0)
+    cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_GRAY2RGBA, 0)
 
     // Apply ghost mask over reference image
     cv.resize(ref_roi, ref_roi, cameraROISize, 0, 0, cv.INTER_LINEAR);

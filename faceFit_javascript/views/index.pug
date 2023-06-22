@@ -10,8 +10,8 @@ block layout-content
               button#send-email-button Send Email
         #ref_btns.asnav2Class
             each file in data
-                .select_ch
-                    button.ref_btn
+                div.select_ch
+                    button.ref_btn.button-image
                         img.img_ref(src=file, crossorigin="anonymous")
 
         #main_view.camView
@@ -19,11 +19,11 @@ block layout-content
                 label#hints_title HINTS
                 table(style='width:100%')
                     tr
-                        td(style='width:15%') Jaw
+                        td(style='width:15%') Pitch
                         td(style='width:85%')
                             #pb_x
                     tr
-                        td Pitch
+                        td Jaw
                         td
                             #pb_y
                     tr
@@ -36,8 +36,8 @@ block layout-content
         canvas#cam_canvas(width="1280" height="960")
         #morph_btns.asnav1Class
             each n in data
-                .show_morph
-                    button.morph_btn
+                div.show_morph
+                    button.morph_btn.button-image
                         img.img_morph(src='images/Thumbs/morph_thumb.jpg')
 
 

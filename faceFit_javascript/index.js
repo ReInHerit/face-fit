@@ -160,7 +160,7 @@ app.post('/init', function(req, res){ //chiedi il body da main e invialo a pytho
         res.send({'body': body});
         });
 })
-app.post('/info', function(req, res, next){
+app.post('/morph', function(req, res, next){
     const objs = req.body
     console.log('info user_id: ', userId)
     request.post(`http://${host}:8050/DATAtoPY`,{json: {objs:objs, user_id: userId}}, async function (error, response, body) {

@@ -111,7 +111,7 @@ def add_dark_pixels(bgr_img, l_channel):
     normalized_l = l_channel / 255.0
 
     # Set the threshold value to determine dark pixels
-    threshold = 0.02  # Adjust the threshold value as needed
+    threshold = 0.01  # Adjust the threshold value as needed
 
     # Create a mask for dark pixels based on the threshold
     dark_pixel_mask = normalized_l >= threshold
@@ -129,9 +129,7 @@ def remove_shadows(img):
     print('in remove shadows')
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                   cv2.THRESH_BINARY_INV, 11, 1)
-    print(thresh.shape, thresh.dtype)
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 1)
     kernel = np.ones((3, 3), np.uint8)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=4)
     print('finding contours')

@@ -1,10 +1,11 @@
 :root {
     --black: #000000;
-    --white: #FFFFFF
+    --white: #FFFFFF;
+    --min-width: 50px; /* Minimum width value */
 }
 
 header {
-    width: 100%;
+    width: 100vw;
 }
 
 h1 {
@@ -12,12 +13,13 @@ h1 {
     text-align: center;
     color: var(--white);
     border-bottom: 2px solid var(--white);
-    padding: 10px;
+    padding: 1vh;
+    font-size: 5vh;
     z-index: 0;
 }
 #popup-button, #reset-button {
     position: absolute;
-    width: 50px;
+    width: min(12vw, var(--min-width));
     left: calc(100vw - 30px);
     top: 30px;
     border-color: transparent;
@@ -25,12 +27,13 @@ h1 {
     z-index: 8;
 }
 #popup-button {
-    left: calc(100vw - 80px);
-    transform: translate(-50%, 0px);
+    left: calc(100vw - 100px);
+    top: 4vh;
+    width: min(12vw, var(--min-width));
 }
 #reset-button {
-    left: calc(100vw - 30px);
-    transform: translate(-50%, 0px);
+    left: calc(100vw - 50px);
+    /*transform: translate(-50%, 0px);*/
 }
 #send_logo, #reset_logo {
     width: 100%;
@@ -56,6 +59,7 @@ h1 {
   }
 
 body, html {
+    overflow: hidden;
     margin: 0;
     padding: 0;
     background-color: var(--black);
@@ -63,14 +67,14 @@ body, html {
 }
 
 .container {
-    width: calc(100% - 10px);
+    width: calc(100vw - 10px);
     height: 100vh;
     min-width: 300px;
     max-height: calc(100vh - 60px);
     margin: auto;
     display: grid;
     align-items: stretch;
-    grid-template-columns: 20% 30% 30% 20%;
+    grid-template-columns: 20vw 30vw 30vw 20vw;
     grid-template-rows: 40% 40% 20%;
     grid-template-areas:
         "ref_btns main_view main_view morph_btns"
@@ -101,7 +105,7 @@ body, html {
     z-index: 1;
 }
 .ref_btn, .morph_btn{
-    padding: 0 1px;
+    padding: 0 5px;
     border: 0;
     background: transparent;
     cursor: pointer;

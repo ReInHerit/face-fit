@@ -17,6 +17,14 @@ import io
 import Face_Maker as F_obj
 from math import floor, ceil
 from match_color import matching_color, find_noise_scratches
+import mediapipe as mp
+
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+
+
+BG_COLOR = (0, 0, 0)
+MASK_COLOR = (255, 255, 255)
 
 ref = []
 ref_dict = []
@@ -34,6 +42,43 @@ triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
 with open(triangulation2_json_path, 'r') as f:
     media_pipes_tris2 = load_json(f)
 
+# Create the options that will be used for ImageSegmenter
+BaseOptions = mp.tasks.BaseOptions
+ImageSegmenter = mp.tasks.vision.ImageSegmenter
+ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
+
+model_path = '../models/hair_segmenter.tflite'
+base_options = BaseOptions(model_asset_path=model_path)
+options = ImageSegmenterOptions(
+    base_options=BaseOptions(model_asset_path=model_path),
+    running_mode=VisionRunningMode.IMAGE, output_category_mask=True)
+
+def get_hair_mask(images):
+    masks = []
+    with ImageSegmenter.create_from_options(options) as segmenter:
+        print('Segmenter created')
+        for file in images:
+            rgb_image = cv2.cvtColor(file, cv2.COLOR_BGR2RGB)
+            image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+
+            # Retrieve the masks for the segmented image
+            segmentation_result = segmenter.segment(image)
+            category_mask = segmentation_result.category_mask
+            confidence_masks = segmentation_result.confidence_masks
+            confidence_masks_np = [mask.numpy_view() for mask in confidence_masks]
+            image_data = image.numpy_view()
+            fg_image = np.zeros(image_data.shape, dtype=np.uint8)
+            fg_image[:] = MASK_COLOR
+            bg_image = np.zeros(image_data.shape, dtype=np.uint8)
+            bg_image[:] = BG_COLOR
+            np_mask = np.stack((confidence_masks_np[1],) * 3, axis=-1)
+            condition = np_mask > 0.5
+            refined_mask = np.where(condition, np_mask, bg_image)
+            condition2 = np.stack((category_mask.numpy_view(),) * 3, axis=-1) > 0.2
+            output_image = np.where(condition2, fg_image, bg_image)
+            masks.append(output_image)
+        return masks
 
 def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
@@ -184,18 +229,21 @@ def morph(c_obj, r_obj):
     mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
 
     ref_image = cv2.imread(r_obj['src'])
+    images = [cam_image, ref_image]
 
+    hair_masks = get_hair_mask(images)
     ref_smoothed, noise = find_noise_scratches(ref_image)
-
+    cam_smoothed, noise_cam = find_noise_scratches(cam_image)
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
             r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
-    c_roi = cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
+    c_roi = cam_smoothed[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
             c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
 
     cam_cc = matching_color(r_roi, c_roi)
 
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
     c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
+
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris2  # triangles
@@ -215,7 +263,9 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(concave_mask)  # Find Centroid
-    center = (int(mid3['m10'] / mid3['m00']), int(mid3['m01'] / mid3['m00']))
+
+    brect = cv2.boundingRect(concave_mask)
+    center_of_brect = (int(brect[0] + brect[2] / 2), int(brect[1] + brect[3] / 2))
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255
@@ -223,9 +273,17 @@ def morph(c_obj, r_obj):
     out = (out * 255).astype('uint8')
     out = cv2.add(out, noise)
     out = cv2.add(out, noise)
-    output = cv2.seamlessClone(out, ref_image, ref_face_mask, center, cv2.NORMAL_CLONE)
+    output = cv2.seamlessClone(out, ref_image, ref_face_mask, center_of_brect, cv2.NORMAL_CLONE)
 
-    return output
+    hair_mask_gray = cv2.cvtColor(hair_masks[1], cv2.COLOR_BGR2GRAY)
+    ret, hair_mask_gray = cv2.threshold(hair_mask_gray, 127, 255, cv2.THRESH_BINARY)
+    br = cv2.boundingRect(hair_mask_gray)  # bounding rect (x,y,width,height)
+    centerOfBR = (br[0] + br[2] // 2, br[1] + br[3] // 2)
+    refined_center = (int(ref_image.shape[1] / 2), int(ref_image.shape[0] / 2))
+    print('refined center', refined_center, 'center of br', centerOfBR)
+    refined_output = cv2.seamlessClone(ref_image, output, hair_mask_gray, centerOfBR, cv2.NORMAL_CLONE)
+
+    return refined_output
 
 
 # ------------------ UTILS ------------------

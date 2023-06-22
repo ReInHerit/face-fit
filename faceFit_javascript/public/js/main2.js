@@ -61,120 +61,123 @@ const ghost_mask_array = [right_eye, left_eye, mouth, nose1, nose2, nose3];
 
 /* UI FUNCTIONS*/
 
-function set_slick(orientation, slides, arrows) {
-    let prev_string = '<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_' + arrows[0] + '.png" alt="PREV"></button>';
-    let next_string = '<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_' + arrows[1] + '.png" alt="NEXT"></button>';
 
-    leftSlick.slick('slickSetOption', 'slidesToShow', slides);
-    rightSlick.slick('slickSetOption', 'slidesToShow', slides);
-    leftSlick.slick('slickSetOption', 'vertical', orientation);
-    rightSlick.slick('slickSetOption', 'vertical', orientation);
-    leftSlick.slick('slickSetOption', 'prevArrow', prev_string)
-    leftSlick.slick('slickSetOption', 'nextArrow', next_string)
-    rightSlick.slick('slickSetOption', 'prevArrow', prev_string)
-    rightSlick.slick('slickSetOption', 'nextArrow', next_string)
-    leftSlick.slick('refresh');
-    rightSlick.slick('refresh');
+function init_slicks(window_aspect_ratio) {
+    const sliders = [leftSlick, rightSlick];
+    const isVertical = window_aspect_ratio === 'vertical'
+    console.log('init_slicks', isVertical, window_aspect_ratio)
+    let arrows = isVertical ? ['left', 'right'] : ['up', 'down'];
+    const prev_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
+    const next_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
+    const slides_and_width = calculateSlideWidthAndCount(isVertical);
+    let slides = slides_and_width[0];
+    let value = slides_and_width[1];
+    console.log('init_slicks', slides, value)
+    sliders.forEach((slider, index) => {
+        slider.on('init', function (event, slick) {
+            console.log('init_slicks', index, slick, value)
+            slider.find('.button-image img').css('width', (value - 5) + 'px');
+            if (!isVertical) {
+                slider.find('.button-image img').css('max-height', (value - 5) + 'px');
+            }
+    }).slick({
+            infinite: false,
+            autoplay: false,
+            slidesToShow: slides,
+            slidesToScroll: slides,
+            dots: false,
+            vertical: isVertical,
+            draggable: true,
+            asNavFor: `.asnav${index + 1}Class`,
+            prevArrow: prev_string,
+            nextArrow: next_string
+        });
+    });
+
+    console.log('init_slicks',)
 }
 
-function init_slicks() {
-    if (leftSlick.length) {
-        leftSlick.slick({
-            dots: false,
-            infinite: false,
-            speed: 300,
-            focusOnSelect: false,
-            slidesToShow: 3.5,
-            slidesToScroll: 3,
-            //arrows: false,
-            vertical: true,
-            draggable: true,
-            asNavFor: '.asnav1Class',
-            prevArrow: "<button type='button' class='ref_btn'><img src='/images/Thumbs/arrow_up.png' alt='UP'></button>",
-            nextArrow: "<button type='button' class='ref_btn'><img src='/images/Thumbs/arrow_down.png' alt='DOWN'></button>"
 
-        });
-        rightSlick.slick({
-            dots: false,
-            infinite: false,
-            speed: 300,
-            focusOnSelect: false,
-            slidesToShow: 3.5,
-            slidesToScroll: 3,
-            vertical: true,
-            //        arrows: true,
-            draggable: true,
-            asNavFor: '.asnav2Class',
-            prevArrow: "<button type='button' class='ref_btn'><img src='/images/Thumbs/arrow_up.png' alt='UP'></button>",
-            nextArrow: "<button type='button' class='ref_btn'><img src='/images/Thumbs/arrow_down.png' alt='DOWN'></button>"
-        });
+function updateSlider() {
+    const width = container.offsetWidth;
+    const height = container.offsetHeight;
+    const aspect = width / height;
+    const isVertical = (aspect <= 1);
+    let orientation, areas, arrows, columns, rows;
 
-        // On init
-        $(".select_ch").each(function (index, el) {
-            leftSlick.slick('slickAdd', "<div>" + el.innerHTML + "</div>");
-        });
-        $(".show_morph").each(function (index, el) {
-            rightSlick.slick('slickAdd', "<div>" + el.innerHTML + "</div>");
-        });
-    }
-}
-
-function window_size() {
-    let orientation, arrows, areas, columns, rows, slides;
-    const width = container.offsetWidth
-    const height = container.offsetHeight
-    const aspect = width / height
-
+    const slides_and_width = calculateSlideWidthAndCount(isVertical);
+    let slides = slides_and_width[0];
+    let value = slides_and_width[1];
+    console.log('updateSlider', slides, value)
     if (aspect <= 1) { // VERTICAL
-        slides = (aspect > 0.6) ? 5 : 4
-
         areas = '"main_view main_view main_view main_view" "ref_btns ref_btns ref_btns ref_btns" "morph_btns morph_btns morph_btns morph_btns"';
-        columns = '25% 25% 25% 25%';
+        columns = '25vw 25vw 25vw 25vw';
         rows = '70% 15% 15%';
+
         container_center.style.width = container_center.style.maxHeight = Math.round(height * 0.7 - hints.offsetHeight - 40) + 'px';
-        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height * 0.2) + 'px';
-        container_right.style.flexDirection = container_left.style.flexDirection = 'row'
-        canvas.style.maxHeight = hints.style.maxWidth = container_center.style.maxHeight
+        container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height * 0.2); + 'px';
+        container_right.style.flexDirection = container_left.style.flexDirection = 'row';
+        canvas.style.maxHeight = hints.style.maxWidth = container_center.style.maxHeight;
 
-        btn_imgs.forEach(el => {
-            el.style.height = '100%'
-            el.style.width = 'auto'
-        })
-        arrows = ['left', 'right']
-        orientation = false
+        arrows = ['left', 'right'];
+        orientation = 'vertical';
     } else { // HORIZONTAL
-        slides = (aspect > 1.5) ? ((width > 1000) ? 3 : 4) : 5
-
         areas = '"ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns"';
-        columns = '20% 30% 30% 20%';
+        columns = '20vw 30vw 30vw 20vw';
         rows = '40% 40% 20%';
+
         container_center.style.maxHeight = Math.round(container.offsetHeight - hints.offsetHeight - 40) + 'px';
         container_right.style.maxHeight = container_left.style.maxHeight = Math.round(height) + 'px';
         container_center.style.width = Math.round(container.offsetWidth * 0.6 - 20) + 'px';
         canvas.style.maxHeight = hints.style.maxWidth = (container.offsetHeight - hints.offsetHeight) + 'px';
-        btn_imgs.forEach(el => {
-            el.style.height = '100%'
-            // el.style.maxWidth = calc(btn_imgs[0].offsetHeight * 0.8) + 'px'
-            el.style.width = 'auto'
-        })
-        container_right.style.flexDirection = container_left.style.flexDirection = 'column'
+        container_right.style.flexDirection = container_left.style.flexDirection = 'column';
         arrows = ['up', 'down'];
-        orientation = true
+        orientation = 'horizontal';
     }
 
-    container.style.gridTemplateAreas = areas
+    container.style.gridTemplateAreas = areas;
     container.style.gridTemplateColumns = columns;
     container.style.gridTemplateRows = rows;
+    container_center.style.maxWidth = Math.round(width - 20) + 'px';
 
-    container_center.style.maxWidth = Math.round(container.offsetWidth - 20) + 'px';
-    set_slick(orientation, slides, arrows)
+    const prev_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
+    const next_string = `<button type="button" class="ref_btn"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
+
+    [leftSlick, rightSlick].forEach((slider) => {
+        slider.slick('slickSetOption', {
+            slidesToShow: slides,
+            slidesToScroll: slides,
+            vertical: orientation === 'horizontal',
+            prevArrow: prev_string,
+            nextArrow: next_string
+        });
+
+        slider.find('.button-image img').css('width', (value - 5) + 'px');
+            if (!isVertical) {
+                slider.find('.button-image img').css('max-height', (value - 5) + 'px');
+            };
+        slider.slick('refresh');
+    });
 }
 
-function path_adjusted(url) {
-    if (!/^\w+:/i.test(url)) {
-        url = url.replace(/^(\.?\/?)([\w@])/, "$1js/$2")
+function calculateSlideWidthAndCount(vertical) {
+    const width = container.offsetWidth;
+    const height = container.offsetHeight;
+    const arrow_clutter = 30
+    let slides;
+
+    let value = vertical ? Math.floor(height * 0.15) - 5 : Math.floor(width * 0.2) - 5;
+    console.log('c', vertical, value, width, height)
+    if (value> 150){value = 150}
+    if (vertical) {
+        const slidesMaxWidth = width - arrow_clutter * 2 - 10;
+        slides = Math.floor(slidesMaxWidth / value);
+
+    } else {
+        const slidesMaxHeight = height - arrow_clutter * 2 - 20;
+        slides = Math.floor(slidesMaxHeight / value);
     }
-    return url
+    return [slides, value];
 }
 
 function extract_index(path) {
@@ -208,70 +211,18 @@ function setButtonClick(button, action) {
 }
 
 
-// function onResults() {
-//     /**
-//      * Solution options.
-//      */
-//     const solutionOptions = {
-//         selfieMode: true,
-//         enableFaceGeometry: false,
-//         maxNumFaces: 1,
-//         refineLandmarks: false,
-//         minDetectionConfidence: 0.5,
-//         minTrackingConfidence: 0.5
-//     };
-//     const results = mpFaceMesh.Results
-//
-//     // Draw the overlays.
-//     context.save();
-//     context.clearRect(0, 0, canvas.width, canvas.height);
-//     context.drawImage(
-//         results.image, 0, 0, canvas.width, canvas.height);
-//     if (results.multiFaceLandmarks) {
-//         for (const landmarks of results.multiFaceLandmarks) {
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_TESSELATION,
-//                 {color: '#C0C0C070', lineWidth: 1});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_RIGHT_EYE,
-//                 {color: '#FF3030'});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_RIGHT_EYEBROW,
-//                 {color: '#FF3030'});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_LEFT_EYE,
-//                 {color: '#30FF30'});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_LEFT_EYEBROW,
-//                 {color: '#30FF30'});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_FACE_OVAL,
-//                 {color: '#E0E0E0'});
-//             drawingUtils.drawConnectors(
-//                 context, landmarks, mpFaceMesh.FACEMESH_LIPS, {color: '#E0E0E0'});
-//             if (solutionOptions.refineLandmarks) {
-//                 drawingUtils.drawConnectors(
-//                     context, landmarks, mpFaceMesh.FACEMESH_RIGHT_IRIS,
-//                     {color: '#FF3030'});
-//                 drawingUtils.drawConnectors(
-//                     context, landmarks, mpFaceMesh.FACEMESH_LEFT_IRIS,
-//                     {color: '#30FF30'});
-//             }
-//         }
-//     }
-//     context.restore();
-// }
-
 async function init() {
     console.log("init");
     let all_btns_indices = [];
+    const aspect = container.offsetWidth / container.offsetHeight
+    const main_direction = aspect > 1 ? 'horizontal' : 'vertical'
 
     /* INITIALIZE FACE LANDMARK DETECTOR */
     detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
 
     /* INITIALIZE UI */
-    init_slicks();
-    window_size();
+    init_slicks(main_direction);
+    updateSlider();
     drawOnCanvas(start_view)
     console.log('UI INITIALIZED')
     /* INITIALIZE SEND EMAIL POPUP */
@@ -303,7 +254,6 @@ async function init() {
     sendEmailButton.addEventListener('click', () => {
         // Get the email address from the input field
         const mailToAddress = emailInput.value;
-        // const files = fs.promises.readdir(morphs_path);
         if (mailToAddress.match(validRegex)) {
             fetch("/morphs_to_send", {
                 method: 'POST',
@@ -390,7 +340,6 @@ async function init() {
             }
             url += '/' + face_arr[selected]['src'];
             ref_img.src = url;
-            // drawOnCanvas(ref_img.src)
             ref_img.onload = function () {
                 if (selected !== -1) {
                     morphed = ''
@@ -414,9 +363,11 @@ async function init() {
         })
     }
     console.log('INTERACTION INITIALIZED')
+    accessCamera();
     body.classList.add('loaded')
 }
 
+/* MANAGE BARS FUNCTIONS */
 function reset_bar() {
     [percent_x, percent_y, percent_z].forEach(bar => {
         bar.style.width = bar.innerHTML = '';
@@ -594,18 +545,8 @@ async function getHeadAngles(keypoints, which) {
         horizontalOpposite,
     ]);
     const horizontalCos = horizontalAdjacent / horizontalHypotenuse;
-    let first = Math.acos(verticalCos) * (180 / Math.PI) -10 ;
+    let first = Math.acos(verticalCos) * (180 / Math.PI) - 10;
     let second = Math.acos(horizontalCos) * (180 / Math.PI);
-    // if (which === 'cam') {
-    //     first = Math.round(normalize(first, {
-    //         'actual': {'lower': 55, 'upper': 115},
-    //         'desired': {'lower': 82, 'upper': 95}
-    //     }))
-    //     second = Math.round(normalize(second, {
-    //         'actual': {'lower': 50, 'upper': 120},
-    //         'desired': {'lower': 120, 'upper': 69}
-    //     }))
-    // }
     let pleft = keypoints[133]
     let pright = keypoints[362]
     let third = Math.atan2(pright[1] - pleft[1], pright[0] - pleft[0]) * (180 / Math.PI)
@@ -714,7 +655,6 @@ function draw_mask_on_ref() {
     let cam_roi_gray = new cv.Mat()
     cv.cvtColor(cam_roi, cam_roi_gray, cv.COLOR_RGBA2GRAY, 0)
     cam_roi.delete();
-    //
 
     // Generate convex hull mask
     let convexHullMat = hull_mask()
@@ -730,8 +670,7 @@ function draw_mask_on_ref() {
 
     // Flip mask horizontally and convert to RGB and RGBA formats
     cv.flip(ghost_mask, ghost_mask, 1)
-    cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_GRAY2RGB, 0)
-    cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_RGB2RGBA, 0)
+    cv.cvtColor(ghost_mask, ghost_mask, cv.COLOR_GRAY2RGBA , 0)
 
     // Apply ghost mask over reference image
     cv.resize(ref_roi, ref_roi, cameraROISize, 0, 0, cv.INTER_LINEAR);
@@ -774,7 +713,7 @@ async function match_faces() {
 
         try {
             const [lmrks, points, bb, angles] = await calc_lmrks(video, 'cam');
-            cam_face.lmrks = lmrks;
+            // cam_face.lmrks = lmrks;
             cam_face.points = points;
             cam_face.bb = bb;
             cam_face.angles = angles;
@@ -786,14 +725,12 @@ async function match_faces() {
             await check_and_swap(cam_face.angles, face_arr[selected].angles);
         } catch (error) {
             console.error(error);
-            // handle the error here, e.g. display an error message to the user
         }
     }
 }
 
 async function check_and_swap(angles_cam, angles_ref) {
     const delta = 5;
-    // console.log('angles_cam', angles_cam, 'angles_ref', angles_ref)
     const [angle1_cam, angle2_cam, angle3_cam] = angles_cam;
     const [angle1_ref, angle2_ref, angle3_ref] = angles_ref;
     if (
@@ -825,7 +762,7 @@ async function check_and_swap(angles_cam, angles_ref) {
                 const data_json = JSON.stringify(objs);
 
                 // Send data to server
-                const res = await fetch('/info', {
+                const res = await fetch('/morph', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
                     body: data_json,
@@ -885,7 +822,7 @@ function check_expression(landmarks) {
 }
 
 function resize_all() {
-    window_size()
+    updateSlider()
     ref_img.src = ref_img.src
     if (selected >= 0) {
         draw_mask_on_ref()
@@ -911,10 +848,10 @@ function accessCamera() {
 function opencvIsReady() {
     console.log('OPENCV.JS READY')
     init().then(r => console.log('ALL IS INITIALIZED'));
-    accessCamera();
 }
 
-window.addEventListener('resize', resize_all, false);
+window.addEventListener('resize', resize_all);
+window.addEventListener('orientationchange', resize_all);
 
 window.addEventListener('beforeunload', function (event) {
     const confirmationMessage = 'Are you sure you want to delete the folder?';

@@ -86,10 +86,10 @@
 {
     float: right;
 }
-.slick-slide img
-{
-    display: block;
-}
+/*.slick-slide img*/
+/*{*/
+/*    display: block;*/
+/*}*/
 .slick-slide.slick-loading img
 {
     display: none;
@@ -98,9 +98,10 @@
 {
     pointer-events: auto;
 }
-.slick-initialized .slick-slide
-{
-    display: block;
+.slick-initialized .slick-slide {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 .slick-loading .slick-slide
 {
@@ -108,7 +109,7 @@
 }
 .slick-vertical .slick-slide
 {
-    display: block;
+    /*display: block;*/
     height: auto;
 }
 .slick-vertical .slick-arrow, .slick-vertical .slick-slide{
@@ -124,3 +125,17 @@
 .slick-arrow.slick-hidden {
     display: none;
 }
+/*.asnav2Class .slick-slide {*/
+/*  flex: 0 0 auto; !* Remove the fixed width *!*/
+/*  width: 100%; !* Occupy the full width of the slide *!*/
+/*}*/
+
+/*.asnav2Class .slick-slide .button-image {*/
+/*  width: 100%;*/
+/*  height: auto;*/
+/*}*/
+
+/*.asnav2Class .slick-slide .button-image img {*/
+/*  width: 100%;*/
+/*  height: auto;*/
+/*}*/

@@ -47,8 +47,9 @@ BaseOptions = mp.tasks.BaseOptions
 ImageSegmenter = mp.tasks.vision.ImageSegmenter
 ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
+model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'hair_segmenter.tflite'))
 
-model_path = '../models/hair_segmenter.tflite'
+# model_path = '../models/hair_segmenter.tflite'
 base_options = BaseOptions(model_asset_path=model_path)
 options = ImageSegmenterOptions(
     base_options=BaseOptions(model_asset_path=model_path),

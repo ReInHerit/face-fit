@@ -1,5 +1,5 @@
 # Base image for the Python server
-FROM nikolaik/python-nodejs:python3.11-nodejs19
+FROM nikolaik/python-nodejs:python3.10-nodejs20
 
 # Create a working directory
 WORKDIR /app

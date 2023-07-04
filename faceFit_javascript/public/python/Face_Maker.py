@@ -1,11 +1,9 @@
-
-from math import degrees, atan2
+import os
 import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe import solutions
-from mediapipe.framework.formats import landmark_pb2
 import numpy as np
 
 # Mediapipe
@@ -21,7 +19,7 @@ CONTOURS = mp_face_mesh.FACEMESH_CONTOURS
 TESSELATION = mp_face_mesh.FACEMESH_TESSELATION
 
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
-model_path = '../models/face_landmarker.task'
+model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'face_landmarker.task'))
 base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.FaceLandmarkerOptions(base_options=base_options,
                                        output_face_blendshapes=True,

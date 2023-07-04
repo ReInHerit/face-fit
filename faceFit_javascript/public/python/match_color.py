@@ -1,4 +1,4 @@
-# COLOR CORRECTION functions
+
 import cv2
 import numpy as np
 from color_matcher import ColorMatcher

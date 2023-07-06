@@ -1,8 +1,8 @@
-
 import cv2
 import numpy as np
 from color_matcher import ColorMatcher
 from color_matcher.normalizer import Normalizer
+
 new_float_type = {
     # preserved types
     np.float32().dtype.char: np.float32,
@@ -35,38 +35,25 @@ def view_images_together(images):
     for i, image in enumerate(images):
         cv2.imshow(f'image{i}', image)
     cv2.waitKey(0)
-    # cv2.destroyAllWindows()
 
 
 def hls_channels(image):
-    h, l, s = cv2.split(cv2.cvtColor(image, cv2.COLOR_BGR2HLS))
+    hls_image = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
+    h, l, s = cv2.split(hls_image)
     return h, l, s
 
 
 def hls_to_bgr(h_channel, s_channel, l_channel):
-    return cv2.cvtColor(cv2.merge((h_channel, s_channel, l_channel)), cv2.COLOR_HLS2BGR)
+    hls_image = cv2.merge((h_channel, l_channel, s_channel))
+    bgr_image = cv2.cvtColor(hls_image, cv2.COLOR_HLS2BGR)
+    return bgr_image
 
 
 def preprocess_image(image):
-    # Check if the image dtype is not uint8
-    if image.dtype != np.uint8:
-        scaled_img = cv2.convertScaleAbs(image, alpha=(255.0 / image.max()))
+    if image.dtype == np.uint8:
+        return image
 
-        image = np.uint8(scaled_img)
-
-    # Check the number of channels in the image
-    if image.shape[2] == 3:
-        # Image is either BGR or RGB
-        # Check if the first channel is Red (indicating RGB)
-        if image[:, :, 2].mean() > image[:, :, 0].mean():
-            print("Image is in RGB color format")
-        else:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            print("Image is in BGR color format")
-    else:
-        print("Image does not have 3 channels, cannot determine color format")
-
-    return image
+    return np.uint8(image * (255.0 / image.max()))
 
 
 def find_noise_scratches(img):  # De-noising
@@ -79,11 +66,17 @@ def outliner(image):
     result_planes = []
     result_norm_planes = []
     rgb_planes = cv2.split(image)
+    kernel = np.ones((7, 7), np.uint8)
     for plane in rgb_planes:
         bg_img = None  # Define bg_img with a default value
         try:
-            dilated_img = cv2.dilate(plane, np.ones((7, 7), np.uint8))
+            dilated_img = cv2.dilate(plane, kernel)
             bg_img = cv2.medianBlur(dilated_img, 21)
+            if bg_img is not None:
+                diff_img = 255 - cv2.absdiff(plane, bg_img)
+                norm_img = cv2.normalize(diff_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+                result_planes.append(diff_img)
+                result_norm_planes.append(norm_img)
             # Perform further processing with bg_img if needed
         except Exception as e:
             print("Error occurred during processing:", e)
@@ -92,11 +85,7 @@ def outliner(image):
             print("Plane data type:", plane.dtype)
 
         # Check if bg_img is assigned before calculating diff_img and norm_img
-        if bg_img is not None:
-            diff_img = 255 - cv2.absdiff(plane, bg_img)
-            norm_img = cv2.normalize(diff_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-            result_planes.append(diff_img)
-            result_norm_planes.append(norm_img)
+
 
     result = cv2.merge(result_planes)
     result_norm = cv2.merge(result_norm_planes)
@@ -117,12 +106,12 @@ def add_dark_pixels(bgr_img, l_channel):
     dark_pixel_mask = normalized_l >= threshold
 
     # Multiply the BGR image with the dark pixel mask to darken dark pixels
-    bgr_img_darkened = bgr_img * dark_pixel_mask[..., np.newaxis]
+    bgr_img_darkened = bgr_img * dark_pixel_mask[:, :, np.newaxis]
 
-    # Convert the output image to uint8 and clip it to the valid range
-    output_img = np.clip(bgr_img_darkened, 0, 255).astype(np.uint8)
+    # Clip the output image to the valid range of 0-255
+    np.clip(bgr_img_darkened, 0, 255, out=bgr_img_darkened)
 
-    return output_img
+    return bgr_img_darkened.astype(np.uint8)
 
 
 def remove_shadows(img):
@@ -133,8 +122,7 @@ def remove_shadows(img):
     kernel = np.ones((3, 3), np.uint8)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=4)
     print('finding contours')
-    contours, hierarchy = cv2.findContours(closing.copy(), cv2.RETR_EXTERNAL,
-                                           cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(closing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
         if h < 50 or w < 50:
@@ -154,25 +142,23 @@ def match_cumulative_cdf(source, template):
     function of the template.
     """
     if source.dtype.kind == 'u':
-        src_lookup = source.reshape(-1)
-        src_counts = np.bincount(src_lookup)
-        tmpl_counts = np.bincount(template.reshape(-1))
+        src_counts = np.bincount(source.ravel(), minlength=256)
+        tmpl_counts = np.bincount(template.ravel(), minlength=256)
 
         # omit values where the count was 0
         tmpl_values = np.nonzero(tmpl_counts)[0]
         tmpl_counts = tmpl_counts[tmpl_values]
     else:
-        src_values, src_lookup, src_counts = np.unique(source.reshape(-1),
-                                                       return_inverse=True,
-                                                       return_counts=True)
-        tmpl_values, tmpl_counts = np.unique(template.reshape(-1),
-                                             return_counts=True)
+        src_values, src_counts = np.unique(source.ravel(), return_counts=True)
+        tmpl_values, tmpl_counts = np.unique(template.ravel(), return_counts=True)
+
     # calculate normalized quantiles for each array
     src_quantiles = np.cumsum(src_counts) / source.size
     tmpl_quantiles = np.cumsum(tmpl_counts) / template.size
 
     interp_a_values = np.interp(src_quantiles, tmpl_quantiles, tmpl_values)
-    return interp_a_values[src_lookup].reshape(source.shape)
+    return interp_a_values[source].reshape(source.shape)
+
 
 
 def supported_float_type(input_dtype, allow_complex=False):
@@ -224,12 +210,10 @@ def match_histograms(image, reference, *, channel_axis=None):
             raise ValueError('Number of channels in the input image and '
                              'reference image must match!')
 
-        matched = np.empty(image.shape, dtype=image.dtype)
+        matched = np.empty_like(image)
         for channel in range(image.shape[-1]):
-            matched_channel = match_cumulative_cdf(image[..., channel], reference[..., channel])
-            matched[..., channel] = matched_channel
+            matched[..., channel] = match_cumulative_cdf(image[..., channel], reference[..., channel])
     else:
-        # match_cumulative_cdf will always return float64 due to np.interp
         matched = match_cumulative_cdf(image, reference)
 
     if matched.dtype.kind == 'f':
@@ -239,18 +223,17 @@ def match_histograms(image, reference, *, channel_axis=None):
     return matched
 
 
+
 def matching_color(img_ref, img_src):
-    print('matching color', img_ref.shape, img_src.shape, img_ref.dtype, img_src.dtype)
     img_src = remove_shadows(img_src)
-    print('img_src', img_src.shape, img_src.dtype)
     img_src = preprocess_image(img_src)
     img_ref = preprocess_image(img_ref)
-    outline = outliner(img_src)[1]
-    outline_l = cv2.split(cv2.cvtColor(outline, cv2.COLOR_BGR2LAB))[0]
+
+    outline_l = outliner(img_src)[1][:, :, 0]
     cm = ColorMatcher()
     img_out = cm.transfer(src=img_src, ref=img_ref, method='mkl')
     img_out = Normalizer(img_out).uint8_norm()
-    print('img_out', img_out.shape, img_out.dtype)
+
     cc = match_histograms(img_out, img_ref)
     cc = add_dark_pixels(cc, outline_l)
 

@@ -21,14 +21,14 @@ h1 {
     position: absolute;
     width: min(12vw, var(--min-width));
     left: calc(100vw - 30px);
-    top: 30px;
+    top: 4vh;
     border-color: transparent;
     background-color: transparent;
     z-index: 8;
 }
 #popup-button {
     left: calc(100vw - 100px);
-    top: 4vh;
+
     width: min(12vw, var(--min-width));
 }
 #reset-button {

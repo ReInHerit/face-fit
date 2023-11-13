@@ -1,27 +1,24 @@
-import math
-import time
-import sys
-import cv2
-from json import load as load_json, dumps, JSONEncoder
 import base64
+import io
+import math
 import os
-import numpy as np
-from shapely.geometry import MultiLineString
-from shapely.ops import unary_union, polygonize
-from scipy.spatial import Delaunay
 from collections import Counter
 from itertools import combinations
-from flask import Flask, jsonify, request
-from PIL import Image
-import io
-import Face_Maker as F_obj
+from json import load as load_json
 from math import floor, ceil
-from match_color import matching_color, find_noise_scratches
+
+import cv2
 import mediapipe as mp
-
+import numpy as np
+from PIL import Image
+from flask import Flask, jsonify, request
 from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
+from scipy.spatial import Delaunay
+from shapely.geometry import MultiLineString
+from shapely.ops import unary_union, polygonize
 
+import Face_Maker as F_obj
+from match_color import matching_color, find_noise_scratches
 
 BG_COLOR = (0, 0, 0)
 MASK_COLOR = (255, 255, 255)
@@ -36,7 +33,6 @@ else:
 
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
-# triangulation_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
 triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
 
 with open(triangulation2_json_path, 'r') as f:
@@ -49,11 +45,11 @@ ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'hair_segmenter.tflite'))
 
-# model_path = '../models/hair_segmenter.tflite'
 base_options = BaseOptions(model_asset_path=model_path)
 options = ImageSegmenterOptions(
     base_options=BaseOptions(model_asset_path=model_path),
     running_mode=VisionRunningMode.IMAGE, output_category_mask=True)
+
 
 def get_hair_mask(images):
     masks = []
@@ -66,20 +62,21 @@ def get_hair_mask(images):
             # Retrieve the masks for the segmented image
             segmentation_result = segmenter.segment(image)
             category_mask = segmentation_result.category_mask
-            confidence_masks = segmentation_result.confidence_masks
-            confidence_masks_np = [mask.numpy_view() for mask in confidence_masks]
             image_data = image.numpy_view()
             fg_image = np.zeros(image_data.shape, dtype=np.uint8)
             fg_image[:] = MASK_COLOR
             bg_image = np.zeros(image_data.shape, dtype=np.uint8)
             bg_image[:] = BG_COLOR
-            np_mask = np.stack((confidence_masks_np[1],) * 3, axis=-1)
-            condition = np_mask > 0.5
-            refined_mask = np.where(condition, np_mask, bg_image)
+            # confidence_masks = segmentation_result.confidence_masks
+            # confidence_masks_np = [mask.numpy_view() for mask in confidence_masks]
+            # np_mask = np.stack((confidence_masks_np[1],) * 3, axis=-1)
+            # condition = np_mask > 0.5
+            # refined_mask = np.where(condition, np_mask, bg_image)
             condition2 = np.stack((category_mask.numpy_view(),) * 3, axis=-1) > 0.2
             output_image = np.where(condition2, fg_image, bg_image)
             masks.append(output_image)
         return masks
+
 
 def get_concave_hull(points_list):  # points_list is a 2D numpy array
     # removed the Qbb option from the scipy defaults, it is much faster and equally precise without it.
@@ -182,13 +179,9 @@ def sort_triangles_by_distance(triangles, viewer_pos, triangles_points):
         v = (d00 * (point[1] - v0[1]) - d01 * (point[0] - v0[0])) * inv_denom
         return (u >= 0) and (v >= 0) and (u + v <= 1)
 
-    # def get_triangle_vertices(triangle):
-    #     # Get the vertices of a triangle using their indices
-    #     return [triangles_points[vertex] for vertex in triangle]
-
     def triangle_covers(triangle1, triangle2):
-        triangle1_vertices = [triangles_points[vertex] for vertex in triangle1] #get_triangle_vertices(triangle1)
-        triangle2_vertices = [triangles_points[vertex] for vertex in triangle2] #get_triangle_vertices(triangle2)
+        triangle1_vertices = [triangles_points[vertex] for vertex in triangle1]
+        triangle2_vertices = [triangles_points[vertex] for vertex in triangle2]
 
         if is_clockwise(triangle1_vertices) or not is_front_facing(triangle1_vertices, viewer_pos):
             # Triangle1 is facing away from the viewer, it cannot visually cover triangle2
@@ -320,58 +313,103 @@ app = Flask(__name__)
 
 
 # ------------------ ROUTES ------------------
+# @app.route('/INIT_PAINTINGS', methods=['POST'])
+# def init():
+#     # POST request
+#     if request.method == 'POST':
+#         global ref_dict
+#         print('INIT Incoming..')
+#         data = request.get_json()
+#         ref_dict = []
+#         for idx, file in enumerate(data):
+#             ref_img = cv2.imread(os.path.join(ROOT_DIR, file))
+#             p_face = F_obj.Face('ref')
+#             p_face.get_landmarks(ref_img)
+#             face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
+#                          'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
+#                          'pix_points': p_face.pix_points,
+#                          'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
+#                          'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
+#                                 'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
+#                                 'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
+#                                            p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]}}
+#             ref_dict.append(face_dict)
+#         print('REFERENCES INIT DONE')
+#         return jsonify(ref_dict), 200
+#
+#     else:
+#         message = {'greeting': 'Hello from Face-Fit Flask server!'}
+#         return jsonify(message)
+
 @app.route('/INIT_PAINTINGS', methods=['POST'])
 def init():
-    # POST request
-    if request.method == 'POST':
-        global ref_dict
-        print('INIT Incoming..')
-        data = request.get_json()
+    global ref_dict
+    print('INIT Incoming..')
+    data = request.get_json()
+
+    try:
+        # Release any existing resources before reinitializing
+        # for face_dict in ref_dict:
+        #     img = face_dict['img']
+        #     if img is not None:
+        #         img.release()
+
         ref_dict = []
         for idx, file in enumerate(data):
             ref_img = cv2.imread(os.path.join(ROOT_DIR, file))
             p_face = F_obj.Face('ref')
             p_face.get_landmarks(ref_img)
-            face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
-                         'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
-                         'pix_points': p_face.pix_points,
-                         'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
-                         'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
-                                'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
-                                'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
-                                           p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]}}
+            face_dict = {
+                 'which': p_face.which,
+                 'id': idx,
+                 'src': file,
+                 'points': p_face.points,
+                 'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
+                 'pix_points': p_face.pix_points,
+                 'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
+                 'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
+                        'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
+                        'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
+                                   p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]},
+                 # 'img': ref_img
+                 }
             ref_dict.append(face_dict)
         print('REFERENCES INIT DONE')
+        # print(ref_dict)
         return jsonify(ref_dict), 200
 
-    else:
-        message = {'greeting': 'Hello from Face-Fit Flask server!'}
-        return jsonify(message)
-
+    except Exception as e:
+        # Handle any exceptions that may occur during resource initialization
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/DATAtoPY', methods=['POST'])
 def sendData():
     # POST request
+    print('Incoming..')
     if request.method == 'POST':
-        print('Incoming..')
+        print('POST Incoming..')
         data = request.get_json()
         data_img = data['objs']
         user = data['user_id']
         c_image = readb64(data_img["c_face"])
         selected = data_img["selected"]
-
+        print(len(ref_dict), selected)
         r_obj = ref_dict[selected]
         c_image = cv2.flip(c_image, 1)
         # Create Frame Face Object
+        print('Creating Face Object..')
         c_obj = F_obj.Face('cam')
         c_obj.get_landmarks(c_image)
         # Select Reference Image Face Object
+        print('Selecting Reference Face Object..')
         head, file_name = os.path.split(r_obj['src'])
         r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)
         # Morph the faces
+        print('Morphing..')
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
         morphed_file_name = 'morph_' + numb + '.png'
+        print('Saving..')
         path = os.path.join(ROOT_DIR, 'temp', user, 'morphs', morphed_file_name)
         write = cv2.imwrite(path, output)
         if write:

@@ -84,9 +84,6 @@ def outliner(image):
             print("Plane shape:", plane.shape)
             print("Plane data type:", plane.dtype)
 
-        # Check if bg_img is assigned before calculating diff_img and norm_img
-
-
     result = cv2.merge(result_planes)
     result_norm = cv2.merge(result_norm_planes)
     return [result, result_norm]
@@ -115,13 +112,11 @@ def add_dark_pixels(bgr_img, l_channel):
 
 
 def remove_shadows(img):
-    print('in remove shadows')
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
     thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 1)
     kernel = np.ones((3, 3), np.uint8)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=4)
-    print('finding contours')
     contours, hierarchy = cv2.findContours(closing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
@@ -217,11 +212,9 @@ def match_histograms(image, reference, *, channel_axis=None):
         matched = match_cumulative_cdf(image, reference)
 
     if matched.dtype.kind == 'f':
-        # output a float32 result when the input is float16 or float32
         out_dtype = supported_float_type(image.dtype)
         matched = matched.astype(out_dtype, copy=False)
     return matched
-
 
 
 def matching_color(img_ref, img_src):

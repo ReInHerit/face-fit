@@ -7,3 +7,4 @@ scipy==1.10.1
 flask==2.2.2
 pillow==9.3.0
 color-matcher
+requests==2.29.0

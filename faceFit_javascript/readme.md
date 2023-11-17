@@ -14,13 +14,11 @@ for example: image01.jpg, image03.jpg ... image99.jpg
 When uploading a new image, you must also update the ___painting_data.json___ file.  
 This file is located in the public/json folder and contains specific information for each image. It has two fields for each image:  
 1. ___description___, which includes a textual description of the image where a face replacement occurred, and will be included in the email sent at the end of the game session. The text in this field can be formatted using HTML tags such as <a href></a>, <br>.  
-2. ___center_delta___, This field holds a pair of values (in pixels) that can be added or subtracted from the system's calculated values if there are discrepancies in the replacement of the user's face on the image. These discrepancies are more likely to occur in paintings. To activate these corrections, you need to remove the comment from line 190 in the __swap_faces.py__ file.  
 
 Example:  
 ```
 "image01.jpg": {
         "description": "the Venus of the painting <a href=\"https://en.wikipedia.org/wiki/The_Birth_of_Venus\">the Birth of Venus</a> by <a href=\"https://en.wikipedia.org/wiki/Sandro_Botticelli\">Sandro Botticelli</a>. <br>Curiosity: Botticelli used <a href=\"https://en.wikipedia.org/wiki/Simonetta_Vespucci\">Simonetta Vespucci</a> as his muse for his Venus.",
-        "center_delta": [8, -13]
         }
 ```
 ## Setup email address and password

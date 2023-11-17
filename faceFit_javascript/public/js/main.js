@@ -48,7 +48,7 @@ const detectorConfig = {
     outputFacialTransformationMatrixes: false,
 }
 // const morphs_path = '../morphs'
-const default_view = '../images/Thumbs/default_view.jpg'
+let default_view = '../images/Thumbs/default_view_h.jpg'
 const default_morph = '../images/Thumbs/morph_thumb.jpg'
 const send_logo = '../images/Thumbs/send.png'
 const reset_logo = '../images/Thumbs/reset.png'
@@ -140,6 +140,7 @@ function updateSlider() {
         columns = '25vw 25vw 25vw 25vw';
         rows = '70% 15% 15%';
         area = '"main_view main_view main_view main_view" "ref_btns ref_btns ref_btns ref_btns" "morph_btns morph_btns morph_btns morph_btns"';
+        default_view = '../images/Thumbs/default_view_v.jpg'
 
         container_center.style.width = container_center.style.maxHeight = `${Math.round(height * 0.7 - hints.offsetHeight - 40)}px`;
         container_right.style.maxHeight = container_left.style.maxHeight = `${Math.round(height * 0.2)}px`;
@@ -151,6 +152,7 @@ function updateSlider() {
         columns = '20vw 30vw 30vw 20vw';
         rows = '40% 40% 20%';
         area = '"ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns" "ref_btns main_view main_view morph_btns"';
+        default_view = '../images/Thumbs/default_view_h.jpg'
 
         container_center.style.maxHeight = `${Math.round(height - hints.offsetHeight - 40)}px`;
         container_right.style.maxHeight = container_left.style.maxHeight = `${Math.round(height)}px`;
@@ -161,7 +163,9 @@ function updateSlider() {
 
     const prevString = `<button type="button" class="slick-prev"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
     const nextString = `<button type="button" class="slick-next"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
-
+    if (ref_img.src.includes('default_view')) {
+        ref_img.src = default_view;
+    }
     [leftSlick, rightSlick].forEach((slider) => {
         slider.slick('slickSetOption', {
             slidesToShow: slides,
@@ -251,6 +255,7 @@ function setButtonClick(button, action) {
 function clearMatchInterval() {
     if (matchInterval) {
         clearInterval(matchInterval);
+        console.log('clearMatchInterval')
         clear_mats()
         reset_bar()
         stopCamera()
@@ -392,6 +397,10 @@ async function init() {
 
     // const btns_indices = [];
     async function handleMainButtonClick(j) {
+        if (isMatching) {
+            console.log('isMatching', isMatching, 'j', j)
+            clearMatchInterval()
+        }
         selected = j;
         await startCamera();
         let url = `${protocol}//${host}`;
@@ -429,6 +438,7 @@ async function init() {
         ref_img.src = (isNaN(m_selected) === false && j !== extract_index(ref_img.src))
             ? morphed_btns[j].firstChild.src
             : default_view;
+        console.log('handleMorphedButtonClick', ref_img.src, m_selected, j)
         drawOnCanvas(ref_img.src)
         selected = -1
     }
@@ -474,9 +484,6 @@ function reset_bar() {
 
 function update_bar() {
     if (morphed === '') {
-        // const selectedFace = face_arr[selected].angles;
-        // const camFaceAngles = cam_angles;
-
         const percentX = 100 - Math.abs(face_arr[selected].angles[0] - cam_angles[0]);
         const percentY = 100 - Math.abs(face_arr[selected].angles[1] - cam_angles[1]);
         const percentZ = 100 - Math.abs(face_arr[selected].angles[2] - cam_angles[2]);
@@ -494,22 +501,19 @@ function update_bar() {
 
 /* FACE DATA CALCULATIONS */
 async function calc_lmrks(image) {
-    // console.log('inside calc_lmrks')
-    // await detector.reset();
     if (detector) {
         await detector.reset();
     } else{
         detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
     }
     try {
-        // let faces = []
         cam_points = {};
         cam_bb = {};
         cam_angles = [];
         cam_expression = [];
+        console.log('in calc_lmrks')
 
         const faces = await detector.estimateFaces(image, {flipHorizontal: false});
-        // console.log(faces.length)
         if (faces.length >> 0) {
             const keypoints = faces[0].keypoints;
             cam_points = processKeyPoints(keypoints);
@@ -525,7 +529,6 @@ async function calc_lmrks(image) {
         // console.log("ended calc_lmrks")
     } catch (error) {
         console.error('Error loading or processing image:', error);
-        // Handle the error appropriately, e.g., by returning an error status or rethrowing it.
         throw error;
     }
 }
@@ -571,21 +574,13 @@ function calculateAngles() {
 
 function getHeadAngles(lmrk10, lmrk133, lmrk152, lmrk226, lmrk362, lmrk446) {
     // V: 10, 152; H: 226, 446
-    const faceVerticalCentralPoint = [
-        0,
-        (lmrk10[1] + lmrk152[1]) * 0.5,
-        (lmrk10[2] + lmrk152[2]) * 0.5,
-    ];
+    const faceVerticalCentralPoint = [0, (lmrk10[1] + lmrk152[1]) * 0.5, (lmrk10[2] + lmrk152[2]) * 0.5];
     const verticalAdjacent = lmrk10[2] - faceVerticalCentralPoint[2];
     const verticalOpposite = lmrk10[1] - faceVerticalCentralPoint[1];
     const verticalHypotenuse = l2Norm([verticalAdjacent, verticalOpposite,]);
     const verticalCos = verticalAdjacent / verticalHypotenuse;
 
-    const faceHorizontalCentralPoint = [
-        (lmrk226[0] + lmrk446[0]) * 0.5,
-        0,
-        (lmrk226[2] + lmrk446[2]) * 0.5,
-    ];
+    const faceHorizontalCentralPoint = [(lmrk226[0] + lmrk446[0]) * 0.5, 0, (lmrk226[2] + lmrk446[2]) * 0.5];
     const horizontalAdjacent = lmrk226[2] - faceHorizontalCentralPoint[2];
     const horizontalOpposite = lmrk226[0] - faceHorizontalCentralPoint[0];
     const horizontalHypotenuse = l2Norm([horizontalAdjacent, horizontalOpposite,]);
@@ -633,32 +628,26 @@ async function draw_mask_on_ref() {
         return;
     }
     try {
-        // const bb_cam_rect = new cv.Rect(cam_bb.xMin, cam_bb.yMin, cam_bb.width, cam_bb.height);
-        // console.log('1) bb_cam_rect', bb_cam_rect, ' memory: ', formatCVMemoryUsage())
         // Create ghost source and draw mask on it
         if (cam_bb.xMin > 0 && cam_bb.yMin > 0 && cam_bb.xMin + cam_bb.width < camera_width && cam_bb.yMin + cam_bb.height < camera_height) {
-            // console.log('1.1')
             const ghost_source = new cv.Mat.zeros(cam_bb.height, cam_bb.width, cv.CV_8UC3);
-            // console.log('1.2', ' memory: ', formatCVMemoryUsage())
             for (const arr of ghost_mask_array) {
                 draw_lines(ghost_source, arr);
             }
             cv.flip(ghost_source, ghost_source, 1);
             cv.cvtColor(ghost_source, ghost_source, cv.COLOR_RGB2RGBA, 0);
             cv.resize(ghost_source, ghost_source, ref_roi_size, 0, 0, cv.INTER_LINEAR);
-            const sum = new cv.Mat()
-            cv.add(ref_roi, ghost_source, sum);
-            cv.add(sum, ghost_source, sum);
-            releaseMat(ghost_source)
             releaseMat(result)
             result = new cv.Mat();
             ref.copyTo(result);
-            sum.copyTo(result.roi(bb_ref_rect));
-            releaseMat(sum)
+            const resultRoi = result.roi(bb_ref_rect);
+            cv.add(ref_roi, ghost_source, resultRoi);
+            cv.add(resultRoi, ghost_source, resultRoi);
+            releaseMat(ghost_source)
             cv.resize(result, result, dsize, 0, 0, cv.INTER_AREA);
             context.clearRect(0, 0, canvas.width, canvas.height)
             cv.imshow(canvas, result)
-            console.log('8) exit function : ', formatCVMemoryUsage())
+            releaseMat(resultRoi)
         } else {
             console.log('face out of frame')
             no_landmarks()
@@ -670,16 +659,6 @@ async function draw_mask_on_ref() {
         const file = "/images/Thumbs/default_view.jpg"
         const path = protocol + '//' + host + ':' + port + file;
         drawOnCanvas(path);
-        // const img = new Image();
-        // let errorMat;
-        // img.onload = function () {
-        //     errorMat = cv.imread(img);
-        //     cv.imshow(canvas, errorMat);
-        // }
-        // img.src = path;
-        // releaseMat(errorMat)
-        // }
-
         console.error('An error occurred in draw_mask_on_ref:', error);
 
     }
@@ -693,7 +672,6 @@ function no_landmarks() {
     const grayResult = new cv.Mat();
     cv.cvtColor(result, grayResult, cv.COLOR_RGBA2GRAY, 0);
     const text = "No face detected"
-    // console.log('grayResult memory: ', formatCVMemoryUsage())
     // Calculate the position to center the text
     const where = new cv.Point(((grayResult.cols - text.length * 15) / 2), ((grayResult.rows + 30) / 2));
     cv.putText(
@@ -712,7 +690,10 @@ function no_landmarks() {
 
 /* MATCHING FUNCTIONS */
 async function match_faces() {
+    console.log('Entering match_faces. isMatching:', isMatching);
     if (!isMatching) {
+        console.log('come_out')
+        clearInterval(matchInterval);
         return;
     }
     if (selected >= 0 && video.width > 0 && video.height > 0) {
@@ -728,7 +709,6 @@ async function match_faces() {
         } catch (error) {
             console.error('An error occurred in match_faces:', error);
             clear_mats()
-            // init_mats()
         }
     }
 }
@@ -751,7 +731,9 @@ async function check_and_swap() {
         if (cam_expression.toString() === face_arr[selected].expression.toString()) {
             console.log('match2')
             isMatching = false;
+
             clearInterval(matchInterval);
+            console.log('clearInterval')
             // cam_angles = [];
             // cam_expression = [];
             morphed = ''
@@ -766,6 +748,7 @@ async function check_and_swap() {
 
                 const data_json = JSON.stringify(objs);
                 // Send data to server
+                selected = -1;
 
                 const res = await fetch('/morph', {
                     method: 'POST',
@@ -793,10 +776,8 @@ async function check_and_swap() {
                 const id = extract_index(rel_path);
                 morphed_btns[id].firstChild.src = morphed + '?' + Math.random();
                 drawOnCanvas(morphed + '?' + Math.random());
-                // reset_bar();
-                // stopCamera()
+
                 selected = -1;
-                // clearMatchInterval()
                 reset_bar()
                 stopCamera()
                 clear_mats()
@@ -807,7 +788,6 @@ async function check_and_swap() {
                 bb_ref_rect = null;
                 ref_size = null;
                 ref_roi_size = null;
-                // isMatching = false;
                 matchInterval = null;
             } catch (err) {
                 console.error(`Fetch problem: ${err.message}`);
@@ -904,10 +884,6 @@ function opencvIsReady() {
     });
 }
 
-// function init_mats() {
-//     ghost_source = new cv.Mat();
-//     sum = new cv.Mat();
-// }
 
 function releaseMat(mat) {
     if (mat && !mat.isDeleted()) {

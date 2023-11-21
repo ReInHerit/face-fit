@@ -1,3 +1,7 @@
+"use strict";
+import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+const {FaceLandmarker, FilesetResolver, DrawingUtils} = await vision;
+
 /* VIEW AND CAMERA */
 const ref_img = document.getElementById("ref_img");
 const video = document.getElementById("webcam");
@@ -39,15 +43,7 @@ const url_port = port ? `:${port}` : '';
 let selected, morphed_btns;
 let face_arr = []
 let morphed = ''
-const model = faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh;
-const detectorConfig = {
-    runtime: 'tfjs',//'mediapipetfjs',
-    solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
-    min_tracking_confidence: 0.5,
-    outputFaceBlendshapes: false,
-    outputFacialTransformationMatrixes: false,
-}
-// const morphs_path = '../morphs'
+
 let default_view = '../images/Thumbs/default_view_h.jpg'
 const default_morph = '../images/Thumbs/morph_thumb.jpg'
 const send_logo = '../images/Thumbs/send.png'
@@ -66,14 +62,19 @@ const nose3 = [8, 336, 296, 334, 293, 300];
 const full_indices_set = new Set([...right_eye, ...left_eye, ...mouth, ...nose1, ...nose2, ...nose3, 10, 152, 226, 446]);
 const ghost_mask_array = [right_eye, left_eye, mouth, nose1, nose2, nose3];
 let  ref_roi, ref, ref_size, result, bb_ref_rect, ref_roi_size, matchInterval, detector;
-const line_color = new cv.Scalar(255, 255, 255, 120);
+let line_color //= new cv.Scalar(255, 255, 255, 120);
 let isMatching = false;
 let cam_points = {}
 let cam_bb = {}
 let cam_angles = []
 let cam_expression = []
 
-let dsize = new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
+let faceLandmarker;
+let runningMode = "IMAGE";
+let webcamRunning = false;
+let lastVideoTime = -1;
+
+let dsize //= new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
 
 /* UI FUNCTIONS*/
 function init_slicks(window_aspect_ratio) {
@@ -272,12 +273,42 @@ function clearMatchInterval() {
     }
 }
 
+async function createFaceLandmarker() {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+    );
+    // console.log("filesetResolver: ", filesetResolver)
+    // console.log("FaceLandmarker: ", FaceLandmarker)
+    try {
+        faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                delegate: "CPU"
+            },
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: true,
+            runningMode,
+            numFaces: 1
+        });
+    } catch (error) {
+        console.log("error: ", error)
+    }
+    // console.log("faceLandmarker: ", faceLandmarker)
+    // demosSection.classList.remove("invisible");
+}
 async function init() {
     console.log("init");
+    line_color = new cv.Scalar(255, 255, 255, 120);
+    dsize = new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
     const aspect = container.offsetWidth / container.offsetHeight
     const main_direction = aspect > 1 ? 'horizontal' : 'vertical'
-
-    /* INITIALIZE USER*/
+    // /* INITIALIZE PAINTINGS' FACE OBJECTS */
+    //     loadJsonFile('../json/ref_images.json')
+    //         .then((json) => {
+    //             face_arr = json;
+    //         });
+    //     console.log('PAINTINGS OBJ INITIALIZED')
+    /* INITIALIZE USER and PAINTINGS DATA*/
     fetch("/set_user", {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -290,14 +321,10 @@ async function init() {
             return res.json();
         })
         .then((json) => {
-            console.log("USER INITIALIZED")
+            face_arr = json['ref_dict'];
+            console.log("USER and PAINTINGs INITIALIZED ", json)
         })
         .catch((err) => console.error(`Fetch problem: ${err.message}`));
-
-    /* INITIALIZE FACE LANDMARK DETECTOR */
-    console.log("initialize detector")
-    detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-    console.log("initialized detector")
 
     /* INITIALIZE UI */
     init_slicks(main_direction);
@@ -384,12 +411,7 @@ async function init() {
     });
     console.log('EMAIL INITIALIZED')
 
-    /* INITIALIZE PAINTINGS' FACE OBJECTS */
-    loadJsonFile('../json/ref_images.json')
-        .then((json) => {
-            face_arr = json;
-        });
-    console.log('PAINTINGS OBJ INITIALIZED')
+
 
     /* INITIALIZE SLICKs BUTTONS AND INTERACTION */
     const reference_btns = container_left.querySelectorAll("div.slick-slide >button");
@@ -406,8 +428,6 @@ async function init() {
         let url = `${protocol}//${host}`;
         if (port && selected >= 0) {
             url += `:${port}/${face_arr[selected]['src']}`;
-
-            // url += `/${face_arr[selected]['src']}`;
             ref_img.src = url;
             ref_img.onload = async function () {
                 clearMatchInterval()
@@ -501,49 +521,52 @@ function update_bar() {
 
 /* FACE DATA CALCULATIONS */
 async function calc_lmrks(image) {
-    if (detector) {
-        await detector.reset();
-    } else{
-        detector = await faceLandmarksDetection.createDetector(model, detectorConfig);
-    }
     try {
         cam_points = {};
         cam_bb = {};
         cam_angles = [];
         cam_expression = [];
-        console.log('in calc_lmrks')
+        let results
+        let startTimeMs = performance.now();
+        if (lastVideoTime !== video.currentTime) {
+            lastVideoTime = video.currentTime;
+            results = faceLandmarker.detectForVideo(video, startTimeMs);
+        }
+        if (results.faceLandmarks[0]) {
+            const landmarks = results.faceLandmarks[0];
+            cam_points = processKeyPoints(landmarks);
+            // const box = calculateBoundingBox(landmarks)
+            cam_bb = processBoundingBox(landmarks);
+            cam_angles = matrixToEulerAngles(results.facialTransformationMatrixes[0].data)
 
-        const faces = await detector.estimateFaces(image, {flipHorizontal: false});
-        if (faces.length >> 0) {
-            const keypoints = faces[0].keypoints;
-            cam_points = processKeyPoints(keypoints);
-            cam_bb = processBoundingBox(faces[0].box);
-            calculateAngles()
             cam_expression = check_expression(cam_points["lmrk13"], cam_points["lmrk14"], cam_points["lmrk33"], cam_points["lmrk78"],
                 cam_points["lmrk133"], cam_points["lmrk145"], cam_points["lmrk159"], cam_points["lmrk263"], cam_points["lmrk308"], cam_points["lmrk362"],
                 cam_points["lmrk374"], cam_points["lmrk386"]);
-        } else {
+        }
+        else {
             no_landmarks()
             // console.log('Cannot calculate landmarks of image')
         }
         // console.log("ended calc_lmrks")
     } catch (error) {
         console.error('Error loading or processing image:', error);
+        // Handle the error appropriately, e.g., by returning an error status or rethrowing it.
         throw error;
     }
 }
 
-function processKeyPoints(keypoints) {
+function processKeyPoints(landmarks) {
     const result = {};
 
-    for (let land = 0; land < keypoints.length; land++) {
+    for (let land = 0; land < landmarks.length; land++) {
         if (full_indices_set.has(land)) {
-            const x = Math.round(keypoints[land].x);
-            const y = Math.round(keypoints[land].y);
+            const x = Math.round(landmarks[land].x * camera_width);
+            const y = Math.round(landmarks[land].y * camera_height)
+            // console.log('x, y', x, y)
             result[`lmrk${land}`] = [x, y];
 
             if ([10, 133, 152, 226, 362, 446].includes(land)) {
-                const z = Math.round(keypoints[land].z);
+                const z = Math.round(landmarks[land].z);
                 result[`lmrk${land}`] = [x, y, z];
             }
         }
@@ -551,7 +574,8 @@ function processKeyPoints(keypoints) {
     return result;
 }
 
-function processBoundingBox(box) {
+function processBoundingBox(landmarks) {
+    const box = calculateBoundingBox(landmarks)
     return {
         xMin: Math.round(box.xMin),
         xMax: Math.round(box.xMax),
@@ -566,10 +590,73 @@ function processBoundingBox(box) {
     };
 }
 
-function calculateAngles() {
-    if (cam_points["lmrk10"] && cam_points["lmrk133"] && cam_points["lmrk152"] && cam_points["lmrk226"] && cam_points["lmrk362"] && cam_points["lmrk446"]) {
-        cam_angles = getHeadAngles(cam_points["lmrk10"], cam_points["lmrk133"], cam_points["lmrk152"], cam_points["lmrk226"], cam_points["lmrk362"], cam_points["lmrk446"]);
+function calculateBoundingBox(points) {
+    if (points.length === 0) {
+        return null; // Return null for an empty list of points
     }
+
+    // Initialize min and max values with the first point
+    let xMin = points[0].x;
+    let xMax = points[0].x;
+    let yMin = points[0].y;
+    let yMax = points[0].y;
+
+    // Iterate through the rest of the points
+    for (let i = 1; i < points.length; i++) {
+        const point = points[i];
+
+        // Update xMin, xMax, yMin, and yMax values
+        xMin = Math.min(xMin, point.x);
+        xMax = Math.max(xMax, point.x);
+        yMin = Math.min(yMin, point.y);
+        yMax = Math.max(yMax, point.y);
+    }
+    xMin = Math.round(xMin * camera_width)
+    xMax = Math.round(xMax * camera_width)
+    yMin = Math.round(yMin * camera_height)
+    yMax = Math.round(yMax * camera_height)
+
+    const width = xMax - xMin;
+    const height = yMax - yMin;
+
+    const box = {
+        xMin: xMin,
+        xMax: xMax,
+        yMin: yMin,
+        yMax: yMax,
+        width: width,
+        height: height
+    };
+    return box;
+}
+
+
+function matrixToEulerAngles(matrix) {
+    const rotationMatrix = [
+        [matrix[0], matrix[1], matrix[2]],
+        [matrix[4], matrix[5], matrix[6]],
+        [matrix[8], matrix[9], matrix[10]]
+    ];
+    const sy = Math.sqrt(rotationMatrix[0][0] * rotationMatrix[0][0] + rotationMatrix[1][0] * rotationMatrix[1][0]);
+
+    let x, y, z;
+
+    if (sy > 1e-6) {
+        x = Math.atan2(rotationMatrix[2][1], rotationMatrix[2][2]);
+        y = Math.atan2(-rotationMatrix[2][0], sy);
+        z = Math.atan2(rotationMatrix[1][0], rotationMatrix[0][0]);
+    } else {
+        x = Math.atan2(-rotationMatrix[1][2], rotationMatrix[1][1]);
+        y = Math.atan2(-rotationMatrix[2][0], sy);
+        z = 0;
+    }
+    // console.log('x, y, z', x, y, z)
+    // Convert angles to degrees
+    x = (x * (180 / Math.PI) + 90) % 360;  // Ensure positive and within [0, 360)
+    y = 180 - ((y * (180 / Math.PI) + 90) % 360 + 360) % 360;  // Adjusted range for y
+    z = (z * (180 / Math.PI));
+
+    return [Math.round(x), Math.round(y), -Math.round(z)];
 }
 
 function getHeadAngles(lmrk10, lmrk133, lmrk152, lmrk226, lmrk362, lmrk446) {
@@ -734,8 +821,6 @@ async function check_and_swap() {
 
             clearInterval(matchInterval);
             console.log('clearInterval')
-            // cam_angles = [];
-            // cam_expression = [];
             morphed = ''
             // Draw image on canvas
             ctx.drawImage(video, 0, 0, camera_width, camera_height);
@@ -748,7 +833,7 @@ async function check_and_swap() {
 
                 const data_json = JSON.stringify(objs);
                 // Send data to server
-                selected = -1;
+                // selected = -1;
 
                 const res = await fetch('/morph', {
                     method: 'POST',
@@ -763,7 +848,9 @@ async function check_and_swap() {
                 const json = await res.json();
                 // Extract information from server response
                 const rel_path = json.relative_path;
+                console.log('rel_path', rel_path)
                 const abs_path = json.absolute_path;
+                console.log('abs_path', abs_path)
                 const user_id = json.user_id;
                 const folder = 'public';
                 const folder_id = abs_path.indexOf(folder);
@@ -853,9 +940,14 @@ function accessCamera() {
 
 function startCamera() {
     return accessCamera()
-        .then((stream) => {
-
+        .then(async (stream) => {
+            webcamRunning = true;
             video.srcObject = stream;
+
+            if (runningMode === "IMAGE") {
+                runningMode = "VIDEO";
+                await faceLandmarker.setOptions({runningMode: "VIDEO"});
+            }
         })
         .catch((error) => {
             console.error("Error starting the camera:", error);
@@ -878,12 +970,21 @@ function stopCamera() {
 }
 
 function opencvIsReady() {
-    console.log('OPENCV.JS READY')
-    init().then(r => {
-        console.log('ALL IS INITIALIZED')
+    document.addEventListener("DOMContentLoaded", async function () {
+        console.log('OPENCV.JS READY')
+        await createFaceLandmarker().then(r => {
+            console.log('FACE LANDMARKER IS READY')
+            $.getScript('../js/opencv.js', async function (data, textStatus, jqxhr) {
+                // console.log(data); // Data returned
+                console.log(textStatus); // Success
+                console.log(jqxhr.status); // 200
+                console.log("Load was performed.");
+                setTimeout(init, 500)
+            });
+        });
+
     });
 }
-
 
 function releaseMat(mat) {
     if (mat && !mat.isDeleted()) {

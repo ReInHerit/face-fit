@@ -224,7 +224,6 @@ def morph(c_obj, r_obj):
 
     ref_image = cv2.imread(r_obj['src'])
     images = [cam_image, ref_image]
-
     hair_masks = get_hair_mask(images)
     ref_smoothed, noise = find_noise_scratches(ref_image)
     cam_smoothed, noise_cam = find_noise_scratches(cam_image)
@@ -234,20 +233,16 @@ def morph(c_obj, r_obj):
             c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
 
     cam_cc = matching_color(r_roi, c_roi)
-
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
     c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
-
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris2  # triangles
-
     new_dt = sort_triangles_by_distance(dt, (0, 0, -5), c_obj.points)
     tris1 = [[cam_points[new_dt[i][j]] for j in range(3)] for i in range(len(new_dt))]
     tris2 = [[ref_points[new_dt[i][j]] for j in range(3)] for i in range(len(new_dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
-
     # GENERATE FINAL IMAGE
     concave_hull = get_concave_hull(np.array(ref_points))
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
@@ -257,7 +252,6 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
     mid3 = cv2.moments(concave_mask)  # Find Centroid
-
     brect = cv2.boundingRect(concave_mask)
     center_of_brect = (int(brect[0] + brect[2] / 2), int(brect[1] + brect[3] / 2))
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
@@ -268,13 +262,11 @@ def morph(c_obj, r_obj):
     out = cv2.add(out, noise)
     out = cv2.add(out, noise)
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center_of_brect, cv2.NORMAL_CLONE)
-
     hair_mask_gray = cv2.cvtColor(hair_masks[1], cv2.COLOR_BGR2GRAY)
     ret, hair_mask_gray = cv2.threshold(hair_mask_gray, 127, 255, cv2.THRESH_BINARY)
     br = cv2.boundingRect(hair_mask_gray)  # bounding rect (x,y,width,height)
     centerOfBR = (br[0] + br[2] // 2, br[1] + br[3] // 2)
     refined_center = (int(ref_image.shape[1] / 2), int(ref_image.shape[0] / 2))
-    print('refined center', refined_center, 'center of br', centerOfBR)
     refined_output = cv2.seamlessClone(ref_image, output, hair_mask_gray, centerOfBR, cv2.NORMAL_CLONE)
 
     return refined_output
@@ -312,35 +304,6 @@ def round_num(value):
 app = Flask(__name__)
 
 
-# ------------------ ROUTES ------------------
-# @app.route('/INIT_PAINTINGS', methods=['POST'])
-# def init():
-#     # POST request
-#     if request.method == 'POST':
-#         global ref_dict
-#         print('INIT Incoming..')
-#         data = request.get_json()
-#         ref_dict = []
-#         for idx, file in enumerate(data):
-#             ref_img = cv2.imread(os.path.join(ROOT_DIR, file))
-#             p_face = F_obj.Face('ref')
-#             p_face.get_landmarks(ref_img)
-#             face_dict = {'which': p_face.which, 'id': idx, 'src': file, 'points': p_face.points,
-#                          'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
-#                          'pix_points': p_face.pix_points,
-#                          'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
-#                          'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
-#                                 'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
-#                                 'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
-#                                            p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]}}
-#             ref_dict.append(face_dict)
-#         print('REFERENCES INIT DONE')
-#         return jsonify(ref_dict), 200
-#
-#     else:
-#         message = {'greeting': 'Hello from Face-Fit Flask server!'}
-#         return jsonify(message)
-
 @app.route('/INIT_PAINTINGS', methods=['POST'])
 def init():
     global ref_dict
@@ -348,12 +311,6 @@ def init():
     data = request.get_json()
 
     try:
-        # Release any existing resources before reinitializing
-        # for face_dict in ref_dict:
-        #     img = face_dict['img']
-        #     if img is not None:
-        #         img.release()
-
         ref_dict = []
         for idx, file in enumerate(data):
             ref_img = cv2.imread(os.path.join(ROOT_DIR, file))
@@ -387,33 +344,27 @@ def sendData():
     # POST request
     print('Incoming..')
     if request.method == 'POST':
-        print('POST Incoming..')
         data = request.get_json()
         data_img = data['objs']
         user = data['user_id']
         c_image = readb64(data_img["c_face"])
         selected = data_img["selected"]
-        print(len(ref_dict), selected)
         r_obj = ref_dict[selected]
         c_image = cv2.flip(c_image, 1)
         # Create Frame Face Object
-        print('Creating Face Object..')
         c_obj = F_obj.Face('cam')
         c_obj.get_landmarks(c_image)
         # Select Reference Image Face Object
-        print('Selecting Reference Face Object..')
         head, file_name = os.path.split(r_obj['src'])
         r_obj['src'] = os.path.join(ROOT_DIR, 'images', file_name)
         # Morph the faces
-        print('Morphing..')
         output = morph(c_obj, r_obj)
         numb = "0" + str(selected + 1) if selected <= 8 else str(selected + 1)
         morphed_file_name = 'morph_' + numb + '.png'
-        print('Saving..')
         path = os.path.join(ROOT_DIR, 'temp', user, 'morphs', morphed_file_name)
         write = cv2.imwrite(path, output)
         if write:
-            return path, 200
+            return jsonify({'path': path}), 200
     # GET request
     else:
         message = {'greeting': 'Hello from Flask!'}

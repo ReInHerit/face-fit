@@ -112,51 +112,6 @@ def add_dark_pixels(bgr_img, l_channel):
     return bgr_img_darkened.astype(np.uint8)
 
 
-# def remove_shadows(img):
-#     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-#     blur = cv2.GaussianBlur(gray, (25, 25), 0)
-#     cv2.imshow('blur', blur)
-#     # img = cv2.divide(gray, blur, scale=192)
-#     # cv2.cvtColor(img, cv2.COLOR_GRAY2BGR, img)
-#     ret, th1 = cv2.threshold(blur, 75, 255, cv2.THRESH_TOZERO)
-#     ret, th2 = cv2.threshold(th1, 127, 255, cv2.THRESH_BINARY_INV)
-#     ret, th3 = cv2.threshold(blur, 77, 255, cv2.THRESH_TOZERO)
-#     ret, th4 = cv2.threshold(blur, 78, 255, cv2.THRESH_TOZERO)
-#     ret, th5 = cv2.threshold(blur, 79, 255, cv2.THRESH_TOZERO)
-#     ret, th6 = cv2.threshold(blur, 80, 255, cv2.THRESH_TOZERO)
-#     # th5 = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 21, 1)
-#     # th6 = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 1)
-#     thresh = cv2.adaptiveThreshold(th1, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 21, 1)
-#     cv2.imshow('th1', th1)
-#     cv2.imshow('th2', th2)
-#     cv2.imshow('th3', th3)
-#     cv2.imshow('th4', th4)
-#     cv2.imshow('th5', th5)
-#     cv2.imshow('th6', th6)
-#     cv2.imshow('thresh', thresh)
-#     kernel = np.ones((3, 3), np.uint8)
-#     closing = cv2.morphologyEx(th2, cv2.MORPH_CLOSE, kernel, iterations=1)
-#     cv2.imshow('closing', closing)
-#     # masked_img = cv2.bitwise_and(img, img, mask=closing)
-#     # cv2.imshow('masked_img', masked_img)
-#     # mean_val = cv2.mean(masked_img, mask=closing)[0]
-#     # img[closing == 0] = mean_val
-#     contours, hierarchy = cv2.findContours(closing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#     for cnt in contours:
-#         x, y, w, h = cv2.boundingRect(cnt)
-#         print(x, y, w, h)
-#         if h < 20 or w < 20:
-#             print('cnt continued')
-#             continue
-#         mask = np.zeros((img.shape[0], img.shape[1]), np.uint8)
-#         mask[y:y + h, x:x + w] = 255
-#         masked_img = cv2.bitwise_and(img, img, mask=mask)
-#         cv2.imshow('masked_img', masked_img)
-#         mean_val = cv2.mean(masked_img, mask=mask)[0]
-#         img[mask == 0] = mean_val
-#     return img
-
-
 def match_cumulative_cdf(source, template):
     """
     Return modified source array so that the cumulative density function of its values matches the cumulative density
@@ -246,7 +201,7 @@ def matching_color(img_ref, img_src):
     cm = ColorMatcher()
     img_out = cm.transfer(src=img_src, ref=img_ref, method='mkl')
     img_out = Normalizer(img_out).uint8_norm()
-    cv2.imshow('img_out', img_out)
+    # cv2.imshow('img_out', img_out)
     cc = match_histograms(img_out, img_ref)
     cc = add_dark_pixels(cc, outline_l)
     return cc

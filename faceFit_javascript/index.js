@@ -16,7 +16,7 @@ require('dotenv').config();
  */
 const app = express();
 const port = process.env.PORT || 8000;
-const host = process.env.HOST || "localhost";
+let host = process.env.HOST || "localhost";
 const protocol = process.env.PROTOCOL || "http";
 let userId = '';
 
@@ -27,11 +27,8 @@ const directoryPath = path.join(__dirname, 'public/images');
 const temp_path = path.join(__dirname, 'public/temp');
 checkPath(temp_path);
 let morphs_path = null;
-let user_path = null;
 const painting_data_file = json_path + '/painting_data.json'
-const gmail_data_file = json_path + '/password_gmail.json'
 const jsonData = JSON.parse(fs.readFileSync(painting_data_file, 'utf8'));
-const gmail = JSON.parse(fs.readFileSync(gmail_data_file, 'utf8'));
 function checkPath(path) {
     if (!fs.existsSync(path)) {
         fs.mkdirSync(path, {recursive: true});
@@ -40,6 +37,8 @@ function checkPath(path) {
         console.log('exists', path)
     }
 }
+
+console.log(host, port)
 /**
  *  App Configuration
  */
@@ -51,8 +50,8 @@ app.use(bodyParser.json({limit: '50mb'}));
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: gmail['email'],
-        pass: gmail['password']
+        user: process.env.MAIL,
+        pass: process.env.MAIL_PASSWORD
     },
     tls: {rejectUnauthorized: false}
 });
@@ -100,7 +99,7 @@ async function send_mail(send_to) {
     });
 
     transporter.sendMail({
-        from: gmail['email'],
+        from: process.env.MAIL,
         to: send_to,
         subject: 'Your Face-Fit Images !',
         text: content,
@@ -135,32 +134,34 @@ app.get('/info', (req, res) => {
     res.send({'start': 'swap'});
 });
 app.post('/set_user', (req, res) => {
-    console.log(userId)
+    console.log('user_id',userId)
     request.post(`http://${host}:8050/INIT_PAINTINGS`, {json: ref_images}, async function (error, response, body) {
 
         if (!error && response.statusCode === 200) {
             console.log('init server');
             userId = uuid.v4();
             console.log('init user', userId);
-            // user_path = path.join(__dirname, 'public/temp', userId);
             morphs_path = path.join(__dirname, 'public/temp', userId, 'morphs');
-            // checkPath(user_path)
             checkPath(morphs_path)
+            res.send({'ref_dict': response.body});
+
+        } else {
+            console.error('Error communicating with Python server:', error);
+            res.status(500).json({ error: 'Internal Server Error' });
         }
-        // res.send({'body': body});
     });
-    res.send({'user': 'initialized'});
 });
 
-// Route for deleting the folder
 app.delete('/folder', (req, res) => {
     const folderPath = path.join(__dirname, 'public/temp', userId);
+    console.log('Deleting folder', folderPath)
     fs.rm(folderPath, {recursive: true}, (err) => {
         if (err) {
             console.error(err);
             res.status(500).send('Error deleting folder');
         } else {
             console.log('Folder deleted successfully by app delete folder');
+            console.log('Starting Proxy at ' + host + ':' + port);
             res.send('Folder deleted successfully');
         }
     });
@@ -168,25 +169,38 @@ app.delete('/folder', (req, res) => {
 
 app.post('/morph', function (req, res, next) {
     const objs = req.body
-
+    console.log('morphing')
     request.post(`http://${host}:8050/DATAtoPY`, {
         json: {
             objs: objs,
             user_id: userId
-        }
+        },
+        timeout: 5000
     }, async function (error, response, body) {
         let abs_morphed_path, file_name, rel_morphed_path;
-        if (!error && response.statusCode === 200) {
-            abs_morphed_path = body
-            file_name = path.parse(body).base
-            rel_morphed_path = '/morphs/' + file_name;
+
+        if (!error) {
+            if (response.statusCode === 200) {
+                console.log('morphed', body);
+
+                abs_morphed_path = body['path']
+                file_name = path.parse(body['path']).base
+                rel_morphed_path = '/morphs/' + file_name;
+
+                res.send({
+                    'user_id': userId,
+                    'file_name': file_name,
+                    'absolute_path': abs_morphed_path,
+                    'relative_path': rel_morphed_path
+                });
+            } else {
+                console.error('Unexpected status code from Python server:', response.statusCode);
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
+        } else {
+            console.error('Error communicating with Python server:', error);
+            res.status(500).json({ error: 'Internal Server Error' });
         }
-        res.send({
-            'user_id': userId,
-            'file_name': file_name,
-            'absolute_path': abs_morphed_path,
-            'relative_path': rel_morphed_path
-        });
     });
 })
 
@@ -213,6 +227,7 @@ app.post('/delete_morphs', function (req, res) {
 /**
  * Server Activation
  */
+
 app.listen(port, host, () => {
     console.log(`Starting Proxy at ${host}:${port}`);
 });

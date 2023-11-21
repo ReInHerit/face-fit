@@ -22,7 +22,7 @@ drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models', 'face_landmarker.task'))
 base_options = python.BaseOptions(model_asset_path=model_path)
 options = vision.FaceLandmarkerOptions(base_options=base_options,
-                                       output_face_blendshapes=True,
+                                       output_face_blendshapes=False,
                                        output_facial_transformation_matrixes=True,
                                        num_faces=1)
 detector = vision.FaceLandmarker.create_from_options(options)

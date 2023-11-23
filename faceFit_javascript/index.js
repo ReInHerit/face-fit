@@ -133,6 +133,9 @@ function delete_morphs() {
 app.get('/info', (req, res) => {
     res.send({'start': 'swap'});
 });
+app.get('/policy', (req, res) => {
+  res.render('policy');
+});
 app.post('/set_user', (req, res) => {
     console.log('user_id',userId)
     request.post(`http://${host}:8050/INIT_PAINTINGS`, {json: ref_images}, async function (error, response, body) {

@@ -17,7 +17,7 @@ h1 {
     font-size: 5vh;
     z-index: 0;
 }
-#popup-button, #reset-button {
+#email-button, #reset-button {
     position: absolute;
     width: min(12vw, var(--min-width));
     left: calc(100vw - 30px);
@@ -26,7 +26,7 @@ h1 {
     background-color: transparent;
     z-index: 8;
 }
-#popup-button {
+#email-button {
     left: calc(100vw - 100px);
 
     width: min(12vw, var(--min-width));
@@ -40,7 +40,7 @@ h1 {
     height: 100%;
     position: relative;
 }
-#popup-window {
+#email-window, #privacy-window {
     position: fixed;
     top: 0;
     left: 0;
@@ -49,7 +49,7 @@ h1 {
     z-index: 999;
     background-color: rgba(0, 0, 0, 0.5);
 }
-#popup-content {
+#email-content {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -57,6 +57,24 @@ h1 {
     background-color: white;
     padding: 30px;
   }
+
+#privacyModal {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: white;
+        padding: 30px;
+        border: 1px solid #ccc;
+        z-index: 1000;
+      }
+#cofirm_section {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    margin: 0;
+}
 
 body, html {
     overflow: hidden;
@@ -177,15 +195,6 @@ td {
     z-index: 0;
 }
 
-
-/*.slick-slider{*/
-/*    display: flex;*/
-/*    !*flex-direction: column;*!*/
-/*}*/
-/*.slick-track{*/
-/*    display: flex;*/
-/*    align-items: center;*/
-/*}*/
 .img_ref, .img_morph{
     position: initial;
     width: 100%;
@@ -330,4 +339,16 @@ td {
 .loaded #loader-wrapper .loader-section.section-left {
     -webkit-transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
     transition: all 0.7s 0.3s cubic-bezier(0.645, 0.045, 0.355, 1.000);
+}
+
+#text_container {
+    color: var(--white);
+    padding: 20px;
+    overflow-y: scroll;
+    height: 88vh;
+}
+#policy_title {
+    font-size: max(16px, min(6vw, 40px));
+    text-align: center;
+    padding: 2vh 0 0.5vh 0vh;
 }

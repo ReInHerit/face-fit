@@ -5,8 +5,21 @@ block layout-content
         a(href="javascript:(function(){var script=document.createElement('script');script.src='https://rawgit.com/paulirish/memory-stats.js/master/bookmarklet.js';document.head.appendChild(script);})()")
             | Run Memory Stats
         // Popup Window
-        #popup-window(style='display: none;')
-          #popup-content
+        #privacy-window(style='display: none;')
+            #privacyModal
+                h2 Privacy Policy
+                p
+                    | Before accessing our webapp, please read and confirm that you have read &#x20;
+                    a(href="/policy", target="_blank") Privacy Policy.
+
+
+                label#cofirm_section(for="confirmCheckbox")
+                    input#confirmCheckbox(type="checkbox")
+                    p I have read and understood the Privacy Policy
+
+                button#confirm_button Confirm
+        #email-window(style='display: none;')
+          #email-content
               h3 Enter your email:
               input#email-input(type='email')
               button#send-email-button Send Email
@@ -45,14 +58,7 @@ block layout-content
 
     script(type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js')
     script(src='https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js')
-    //script(src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh')
-    //script(src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core')
-    //script(src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter')
-    //script(src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl')
-    //script(src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection")
-    //script(src='https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection')
-    //
-    //script(src='js/opencv.js')
+
     script(src="js/main.js" type="module" )
 
 

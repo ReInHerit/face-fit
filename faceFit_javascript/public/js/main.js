@@ -25,11 +25,13 @@ const cam_canvas = document.getElementById('cam_canvas');
 const ctx = cam_canvas.getContext('2d');
 const context = canvas.getContext('2d');
 /* POPUP */
-const popupButton = document.getElementById('popup-button');
+const emailButton = document.getElementById('email-button');
 const resetButton = document.getElementById('reset-button');
-const popupWindow = document.getElementById('popup-window');
+const emailWindow = document.getElementById('email-window');
 const emailInput = document.getElementById('email-input');
 const sendEmailButton = document.getElementById('send-email-button');
+const privacy_popup = document.getElementById('privacyModal');
+const privacyWindow = document.getElementById('privacy-window');
 const camera_width = 1280;
 const camera_height = 960;
 const framerate = 5;
@@ -39,7 +41,6 @@ const host = window.location.hostname;
 const protocol = window.location.protocol;
 const url_base = `${protocol}//${host}`;
 const url_port = port ? `:${port}` : '';
-// let cam_face = new Face('cam', video);
 let selected, morphed_btns;
 let face_arr = []
 let morphed = ''
@@ -75,7 +76,8 @@ let webcamRunning = false;
 let lastVideoTime = -1;
 
 let dsize //= new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
-
+localStorage.setItem('privacyConfirmed', 'false');
+let hasConfirmed = localStorage.getItem('privacyConfirmed');
 /* UI FUNCTIONS*/
 function init_slicks(window_aspect_ratio) {
     const sliders = [leftSlick, rightSlick];
@@ -302,12 +304,7 @@ async function init() {
     dsize = new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
     const aspect = container.offsetWidth / container.offsetHeight
     const main_direction = aspect > 1 ? 'horizontal' : 'vertical'
-    // /* INITIALIZE PAINTINGS' FACE OBJECTS */
-    //     loadJsonFile('../json/ref_images.json')
-    //         .then((json) => {
-    //             face_arr = json;
-    //         });
-    //     console.log('PAINTINGS OBJ INITIALIZED')
+
     /* INITIALIZE USER and PAINTINGS DATA*/
     fetch("/set_user", {
         method: 'POST',
@@ -334,7 +331,7 @@ async function init() {
 
     /* INITIALIZE SEND EMAIL POPUP */
     const validRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/;
-    popupButton.firstChild.src = send_logo
+    emailButton.firstChild.src = send_logo
     resetButton.firstChild.src = reset_logo
     resetButton.addEventListener('click', () => {
         fetch("/delete_morphs", {
@@ -354,10 +351,10 @@ async function init() {
                 // setMorphsButtons(default_morph);
             })
             .catch((err) => console.error(`Fetch problem: ${err.message}`));
-        popupWindow.style.display = 'none';
+        emailWindow.style.display = 'none';
     })
-    popupButton.addEventListener('click', () => {
-        popupWindow.style.display = 'block';
+    emailButton.addEventListener('click', () => {
+        emailWindow.style.display = 'block';
     });
     sendEmailButton.addEventListener('click', () => {
         const mailToAddress = emailInput.value;
@@ -379,31 +376,15 @@ async function init() {
                 })
                 .catch((err) => console.error(`Fetch problem: ${err.message}`));
 
-            // Close the popup window
-            popupWindow.style.display = 'none';
+            // Close the email window
+            emailWindow.style.display = 'none';
         } else {
             if (confirm("Your input is not a valid email address.\n" +
-                "Press Cancel to retry or Ok to reset the game!")) {
-
-                fetch("/delete_morphs", {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    body: JSON.stringify({'morphs': 'delete'}),
-                })
-                    .then((res) => {
-                        if (!res.ok) {
-                            throw new Error(`HTTP error: ${res.status}`);
-                        }
-                        return res.json();
-                    })
-                    .then((json) => {
-                        drawOnCanvas(start_view);
-                        setMorphsButtons(default_morph);
-                    })
-                    .catch((err) => console.error(`Fetch problem: ${err.message}`));
-                popupWindow.style.display = 'none';
-            } else {
+                "Press Ok to retry or Cancel to exit email window!")) {
                 console.log('Retry')
+
+            } else {emailWindow.style.display = 'none';
+
             }
             return false;
 
@@ -479,8 +460,35 @@ async function init() {
     }
     console.log('INTERACTION INITIALIZED')
     body.classList.add('loaded')
+    privacy_popup.classList.add('loaded')
+    //
+    setTimeout(function() {
+        privacy_popup.style.display = 'block';
+        privacyWindow.style.display = 'block'
+    } , 950);
+    // If not confirmed, show the privacy modal
+    if (!hasConfirmed) {
+      privacy_popup.style.display = 'block';
+    }
+    document.getElementById('confirm_button').onclick = confirmPrivacy;
 }
 
+function confirmPrivacy() {
+        // Check if the user has confirmed reading the policy
+        const isConfirmed = document.getElementById('confirmCheckbox').checked;
+
+        if (isConfirmed) {
+          // Store confirmation in local storage
+          localStorage.setItem('privacyConfirmed', 'true');
+
+          // Close the privacy modal
+          privacy_popup.style.display = 'none';
+          privacyWindow.style.display = 'none';
+        } else {
+          // Optionally, display a message or take other actions for non-confirmation
+          alert('You must confirm that you have read the Privacy Policy to access the webapp.');
+        }
+      }
 async function loadJsonFile(filePath) {
     try {
         const response = await fetch(filePath);
@@ -985,7 +993,13 @@ function opencvIsReady() {
 
     });
 }
-
+// document.getElementById('loader').addEventListener('animationend', function() {
+//   // Add the 'loaded' class to the body to trigger the CSS animations
+//   // document.body.classList.add('loaded');
+//
+//   // Make #privacyModal visible
+//   privacy_popup.style.display = 'block';
+// });
 function releaseMat(mat) {
     if (mat && !mat.isDeleted()) {
         mat.delete();

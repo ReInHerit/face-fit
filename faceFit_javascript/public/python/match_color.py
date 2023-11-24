@@ -68,7 +68,6 @@ def outliner(image):
     rgb_planes = cv2.split(image)
     kernel = np.ones((7, 7), np.uint8)
     for plane in rgb_planes:
-        bg_img = None  # Define bg_img with a default value
         try:
             dilated_img = cv2.dilate(plane, kernel)
             bg_img = cv2.medianBlur(dilated_img, 21)
@@ -97,14 +96,14 @@ def add_dark_pixels(bgr_img, l_channel):
     normalized_l = l_channel / 255.0
 
     # Set the threshold value to determine dark pixels
-    threshold = 0.01  # Adjust the threshold value as needed
+    threshold = 0.7  # Adjust the threshold value as needed
 
     # Create a mask for dark pixels based on the threshold
     dark_pixel_mask = normalized_l >= threshold
+    blurred_dark_pixel_mask = cv2.GaussianBlur(dark_pixel_mask.astype(np.float64), (15, 15), 0)
 
     # Multiply the BGR image with the dark pixel mask to darken dark pixels
-    bgr_img_darkened = bgr_img * dark_pixel_mask[:, :, np.newaxis]
-    # bgr_img_darkened = bgr_img_darkened * dark_pixel_mask[:, :, np.newaxis]
+    bgr_img_darkened = bgr_img * blurred_dark_pixel_mask[:, :, np.newaxis]
 
     # Clip the output image to the valid range of 0-255
     np.clip(bgr_img_darkened, 0, 255, out=bgr_img_darkened)
@@ -198,10 +197,15 @@ def match_histograms(image, reference, *, channel_axis=None):
 def matching_color(img_ref, img_src):
     img_ref = preprocess_image(img_ref)
     outline_l = outliner(img_src)[1][:, :, 0]
+    outline_l_float = outline_l.astype(np.float32)
+
+    # Increase the intensity of darker pixels
+    outline_l_float[outline_l_float < 200] *= 0.5  # Adjust the factor as needed
+
     cm = ColorMatcher()
     img_out = cm.transfer(src=img_src, ref=img_ref, method='mkl')
     img_out = Normalizer(img_out).uint8_norm()
-    # cv2.imshow('img_out', img_out)
     cc = match_histograms(img_out, img_ref)
+
     cc = add_dark_pixels(cc, outline_l)
     return cc

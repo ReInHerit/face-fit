@@ -1,30 +1,22 @@
 "use strict";
 import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 const {FaceLandmarker, FilesetResolver, DrawingUtils} = await vision;
-
-/* VIEW AND CAMERA */
-const ref_img = document.getElementById("ref_img");
-const video = document.getElementById("webcam");
-
-/* HINTS */
+// HTML ELEMENTS SELECTION
+    /* HINTS */
 const hints = document.getElementById("hints_section");
 const percent_x = document.getElementById("pb_x");
 const percent_y = document.getElementById("pb_y");
 const percent_z = document.getElementById("pb_z");
-
-/* CONTAINERS */
+    /* SLICKs */
+const leftSlick = $("#ref_btns");
+const rightSlick = $("#morph_btns")
+    /* CONTAINERS */
 const body = document.body
 const container = document.getElementsByClassName("container")[0]
 const container_left = document.getElementById("ref_btns");
 const container_right = document.getElementById("morph_btns")
 const container_center = document.getElementById("main_view")
-
-/* CANVAS */
-const canvas = document.getElementById("canvas");
-const cam_canvas = document.getElementById('cam_canvas');
-const ctx = cam_canvas.getContext('2d');
-const context = canvas.getContext('2d');
-/* POPUP */
+    /* POPUPs */
 const emailButton = document.getElementById('email-button');
 const resetButton = document.getElementById('reset-button');
 const emailWindow = document.getElementById('email-window');
@@ -32,28 +24,31 @@ const emailInput = document.getElementById('email-input');
 const sendEmailButton = document.getElementById('send-email-button');
 const privacy_popup = document.getElementById('privacyModal');
 const privacyWindow = document.getElementById('privacy-window');
+    /* CAMERA */
+const ref_img = document.getElementById("ref_img");
+const video = document.getElementById("webcam");
+const canvas = document.getElementById("canvas");
+const cam_canvas = document.getElementById('cam_canvas');
+const ctx = cam_canvas.getContext('2d');
+const context = canvas.getContext('2d');
+// SETTINGS
+    /* CAMERA, VIEW SETTINGS */
 const camera_width = 1280;
 const camera_height = 960;
-const framerate = 5;
+const framerate = 30;
 const interval = 1000 / framerate;
-const port = window.location.port;
-const host = window.location.hostname;
-const protocol = window.location.protocol;
-const url_base = `${protocol}//${host}`;
-const url_port = port ? `:${port}` : '';
-let selected, morphed_btns;
-let face_arr = []
-let morphed = ''
-
 let default_view = '../images/Thumbs/default_view_h.jpg'
 const default_morph = '../images/Thumbs/morph_thumb.jpg'
 const send_logo = '../images/Thumbs/send.png'
 const reset_logo = '../images/Thumbs/reset.png'
 const start_view = '../images/Thumbs/start_view.jpg'
-
-const leftSlick = $("#ref_btns");
-const rightSlick = $("#morph_btns")
-
+    /* NETWORK SETTINGS */
+const port = window.location.port;
+const host = window.location.hostname;
+const protocol = window.location.protocol;
+const url_base = `${protocol}//${host}`;
+const url_port = port ? `:${port}` : '';
+    /* FACE DATA */
 const right_eye = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7, 33];
 const left_eye = [362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382, 362];
 const mouth = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78];
@@ -62,9 +57,11 @@ const nose2 = [2, 94, 19, 1, 4, 5, 195, 197, 6, 168, 8, 107, 66, 105, 63, 70];
 const nose3 = [8, 336, 296, 334, 293, 300];
 const full_indices_set = new Set([...right_eye, ...left_eye, ...mouth, ...nose1, ...nose2, ...nose3, 10, 152, 226, 446]);
 const ghost_mask_array = [right_eye, left_eye, mouth, nose1, nose2, nose3];
-let  ref_roi, ref, ref_size, result, bb_ref_rect, ref_roi_size, matchInterval, detector;
-let line_color //= new cv.Scalar(255, 255, 255, 120);
-let isMatching = false;
+
+let selected, morphed_btns;
+let face_arr = []
+let morphed = ''
+let dsize, ref_roi, ref, ref_size, result, bb_ref_rect, ref_roi_size, matchInterval, detector, line_color
 let cam_points = {}
 let cam_bb = {}
 let cam_angles = []
@@ -72,12 +69,13 @@ let cam_expression = []
 
 let faceLandmarker;
 let runningMode = "IMAGE";
-let webcamRunning = false;
+let isMatching = false;
+// let webcamRunning = false;
 let lastVideoTime = -1;
 
-let dsize //= new cv.Size(container_center.offsetWidth, container_center.offsetWidth);
 localStorage.setItem('privacyConfirmed', 'false');
 let hasConfirmed = localStorage.getItem('privacyConfirmed');
+
 /* UI FUNCTIONS*/
 function init_slicks(window_aspect_ratio) {
     const sliders = [leftSlick, rightSlick];
@@ -85,10 +83,10 @@ function init_slicks(window_aspect_ratio) {
     let arrows = isVertical ? ['left', 'right'] : ['up', 'down'];
     const prevArrowString = `<button type="button" class="slick-prev"><img src="/images/Thumbs/arrow_${arrows[0]}.png" alt="PREV"></button>`;
     const nextArrowString = `<button type="button" class="slick-next"><img src="/images/Thumbs/arrow_${arrows[1]}.png" alt="NEXT"></button>`;
-    // Calculate slide width and count once
+
     const [slides, value] = calculateSlideWidthAndCount(isVertical);
 
-    // Define a common function for setting arrow properties
+    // Setting arrow properties
     function setArrowProperties(slider, value) {
         slider.find('.button-image img').css('width', (value - 5) + 'px');
         if (!isVertical) {
@@ -98,7 +96,6 @@ function init_slicks(window_aspect_ratio) {
 
     sliders.forEach((slider, index) => {
         slider.on('init', function (event, slick) {
-            // console.log('init_slicks', index, slick, value)
             setArrowProperties(slider, value);
         }).slick({
             infinite: false,
@@ -116,10 +113,7 @@ function init_slicks(window_aspect_ratio) {
             const $prevArrow = $(slick.$prevArrow);
             const $nextArrow = $(slick.$nextArrow);
 
-            // Disable the previous arrow when reaching the start of the slider
             $prevArrow.toggleClass('disabled', nextSlide === 0);
-
-            // Disable the next arrow when reaching the end of the slider
             $nextArrow.toggleClass('disabled', nextSlide === slick.slideCount - 1);
         });
     });
@@ -135,7 +129,6 @@ function updateSlider() {
     let orientation, areas, arrows, columns, rows, area;
 
     const [slides, value] = calculateSlideWidthAndCount(isVertical);
-    // console.log('updateSlider', slides, value);
 
     if (isVertical) {
         orientation = 'vertical';
@@ -198,11 +191,9 @@ function calculateSlideWidthAndCount(vertical) {
     }
 
     const arrowClutter = 30;
-
     // Caching the container dimensions to minimize layout thrashing
     const width = container.offsetWidth;
     const height = container.offsetHeight;
-
     // Determine the max value for slides
     let maxValue = vertical ? Math.floor(height * 0.15) - 5 : Math.floor(width * 0.2) - 5;
     maxValue = Math.min(maxValue, 150);
@@ -258,7 +249,6 @@ function setButtonClick(button, action) {
 function clearMatchInterval() {
     if (matchInterval) {
         clearInterval(matchInterval);
-        console.log('clearMatchInterval')
         clear_mats()
         reset_bar()
         stopCamera()
@@ -271,33 +261,9 @@ function clearMatchInterval() {
         ref_roi_size = null;
         isMatching = false;
         matchInterval = null;
-
     }
 }
 
-async function createFaceLandmarker() {
-    const filesetResolver = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-    );
-    // console.log("filesetResolver: ", filesetResolver)
-    // console.log("FaceLandmarker: ", FaceLandmarker)
-    try {
-        faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                delegate: "CPU"
-            },
-            outputFaceBlendshapes: false,
-            outputFacialTransformationMatrixes: true,
-            runningMode,
-            numFaces: 1
-        });
-    } catch (error) {
-        console.log("error: ", error)
-    }
-    // console.log("faceLandmarker: ", faceLandmarker)
-    // demosSection.classList.remove("invisible");
-}
 async function init() {
     console.log("init");
     line_color = new cv.Scalar(255, 255, 255, 120);
@@ -472,7 +438,6 @@ async function init() {
     }
     document.getElementById('confirm_button').onclick = confirmPrivacy;
 }
-
 function confirmPrivacy() {
         // Check if the user has confirmed reading the policy
         const isConfirmed = document.getElementById('confirmCheckbox').checked;
@@ -489,19 +454,7 @@ function confirmPrivacy() {
           alert('You must confirm that you have read the Privacy Policy to access the webapp.');
         }
       }
-async function loadJsonFile(filePath) {
-    try {
-        const response = await fetch(filePath);
 
-        if (!response.ok) {
-            throw new Error(`HTTP error: ${response.status}`);
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Error loading JSON file:', error);
-    }
-}
 
 /* MANAGE BARS FUNCTIONS */
 function reset_bar() {
@@ -509,7 +462,6 @@ function reset_bar() {
         bar.style.width = bar.innerHTML = '';
     });
 }
-
 function update_bar() {
     if (morphed === '') {
         const percentX = 100 - Math.abs(face_arr[selected].angles[0] - cam_angles[0]);
@@ -527,7 +479,28 @@ function update_bar() {
     }
 }
 
+
 /* FACE DATA CALCULATIONS */
+async function createFaceLandmarker() {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+    );
+    try {
+        faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+            baseOptions: {
+                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                delegate: "CPU"
+            },
+            outputFaceBlendshapes: false,
+            outputFacialTransformationMatrixes: true,
+            runningMode,
+            numFaces: 1
+        });
+    } catch (error) {
+        console.log("error: ", error)
+    }
+}
+
 async function calc_lmrks(image) {
     try {
         cam_points = {};
@@ -553,9 +526,7 @@ async function calc_lmrks(image) {
         }
         else {
             no_landmarks()
-            // console.log('Cannot calculate landmarks of image')
         }
-        // console.log("ended calc_lmrks")
     } catch (error) {
         console.error('Error loading or processing image:', error);
         // Handle the error appropriately, e.g., by returning an error status or rethrowing it.
@@ -638,7 +609,6 @@ function calculateBoundingBox(points) {
     return box;
 }
 
-
 function matrixToEulerAngles(matrix) {
     const rotationMatrix = [
         [matrix[0], matrix[1], matrix[2]],
@@ -665,31 +635,6 @@ function matrixToEulerAngles(matrix) {
     z = (z * (180 / Math.PI));
 
     return [Math.round(x), Math.round(y), -Math.round(z)];
-}
-
-function getHeadAngles(lmrk10, lmrk133, lmrk152, lmrk226, lmrk362, lmrk446) {
-    // V: 10, 152; H: 226, 446
-    const faceVerticalCentralPoint = [0, (lmrk10[1] + lmrk152[1]) * 0.5, (lmrk10[2] + lmrk152[2]) * 0.5];
-    const verticalAdjacent = lmrk10[2] - faceVerticalCentralPoint[2];
-    const verticalOpposite = lmrk10[1] - faceVerticalCentralPoint[1];
-    const verticalHypotenuse = l2Norm([verticalAdjacent, verticalOpposite,]);
-    const verticalCos = verticalAdjacent / verticalHypotenuse;
-
-    const faceHorizontalCentralPoint = [(lmrk226[0] + lmrk446[0]) * 0.5, 0, (lmrk226[2] + lmrk446[2]) * 0.5];
-    const horizontalAdjacent = lmrk226[2] - faceHorizontalCentralPoint[2];
-    const horizontalOpposite = lmrk226[0] - faceHorizontalCentralPoint[0];
-    const horizontalHypotenuse = l2Norm([horizontalAdjacent, horizontalOpposite,]);
-    const horizontalCos = horizontalAdjacent / horizontalHypotenuse;
-
-    const first = Math.acos(verticalCos) * (180 / Math.PI) - 10;
-    const second = Math.acos(horizontalCos) * (180 / Math.PI);
-    const third = Math.atan2(lmrk362[1] - lmrk133[1], lmrk362[0] - lmrk133[0]) * (180 / Math.PI)
-
-    return [Math.round(first), Math.round(second), -Math.round(third)];
-}
-
-function l2Norm(vector) {
-    return Math.sqrt(vector.reduce((acc, val) => acc + val * val, 0));
 }
 
 function draw_lines(img, arr) {
@@ -719,11 +664,9 @@ function draw_lines(img, arr) {
 
 async function draw_mask_on_ref() {
     if (cam_bb.x === undefined && cam_bb.y === undefined && cam_bb.width === undefined && cam_bb.height === undefined) {
-        // console.log('0) cam_bb', cam_bb, ' memory: ', formatCVMemoryUsage());
         return;
     }
     try {
-        // Create ghost source and draw mask on it
         if (cam_bb.xMin > 0 && cam_bb.yMin > 0 && cam_bb.xMin + cam_bb.width < camera_width && cam_bb.yMin + cam_bb.height < camera_height) {
             const ghost_source = new cv.Mat.zeros(cam_bb.height, cam_bb.width, cv.CV_8UC3);
             for (const arr of ghost_mask_array) {
@@ -750,12 +693,10 @@ async function draw_mask_on_ref() {
     } catch (error) {
         console.log("matchInterval exists")
         clearMatchInterval()
-        // selected = -1;
         const file = "/images/Thumbs/default_view.jpg"
         const path = protocol + '//' + host + ':' + port + file;
         drawOnCanvas(path);
         console.error('An error occurred in draw_mask_on_ref:', error);
-
     }
 }
 
@@ -795,7 +736,6 @@ async function match_faces() {
         try {
             await calc_lmrks(video);
             if (Object.keys(cam_points).length === 0 || Object.keys(cam_bb).length === 0 || cam_angles.length === 0) {
-                // console.log("No landmarks computed.")
                 return;
             }
             update_bar();
@@ -821,14 +761,11 @@ async function check_and_swap() {
         angle3_cam <= angle3_ref + delta / 2
     ) {
         console.log('match1')
-
-        // console.log('cam_expression', cam_expression, 'face_arr[selected].expression', face_arr[selected].expression)
         if (cam_expression.toString() === face_arr[selected].expression.toString()) {
             console.log('match2')
             isMatching = false;
 
             clearInterval(matchInterval);
-            console.log('clearInterval')
             morphed = ''
             // Draw image on canvas
             ctx.drawImage(video, 0, 0, camera_width, camera_height);
@@ -840,9 +777,6 @@ async function check_and_swap() {
                 const objs = {selected, c_face: data_url};
 
                 const data_json = JSON.stringify(objs);
-                // Send data to server
-                // selected = -1;
-
                 const res = await fetch('/morph', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
@@ -850,28 +784,22 @@ async function check_and_swap() {
                 });
                 if (!res.ok) {
                     throw new Error(`HTTP error: ${res.status}`);
-
                 }
 
                 const json = await res.json();
                 // Extract information from server response
                 const rel_path = json.relative_path;
-                console.log('rel_path', rel_path)
                 const abs_path = json.absolute_path;
-                console.log('abs_path', abs_path)
-                const user_id = json.user_id;
                 const folder = 'public';
                 const folder_id = abs_path.indexOf(folder);
 
                 const sub_path = abs_path.slice(folder_id + folder.length);
                 // Construct morphed URL
-
                 morphed = `${url_base}${url_port}${sub_path}`;
                 // Update button image and canvas
                 const id = extract_index(rel_path);
                 morphed_btns[id].firstChild.src = morphed + '?' + Math.random();
                 drawOnCanvas(morphed + '?' + Math.random());
-
                 selected = -1;
                 reset_bar()
                 stopCamera()
@@ -887,12 +815,9 @@ async function check_and_swap() {
             } catch (err) {
                 console.error(`Fetch problem: ${err.message}`);
             }
-
-
         }
     }
 }
-
 
 function check_expression(lmrk13, lmrk14, lmrk33, lmrk78,
                           lmrk133, lmrk145, lmrk159, lmrk263,
@@ -918,8 +843,7 @@ function check_expression(lmrk13, lmrk14, lmrk33, lmrk78,
         return [l_e, r_e, lips]
     } catch (error) {
         console.error("An error occurred in check_expression:", error);
-        // Handle the error or rethrow it if needed
-        throw error; // Rethrow the error to propagate it further if necessary
+        throw error;
     }
 }
 
@@ -931,7 +855,6 @@ async function resize_all() {
         await draw_mask_on_ref()
     }
 }
-
 
 function accessCamera() {
     console.log("accessCamera")
@@ -949,7 +872,7 @@ function accessCamera() {
 function startCamera() {
     return accessCamera()
         .then(async (stream) => {
-            webcamRunning = true;
+            // webcamRunning = true;
             video.srcObject = stream;
 
             if (runningMode === "IMAGE") {
@@ -970,11 +893,6 @@ function stopCamera() {
         });
         video.srcObject = null;
     }
-    if (detector) {
-        detector.dispose(); // Example: Release resources associated with the detector
-        detector = null; // Set the detector to null to indicate it's no longer available
-
-    }
 }
 
 function opencvIsReady() {
@@ -983,9 +901,6 @@ function opencvIsReady() {
         await createFaceLandmarker().then(r => {
             console.log('FACE LANDMARKER IS READY')
             $.getScript('../js/opencv.js', async function (data, textStatus, jqxhr) {
-                // console.log(data); // Data returned
-                console.log(textStatus); // Success
-                console.log(jqxhr.status); // 200
                 console.log("Load was performed.");
                 setTimeout(init, 500)
             });
@@ -993,13 +908,7 @@ function opencvIsReady() {
 
     });
 }
-// document.getElementById('loader').addEventListener('animationend', function() {
-//   // Add the 'loaded' class to the body to trigger the CSS animations
-//   // document.body.classList.add('loaded');
-//
-//   // Make #privacyModal visible
-//   privacy_popup.style.display = 'block';
-// });
+
 function releaseMat(mat) {
     if (mat && !mat.isDeleted()) {
         mat.delete();

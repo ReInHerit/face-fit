@@ -226,7 +226,7 @@ def morph(c_obj, r_obj):
     images = [cam_image, ref_image]
     hair_masks = get_hair_mask(images)
     ref_smoothed, noise = find_noise_scratches(ref_image)
-    cam_smoothed, noise_cam = find_noise_scratches(cam_image)
+    cam_smoothed, _ = find_noise_scratches(cam_image)
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
             r_obj['bb']['xMin'] - offset:r_obj['bb']['xMax'] + offset]
     c_roi = cam_smoothed[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
@@ -259,9 +259,12 @@ def morph(c_obj, r_obj):
     out_bg = ref_smoothed.astype('float') / 255
     out = out_bg * (1 - r_face_mask_3ch) + out_face * r_face_mask_3ch
     out = (out * 255).astype('uint8')
+
     out = cv2.add(out, noise)
     out = cv2.add(out, noise)
+    # print('here')
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center_of_brect, cv2.NORMAL_CLONE)
+    # print('here2')
     hair_mask_gray = cv2.cvtColor(hair_masks[1], cv2.COLOR_BGR2GRAY)
     ret, hair_mask_gray = cv2.threshold(hair_mask_gray, 127, 255, cv2.THRESH_BINARY)
     br = cv2.boundingRect(hair_mask_gray)  # bounding rect (x,y,width,height)

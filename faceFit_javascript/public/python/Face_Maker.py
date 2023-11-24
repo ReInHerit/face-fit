@@ -6,8 +6,7 @@ from mediapipe.tasks.python import vision
 from mediapipe import solutions
 import numpy as np
 
-# Mediapipe
-
+# # Mediapipe
 mp_drawing = solutions.drawing_utils
 mp_drawing_styles = solutions.drawing_styles
 mp_face_mesh = solutions.face_mesh
@@ -25,7 +24,20 @@ options = vision.FaceLandmarkerOptions(base_options=base_options,
                                        output_face_blendshapes=False,
                                        output_facial_transformation_matrixes=True,
                                        num_faces=1)
-detector = vision.FaceLandmarker.create_from_options(options)
+
+
+class FaceLandmarker:
+    def __init__(self):
+        # Mediapipe
+        self.detector = vision.FaceLandmarker.create_from_options(options)
+
+    def detect_landmarks(self, image):
+        # w, h, c = image.shape
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+        detection_result = self.detector.detect(mp_image)
+        return detection_result.face_landmarks, detection_result.facial_transformation_matrixes[0]
+
 
 class Face:
     def __init__(self, which):
@@ -35,23 +47,15 @@ class Face:
         self.landmarks = []
         self.points = []
         self.pix_points = []
-        self.alpha = 0
-        self.beta = 0
-        self.gamma = 0
+        self.alpha, self.beta, self.gamma = 0, 0, 0
         self.status = {'l_e': '', 'r_e': '', 'lips': ''}
-        self.delta_x = 0
-        self.delta_y = 0
-        self.bb_p1 = (0, 0)
-        self.bb_p2 = (0, 0)
+        self.delta_x, self.delta_y = 0, 0
+        self.bb_p1, self.bb_p2 = (0, 0), (0, 0)
 
     def get_landmarks(self, n_image):
         w, h, c = n_image.shape
         self.image = n_image
-        rgb_image = cv2.cvtColor(n_image, cv2.COLOR_BGR2RGB)
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
-        detection_result = detector.detect(mp_image)
-        face_landmarks = detection_result.face_landmarks
-        transformation_matrix = detection_result.facial_transformation_matrixes[0]
+        face_landmarks, transformation_matrix = detector.detect_landmarks(n_image)
         if face_landmarks[0]:
             length = len(face_landmarks[0])
             self.points, self.pix_points = [], []
@@ -76,8 +80,8 @@ class Face:
             self.delta_y = cy_max - cy_min
             self.alpha, self.beta, self.gamma = self.get_face_angles(transformation_matrix)
 
-
-    def get_face_angles(self, transformation_matrix):
+    @staticmethod
+    def get_face_angles(transformation_matrix):
         rotation_matrix = transformation_matrix[:3, :3]
 
         # Perform Euler angle decomposition
@@ -91,7 +95,8 @@ class Face:
         jaw_deg = np.round(np.degrees(jaw)).astype(int)
         return pitch_deg, roll_deg, jaw_deg
 
-    def check_expression(self, face_points):
+    @staticmethod
+    def check_expression(face_points):
         # l_eye
         l_gap = aperture(face_points, 362, 263, 386, 374)
         if l_gap <= 0.1:
@@ -136,30 +141,6 @@ class Face:
             connection_drawing_spec=dr_spec)
 
 
-# class FacePart:
-#     def __init__(self, part_group):
-#         self.part_group = part_group
-#         self.idx = []
-#         self.pts = []
-#         self.raw_pts = []
-#         self.get_idx()
-#
-#     def get_idx(self):
-#         part = list(self.part_group)
-#         for index in part:
-#             self.idx.append(index[0])
-#             self.idx.append(index[1])
-#         self.idx = sorted(set(self.idx))
-#
-#     def calc_pts(self, points_array):
-#         self.raw_pts = [points_array[i] for i in self.idx]
-#         v = np.array(self.raw_pts)
-#         new_range = (0, 1)
-#         scaled_unit = (max(new_range) - min(new_range)) / (np.max(v) - np.min(v))
-#         new_points = v * scaled_unit - np.min(v) * scaled_unit + min(new_range)
-#         self.pts = new_points.tolist()
-#
-
 def aperture(pixel_points, id1, id2, id3, id4):
     p1 = (pixel_points[id1][0], pixel_points[id1][1])
     p2 = (pixel_points[id2][0], pixel_points[id2][1])
@@ -169,3 +150,6 @@ def aperture(pixel_points, id1, id2, id3, id4):
     p2_p1 = ((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2) ** 0.5
     division = p4_p3 / p2_p1
     return division
+
+
+detector = FaceLandmarker()

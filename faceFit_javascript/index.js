@@ -1,6 +1,4 @@
-/**
- * Required External Modules
- */
+// Required External Modules
 const express = require("express");
 const path = require("path");
 const fs = require('fs');
@@ -11,24 +9,20 @@ const uuid = require('uuid');
 const fs_extra = require('fs-extra');
 require('dotenv').config();
 
-/**
- * App Variables
- */
+// App Variables
 const app = express();
 const port = process.env.PORT || 8000;
 let host = process.env.HOST || "localhost";
-const protocol = process.env.PROTOCOL || "http";
+// const protocol = process.env.PROTOCOL || "http";
 let userId = '';
-
 let ref_images = [];
-
 const json_path = path.join(__dirname, 'public/json');
 const directoryPath = path.join(__dirname, 'public/images');
 const temp_path = path.join(__dirname, 'public/temp');
-checkPath(temp_path);
 let morphs_path = null;
 const painting_data_file = json_path + '/painting_data.json'
 const jsonData = JSON.parse(fs.readFileSync(painting_data_file, 'utf8'));
+// Helper function to check if a path exists, create it if not
 function checkPath(path) {
     if (!fs.existsSync(path)) {
         fs.mkdirSync(path, {recursive: true});
@@ -37,16 +31,16 @@ function checkPath(path) {
         console.log('exists', path)
     }
 }
+// Initialize temp directories
+checkPath(temp_path);
 
-console.log(host, port)
-/**
- *  App Configuration
- */
+// App Configuration
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "pug");
 app.use(express.static(path.join(__dirname, "public")));
 app.use(bodyParser.json({limit: '50mb'}));
 
+// Nodemailer transporter configuration
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -55,10 +49,8 @@ const transporter = nodemailer.createTransport({
     },
     tls: {rejectUnauthorized: false}
 });
-/**
- * Paintings' Files
- */
 
+// Read paintings' files and populate ref_images
 fs.readdir(directoryPath, function (err, files) {
     if (err) {
         return console.log('Unable to scan directory: ' + err);
@@ -70,12 +62,14 @@ fs.readdir(directoryPath, function (err, files) {
             ref_images.push('images/' + file);
         }
     });
-    console.log(ref_images.length)
+
+    // Define route for the home page
     app.get("/", (req, res) => {
         res.render("index", {title: "FACE-FIT", data: ref_images, ga_key: process.env.GA_KEY});
     });
 });
 
+// Extract number from file name
 function extract_number(fileName) {
     const replaced = fileName.replace(/\D/g, ''); // 👉️ '123'
     let numb;
@@ -85,6 +79,7 @@ function extract_number(fileName) {
     return numb
 }
 
+// Send mail function
 async function send_mail(send_to) {
     const files = await fs.promises.readdir(morphs_path);
     const morph_list = files.map(file => ({filename: file, path: `${morphs_path}/${file}`}));
@@ -113,9 +108,9 @@ async function send_mail(send_to) {
             delete_morphs();
         }
     });
-
 }
 
+// Delete morphs function
 function delete_morphs() {
     const path_to_delete = path.join(__dirname, 'public/temp', userId);
     console.log('path to delete', path_to_delete);
@@ -127,9 +122,7 @@ function delete_morphs() {
     checkPath(morphs_path)
 }
 
-/**
- * Routes Definitions
- */
+// Routes Definitions
 app.get('/info', (req, res) => {
     res.send({'start': 'swap'});
 });
@@ -138,7 +131,7 @@ app.get('/policy', (req, res) => {
 });
 app.post('/set_user', (req, res) => {
     console.log('user_id',userId)
-    request.post(`http://${host}:8050/INIT_PAINTINGS`, {json: ref_images}, async function (error, response, body) {
+    request.post(`http://${host}:8050/INIT_PAINTINGS`, {json: ref_images}, async function (error, response) {
 
         if (!error && response.statusCode === 200) {
             console.log('init server');
@@ -170,15 +163,14 @@ app.delete('/folder', (req, res) => {
     });
 });
 
-app.post('/morph', function (req, res, next) {
+app.post('/morph', function (req, res) {
     const objs = req.body
     console.log('morphing')
     request.post(`http://${host}:8050/DATAtoPY`, {
         json: {
             objs: objs,
             user_id: userId
-        },
-        timeout: 5000
+        }
     }, async function (error, response, body) {
         let abs_morphed_path, file_name, rel_morphed_path;
 
@@ -210,8 +202,7 @@ app.post('/morph', function (req, res, next) {
 app.post('/morphs_to_send', function (req, res) {
     const user_input = req.body
     send_mail(user_input['mail'])
-        .then(r => {
-
+        .then(()=> {
             res.send({'answer': 'sent'})
         })
         .catch(error => {
@@ -221,16 +212,11 @@ app.post('/morphs_to_send', function (req, res) {
 })
 
 app.post('/delete_morphs', function (req, res) {
-    const user_input = req.body
     delete_morphs()
-
     res.send({'morphs': 'deleted'})
-
 })
-/**
- * Server Activation
- */
 
+// Server Activation
 app.listen(port, host, () => {
     console.log(`Starting Proxy at ${host}:${port}`);
 });

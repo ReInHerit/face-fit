@@ -220,11 +220,12 @@ def sort_triangles_by_distance(triangles, viewer_pos, triangles_points):
 
 def morph(c_obj, r_obj):
     cam_image, cam_points, ref_points = c_obj.image, c_obj.pix_points, r_obj['pix_points']
-    mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 5
+    mask_dilate_iter, mask_erode_iter, blur_value, offset = 10, 15, 35, 20
 
     ref_image = cv2.imread(r_obj['src'])
     images = [cam_image, ref_image]
     hair_masks = get_hair_mask(images)
+
     ref_smoothed, noise = find_noise_scratches(ref_image)
     cam_smoothed, _ = find_noise_scratches(cam_image)
     r_roi = ref_smoothed[r_obj['bb']['yMin'] - offset:r_obj['bb']['yMax'] + offset,
@@ -233,8 +234,10 @@ def morph(c_obj, r_obj):
             c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset]
 
     cam_cc = matching_color(r_roi, c_roi)
+
     cam_image[c_obj.bb_p1[1] - offset:c_obj.bb_p2[1] + offset,
     c_obj.bb_p1[0] - offset:c_obj.bb_p2[0] + offset] = cam_cc.astype('float64')
+
     # SWAP FACE
     ref_new_face = np.zeros(ref_image.shape, np.uint8)
     dt = media_pipes_tris2  # triangles
@@ -243,6 +246,7 @@ def morph(c_obj, r_obj):
     tris2 = [[ref_points[new_dt[i][j]] for j in range(3)] for i in range(len(new_dt))]
     for i in range(0, len(tris1)):  # Apply affine transformation to Delaunay triangles
         warp_triangle(cam_image, ref_new_face, tris1[i], tris2[i])
+
     # GENERATE FINAL IMAGE
     concave_hull = get_concave_hull(np.array(ref_points))
     ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
@@ -251,9 +255,8 @@ def morph(c_obj, r_obj):
     ref_face_mask = cv2.dilate(concave_mask, None, iterations=mask_dilate_iter)
     ref_face_mask = cv2.erode(ref_face_mask, None, iterations=mask_erode_iter)
     ref_face_mask = cv2.GaussianBlur(ref_face_mask, (blur_value, blur_value), sigmaX=0, sigmaY=0)
-    mid3 = cv2.moments(concave_mask)  # Find Centroid
-    brect = cv2.boundingRect(concave_mask)
-    center_of_brect = (int(brect[0] + brect[2] / 2), int(brect[1] + brect[3] / 2))
+
+
     r_face_mask_3ch = cv2.cvtColor(ref_face_mask, cv2.COLOR_GRAY2BGR).astype('float') / 255.
     out_face = (ref_new_face.astype('float') / 255)
     out_bg = ref_smoothed.astype('float') / 255
@@ -262,14 +265,17 @@ def morph(c_obj, r_obj):
 
     out = cv2.add(out, noise)
     out = cv2.add(out, noise)
-    # print('here')
+
+    # Find Center of the polygon to place the face
+    brect = cv2.boundingRect(concave_mask)
+    center_of_brect = (int(brect[0] + brect[2] / 2), int(brect[1] + brect[3] / 2))
+
     output = cv2.seamlessClone(out, ref_image, ref_face_mask, center_of_brect, cv2.NORMAL_CLONE)
-    # print('here2')
+    # place ref hairs on top of the output
     hair_mask_gray = cv2.cvtColor(hair_masks[1], cv2.COLOR_BGR2GRAY)
     ret, hair_mask_gray = cv2.threshold(hair_mask_gray, 127, 255, cv2.THRESH_BINARY)
     br = cv2.boundingRect(hair_mask_gray)  # bounding rect (x,y,width,height)
     centerOfBR = (br[0] + br[2] // 2, br[1] + br[3] // 2)
-    refined_center = (int(ref_image.shape[1] / 2), int(ref_image.shape[0] / 2))
     refined_output = cv2.seamlessClone(ref_image, output, hair_mask_gray, centerOfBR, cv2.NORMAL_CLONE)
 
     return refined_output

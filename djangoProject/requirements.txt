@@ -1,0 +1,12 @@
+django==4.1
+matplotlib==3.6.2
+numpy==1.23.5
+opencv-python==4.6.0.66
+mediapipe>=0.10.0
+shapely==2.0.0
+scipy==1.10.1
+# flask==2.2.2
+# pillow==9.3.0
+color-matcher
+python-dotenv==1.0.0
+python-decouple==3.8

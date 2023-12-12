@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+{% load static %}
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <title>{{ title }}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'assets/images/favicon/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'assets/images/favicon/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'assets/images/favicon/favicon-16x16.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'assets/images/favicon/android-chrome-192x192.png' %}">
+    <link rel="manifest" href="{% static 'assets/images/favicon/site.webmanifest' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'assets/css/mystyle.css' %}">
+    <link rel="stylesheet" type="text/css" href="{% static 'assets/css/custom_slicks.css' %}">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_key }}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', "{{ ga_key }}");
+    </script>
+</head>
+<header>
+    <h1>Face-Fit</h1>
+    <button id="email-button" type="button" title="Send Mail">
+        <img id="send_logo">
+    </button>
+    <button id="reset-button" type="button" title="Reset All">
+        <img id="reset_logo">
+    </button>
+</header>
+<body>
+    <form id="your-form-id">
+    {% csrf_token %}
+    <!-- Other form fields -->
+    </form>
+    <div id="loader-wrapper">
+        <div id="loader"></div>
+        <div class="loader-section section-left"></div>
+        <div class="loader-section section-right"></div>
+    </div>
+    <main class="container">
+        <a href="javascript:(function(){var script=document.createElement('script');script.src='https://rawgit.com/paulirish/memory-stats.js/master/bookmarklet.js';document.head.appendChild(script);})()">
+            Run Memory Stats
+        </a>
+        <div id="privacy-window" style="display: none;">
+            <div id="privacyModal">
+                <h2>Privacy Policy</h2>
+                <p>
+                    Before accessing our web app, please read and confirm that you have read
+                    <a href="/FaceFit/policy/" target="_blank">Privacy Policy</a>.
+                </p>
+
+                <label id="cofirm_section" for="confirmCheckbox">
+                    <input id="confirmCheckbox" type="checkbox">
+                    <p>I have read and understood the Privacy Policy</p>
+                </label>
+
+                <button id="confirm_button">Confirm</button>
+            </div>
+        </div>
+        <!-- Popup Window -->
+        <div id="email-window" style="display: none;">
+            <div id="popup-content">
+                <h3>Enter your email:</h3>
+                <input id="email-input" type="email">
+                <button id="send-email-button">Send Email</button>
+            </div>
+        </div>
+        <div id="ref_btns" class="asnav2Class">
+            {% for file in data %}
+                <div class="select_ch">
+                    <button class="ref_btn button-image">
+                        <img class="img_ref" src="{{ file.source.url }}" crossorigin="anonymous">
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+        <div id="main_view" class="camView">
+            <div id="hints_section">
+                <label id="hints_title">HINTS</label>
+                <table style="width:100%">
+                    <tr>
+                        <td style="width:15%">Pitch</td>
+                        <td style="width:85%">
+                            <div id="pb_x"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Jaw</td>
+                        <td>
+                            <div id="pb_y"></div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Roll</td>
+                        <td>
+                            <div id="pb_z"></div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <canvas id="canvas"></canvas>
+            <img id="ref_img" src="" style="display: none;" alt="Welcome to Face-Fit">
+        </div>
+        <video id="webcam" class="invisible" autoplay="true" muted width="1280" height="960"></video>
+        <canvas id="cam_canvas" width="1280" height="960"></canvas>
+        <div id="morph_btns" class="asnav1Class">
+            {% for n in data %}
+                <div class="show_morph">
+                    <button class="morph_btn button-image">
+                        <img class="img_morph" src="{% static 'assets/images/Thumbs/morph_thumb.jpg' %}">
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    </main>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/slick-carousel/1.8.1/slick.min.js"></script>
+
+
+    <script src="{% static 'assets/js/main.js' %}" type="module" ></script>
+</body>
+</html>

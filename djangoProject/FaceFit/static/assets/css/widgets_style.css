@@ -1,0 +1,63 @@
+#id_reference_text {
+    background: #1a9aef;
+}
+
+.ck-toolbar__items, .ck-sticky-panel {
+    background: #1b1b1b ;
+}
+div.form-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+/*:root {*/
+/*    --ck-color-widget-drag-handler-icon-color: #fff;*/
+/*    --ck-color-base-background: #333;*/
+/*    --ck-color-base-text: #fff;*/
+/*}*/
+
+
+/* Customizing the editor background */
+/*.ck.ck-reset_all {*/
+/*    background: var(--ck-color-base-background);*/
+/*    color: var(--ck-color-base-text);*/
+/*}*/
+form .form-row p {
+    color: white;
+    font-size: 1rem;}
+.form-row a:link, .form-row a:visited {
+    color: #1b8dd9;
+    font-size: 1rem;
+    text-decoration: underline;
+}
+:root {
+    --ck-color-base-background : #121212;
+    --ck-color-button-default-hover-background : #264a5c;
+    --ck-color-button-on-background: #40758f;
+    --ck-color-tooltip-background: #ddd;
+    --ck-color-tooltip-text: #121212;
+}
+.ck.ck-icon.ck-icon_inherit-color, .ck.ck-label, .ck.ck-input.ck-input-text {
+    color: #fff;
+}
+.ck.ck-icon.ck-icon_inherit-color:hover, .ck.ck-icon.ck-icon_inherit-color:active {
+    /*background: #1a9aef;*/
+    color: white;
+}
+
+/* Style the button */
+.ck-button {
+    background-color: #570808;
+    color: #205067;
+    border: 1px solid #006b1b;
+    /* Add any other styles you want to customize the button */
+}
+.ck.ck-link-actions .ck-button.ck-link-actions__preview .ck-button__label{
+    color: #1b8cd7;
+}
+/* Style the button on hover */
+.ck-button:hover {
+    background-color: #417690;
+    color: #1a9aef;
+    /* Add any other styles for the hover state */
+}

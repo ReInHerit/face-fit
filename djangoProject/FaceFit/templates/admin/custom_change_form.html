@@ -1,0 +1,52 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/widgets.css' %}">
+
+
+{% endblock %}
+
+{% block extrahead %}
+
+    {{ block.super }}
+    <script src="https://cdn.ckeditor.com/ckeditor5/40.1.0/classic/ckeditor.js"></script>
+    <script type="text/javascript" src="{% static '/ckeditor/ckeditor_setup.js' %}"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+
+        $(document).ready(function() {
+            var previousAnchorLink = $('.file-upload a').attr('href');
+
+            $('#id_source').change(function() {
+                {#if ($(this).val())#}
+                var imageName = $(this).val().split('\\').pop().split('/').pop().split('.')[0];
+                console.log((imageName));
+                var referenceTitleField = $('#id_reference_title');
+                {#var imageName = $(this).val().split('\\').pop().split('/').pop().split('.')[0];#}
+                var currentAnchorLink = $('.file-upload a').attr('href');
+                if (currentAnchorLink !== previousAnchorLink) {
+                    // Value has changed, update the reference title field
+                    var filenameFromLink = currentAnchorLink.split('/').pop().split('.')[0];
+
+                    referenceTitleField.val(filenameFromLink);
+
+                    // Update the previous value
+                    previousAnchorLink = currentAnchorLink;
+                }
+                else {
+                    referenceTitleField.val(imageName);
+                }
+
+            });
+        });
+    </script>
+    {{ media }}
+    <link rel="stylesheet" type="text/css" href="{% static 'assets/css/widgets_style.css' %}">
+{#    <style>#}
+{#        /* Add your custom styles here, for example: */#}
+{#        :root {#}
+{#            --ck-color-base-background : #121212;}#}
+{#    </style>#}
+{% endblock %}

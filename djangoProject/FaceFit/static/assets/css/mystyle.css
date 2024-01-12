@@ -432,16 +432,16 @@ td {
 }
 
 #footer .social-links a {
-    font-size: 3vh;
+    font-size: 2vh;
     display: inline-block;
-    /*background: #11303b;*/
+    /* background: #11303b; */
     color: #fff;
-    line-height: 0;
+    /* line-height: 0; */
     padding: 0.5vh 0;
     border-radius: 50%;
-    text-align: center;
-    width: 4vh;
-    height: 4vh;
+     text-align: center;
+    width: 3.4vh;
+    /* height: 4vh; */
     transition: 0.3s;
 }
 

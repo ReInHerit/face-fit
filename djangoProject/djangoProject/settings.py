@@ -20,7 +20,6 @@ GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
 GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
 GA_KEY = os.getenv('GA_KEY')
 django_key = os.getenv('DJANGO_KEY')
-print('dk:', django_key)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = django_key

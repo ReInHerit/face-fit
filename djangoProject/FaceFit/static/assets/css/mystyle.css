@@ -362,12 +362,13 @@ td {
 }
 
 #text_container {
-    color: var(--white);
-    padding: 20px;
+    color: black;
+    padding: 20px 20vw;
     overflow-y: scroll;
     height: 88vh;
 }
 #policy_title {
+    color: black;
     font-size: max(16px, min(6vw, 40px));
     text-align: center;
     padding: 2vh 0 0.5vh 0vh;

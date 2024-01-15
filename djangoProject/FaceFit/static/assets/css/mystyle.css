@@ -6,6 +6,11 @@
 
 header {
     width: 100vw;
+    background-color: #009de0;
+    display: flex;
+    align-items: center;
+    min-height: 7vh;
+    z-index: 100;
 }
 
 h1 {
@@ -72,15 +77,28 @@ body, html {
     overflow: hidden;
     margin: 0;
     padding: 0;
-    background-color: var(--black);
-    font-family: 'Trebuchet MS', serif;
+    background-color: white;
+    font-family: 'Roboto', serif;
 }
+#header_logo {
+    max-height: 5vh;
+    margin: 1vh;
+    float: left;
+}
+#undertitle {
+    font-size: 1.5vh;
 
+}
+#header_title {
+    color: #FFFFFF;
+    line-height: 1;
+    font-size: 4vh;
+}
 .container {
-    width: calc(100vw - 10px);
-    height: 100vh;
+    /*width: calc(100vw - 10px);*/
+    height: calc(100vh - 120px);
     min-width: 300px;
-    max-height: calc(100vh - 60px);
+    /*max-height: calc(100vh - 60px);*/
     margin: auto;
     display: grid;
     align-items: stretch;
@@ -93,7 +111,7 @@ body, html {
 }
 #cam_canvas {
     position: absolute;
-    top: 0;
+    top: 7vh;
     left: 0;
     max-width: 100vw;
     max-height: 100vh;
@@ -135,7 +153,7 @@ body, html {
 }
 
 th, td, #hints_title {
-    color: var(--white);
+    color: black;
     padding-inline: 5px;
     margin-left: 5px
 }
@@ -152,8 +170,8 @@ td {
 
 #pb_x, #pb_y, #pb_z {
     width: 0;
-    height: 12px;
-    background-color: #e59914;
+    height: 17px;
+    background-color: #006d9b;
     text-align: right;
     max(12px, min(1.7vw, 15px))
     line-height: 10px;
@@ -169,6 +187,7 @@ td {
     width: calc(100% - 20px);
     height: min-content;
     margin: 10px;
+
 }
 
 #webcam {
@@ -343,12 +362,13 @@ td {
 }
 
 #text_container {
-    color: var(--white);
-    padding: 20px;
+    color: black;
+    padding: 20px 20vw;
     overflow-y: scroll;
     height: 88vh;
 }
 #policy_title {
+    color: black;
     font-size: max(16px, min(6vw, 40px));
     text-align: center;
     padding: 2vh 0 0.5vh 0vh;
@@ -374,3 +394,90 @@ td {
 ::-webkit-scrollbar-thumb:hover {
   background-color: #555; /* Set the color of the scrollbar thumb on hover */
 }
+
+
+/*--------------------------------------------------------------
+# Footer
+--------------------------------------------------------------*/
+#footer {
+    text-align: center;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    padding: 0;
+    z-index: 10;
+}
+
+.footer_container {
+    background: #009de0;
+    position: relative;
+    height: 5vh;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#footer h3 {
+    font-size: 2vw;
+    font-weight: 400;
+    color: #fff;
+    position: relative;
+    line-height: 5%;
+    margin: 0 1vw 0 2vw;
+}
+
+#footer .social-links {
+    margin: 0 2vw;
+}
+
+#footer .social-links a {
+    font-size: 2vh;
+    display: inline-block;
+    /* background: #11303b; */
+    color: #fff;
+    /* line-height: 0; */
+    padding: 0.5vh 0;
+    border-radius: 50%;
+     text-align: center;
+    width: 3.4vh;
+    /* height: 4vh; */
+    transition: 0.3s;
+}
+
+#footer .social-links a:hover {
+    background: #fdf003;
+    color: #11303b;
+    text-decoration: none;
+}
+
+@media screen and (min-width: 450px) and (max-width: 769px) {
+    #footer h3 {
+        font-size: 3vw;
+    }
+}
+
+@media screen and (max-width: 449px) {
+    #footer {
+        position: fixed;
+    }
+
+    #footer h3 {
+        font-size: 3vw;
+        line-height: 6vh;
+    }
+
+    #footer .social-links {
+        display: inline-block;
+        margin: 1vh;
+    }
+
+    #footer .social-links a {
+        position: relative;
+        font-size: 5vw;
+        width: 7vw;
+        padding: 1vw;
+        height: 7vw;
+    }
+}
+

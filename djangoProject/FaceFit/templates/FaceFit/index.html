@@ -14,6 +14,7 @@
     <link rel="manifest" href="{% static 'assets/images/favicon/site.webmanifest' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'assets/css/mystyle.css' %}">
     <link rel="stylesheet" type="text/css" href="{% static 'assets/css/custom_slicks.css' %}">
+    <link href="{% static 'assets/boxicons/css/boxicons.min.css' %}" rel="stylesheet">
 
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_key }}"></script>
     <script>
@@ -24,7 +25,15 @@
     </script>
 </head>
 <header>
-    <h1>Face-Fit</h1>
+    <a href="https://reinherit-hub.eu/applications" target="_blank" title="ReInHerit Digital Hub">
+        <img id="header_logo" alt="reinherit logo"
+             src="{% static 'assets/images/favicon/reinherit-logo-square-300x300.jpg' %}">
+    </a>
+    <div id="header_title">
+        <em>Re</em><strong>InHerit</strong>
+        <div id="undertitle">Redefining the Future of Cultural Heritage</div>
+    </div>
+{#    <h1>Face-Fit</h1>#}
     <button id="email-button" type="button" title="Send Mail">
         <img id="send_logo">
     </button>
@@ -124,4 +133,22 @@
 
     <script src="{% static 'assets/js/main.js' %}" type="module" ></script>
 </body>
+<footer id="footer">
+    <div class="footer_container">
+        <h3><em>Re</em><strong>InHerit</strong> Toolkit - Face-Fit </h3>
+
+        <div class="social-links">
+            <a href="https://twitter.com/reinherit_" target="_blank" title="twitter" class="twitter"><i
+                    class="bx bxl-twitter"></i></a>
+            <a href="https://www.facebook.com/ReInHerit/" target="_blank" title="facebook" class="facebook"><i
+                    class="bx bxl-facebook"></i></a>
+            <a href="https://www.instagram.com/reinherit_/" target="_blank" title="instagram" class="instagram"><i
+                    class="bx bxl-instagram"></i></a>
+            <a href="https://www.linkedin.com/company/reinherit-h2020" target="_blank" title="linkedin"
+               class="linkedin"><i class="bx bxl-linkedin"></i></a>
+            <a href="https://www.youtube.com/channel/UCWg6SySC2I-RQ41qjxZmTmA" target="_blank" title="youtube"
+               class="youtube"><i class="bx bxl-youtube"></i></a>
+        </div>
+    </div>
+</footer>
 </html>

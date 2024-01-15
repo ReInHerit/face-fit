@@ -22,7 +22,9 @@ and one as web app, useful for mobile devices.
 - [Desktop app](#faceFit_Python)
 - [Web app](#faceFit_javascript)
 
-Each subdirectory contains a READM.md that describes how to install it.
+The most up-to-date version of the code is in the v2.0 branch and Web-based.
+
+Each subdirectory contains a README.md that describes how to install it.
 
 ## Citation
 

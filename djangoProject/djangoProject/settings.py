@@ -13,13 +13,14 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+from django.core.management.utils import get_random_secret_key
 
 load_dotenv()
 # Now you can access environment variables using config
 GMAIL_EMAIL = os.getenv('GMAIL_EMAIL')
 GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
 GA_KEY = os.getenv('GA_KEY')
-django_key = os.getenv('DJANGO_KEY')
+django_key = os.getenv('DJANGO_KEY', default=get_random_secret_key())
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = django_key

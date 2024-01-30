@@ -56,7 +56,6 @@ def set_user(request):
         user_folder = os.path.join(assets_folder, 'temp_folders', user_id)
         morphs_folder = os.path.join(user_folder, 'morphs')
         os.makedirs(morphs_folder, exist_ok=True)
-        # images_folder = os.path.join(static_folder, 'assets/images')  # Replace with the actual path
         face_dict = create_face_dict(images_folder)
 
         # Update the global ref_dict with the generated face_dict
@@ -80,7 +79,6 @@ def get_dataset(request):
             'src': item['source'],
             'title': item['reference_title'],
             'text': item['reference_text'],
-            # Add other fields as needed
         }
         for item in dataset_list
     ]
@@ -106,7 +104,6 @@ def get_dataset(request):
                  }
             ref_dict.append(face_dict)
         print('REFERENCES INIT DONE')
-        # print(ref_dict)
         return JsonResponse({'ref_dict': ref_dict}, status = 200)
 
     except Exception as e:
@@ -139,7 +136,6 @@ def morph_view(request):
             os.makedirs(morphs_folder, exist_ok=True)
             print('Saving in user folder..', morphs_folder, morphed_file_name)
             path = os.path.join(morphs_folder, morphed_file_name)
-            print('Path:', path)
             write = cv2.imwrite(path, output)
             if write:
                 print('Saved')
@@ -162,7 +158,7 @@ def send_email(request):
         print(user_input)
         send_to = user_input['mail']
         user_folder = user_input['user_folder']
-        morphs_path = user_input['user_folder'] + '/morphs'
+        # morphs_path = user_input['user_folder'] + '/morphs'
         try:
             # Your existing send_mail logic
             send_mail(send_to, user_folder)
@@ -176,25 +172,20 @@ def send_email(request):
 def delete_morphs(request):
     if request.method == 'POST':
         user_input = json.loads(request.body)
-        print('in view delete_morphs',user_input)
-        # morphs_path = user_input['morphs_path'] + '/morphs'
         user_folder = user_input['morphs_path']
-        # print(morphs_path)
         try:
-            # Your existing send_mail logic
             del_user_data(user_folder)
             return JsonResponse({'answer': 'deleted'})
         except Exception as e:
             print(f'Error deleting morphs: {e}')
             return JsonResponse({'error': 'Could not delete morphs'}, status=500)
-        return JsonResponse({'error': 'Invalid request method'}, status=400)
+        # return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 
 def send_mail(send_to, path):
     morphs_path = os.path.join(path, 'morphs')
     gmail_email = settings.GMAIL_EMAIL
     gmail_password = settings.GMAIL_PASSWORD
-    print(gmail_email, gmail_password, path)
     files = os.listdir(morphs_path)
     morph_list = [{'filename': file, 'path': os.path.join(morphs_path, file)} for file in files]
 
@@ -205,7 +196,7 @@ def send_mail(send_to, path):
         index = numb - 1
         if numb <= 9:
             numb = '0' + str(numb)
-        description = ref_dict[index]['ref_text'] # painting_data.get(f'image{numb}.jpg', {}).get('description', '')
+        description = ref_dict[index]['ref_text']
         content += f'<li>{description}</li>'
 
     msg = MIMEMultipart()
@@ -226,7 +217,6 @@ def send_mail(send_to, path):
             server.starttls()
             server.login(gmail_email, gmail_password)
             server.sendmail(gmail_email, send_to, msg.as_string())
-            # del_user_data(path)
             print('Email sent successfully!')
     except Exception as e:
         print(f'Error sending mail: {e}')

@@ -80,7 +80,7 @@ The dot at the end specifies the current directory.
 <h3>Start your app container</h3>
 Now that you have an image, run the application in a container using the following docker run command.  
 ```
-docker run -env-file:.env -v morphs-volume:/app/morphs:rw -p 8000:8000 -p 8050:8050 facefit
+docker run --env-file=.env -v morphs-volume:/app/morphs:rw -p 8000:8000 -p 8050:8050 facefit
 ``` 
 <h3>Play with the app</h3>
 Now open a browser and go to the address:  

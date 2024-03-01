@@ -70,7 +70,7 @@ To upload custom images to the server:
 <h2>How to manage docker</h2>
 
 <h3>Prerequisites</h3>
-To befin, set up and run Docker on your operating system. If you are unfamiliar with Docker, refer to the official documentation [here](https://docs.docker.com/).
+To begin, set up and run Docker on your operating system. If you are unfamiliar with Docker, refer to the official documentation [here](https://docs.docker.com/).
 <h3>Create your docker container image </h3>
 To build the image using the Dockerfile, open a terminal, navigate to the folder containing the Dockerfile and type:  
 ```

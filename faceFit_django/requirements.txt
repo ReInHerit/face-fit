@@ -10,3 +10,4 @@ scipy==1.10.1
 color-matcher
 python-dotenv==1.0.0
 python-decouple==3.8
+gunicorn

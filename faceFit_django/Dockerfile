@@ -39,7 +39,7 @@ EXPOSE $PORT
 # Load environment variables from .env file
 RUN ["python", "-c", "import dotenv; dotenv.load_dotenv(dotenv_path='.env')"]
 # Run the application
-ENTRYPOINT ["python", "manage.py"]
-CMD ["runserver", "0.0.0.0:8000"]
+#ENTRYPOINT ["python", "manage.py"]
+#CMD ["runserver", "0.0.0.0:8000"]
 #for heroku
-#CMD gunicorn --bind 0.0.0.0:$PORT djangoProject.wsgi
+CMD gunicorn --bind 0.0.0.0:$PORT djangoProject.wsgi

@@ -20,7 +20,7 @@ The app is available in two versions: one as desktop app, useful for installatio
 and one as web app, useful for mobile devices.
 
 - [Desktop app](#faceFit_Python)
-- [Web app](#faceFit_javascript)
+- [Web app](#faceFit_django)
 
 The most up-to-date version of the code is in the v2.0 branch and Web-based.
 

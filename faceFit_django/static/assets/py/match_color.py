@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from color_matcher import ColorMatcher
 from color_matcher.normalizer import Normalizer
-from FaceFit.static.assets.py.utils import preprocess_image, LAB_channels
+from static.assets.py.utils import preprocess_image, LAB_channels
 
 new_float_type = {
     # preserved types

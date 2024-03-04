@@ -23,6 +23,7 @@ GA_KEY = os.getenv('GA_KEY')
 django_key = os.getenv('DJANGO_KEY', default=get_random_secret_key())
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+print('BASE DIR', BASE_DIR)
 SECRET_KEY = django_key
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
@@ -144,10 +145,12 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "FaceFit", "static")]
+print('STATIC ROOT', STATIC_ROOT)
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "faceFit_django/FaceFit", "static")]
 
 # Specify the directory where user folders will be stored
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+print('MEDIA ROOT', MEDIA_ROOT)
 MEDIA_URL = '/media/'
 
 # Default primary key field type

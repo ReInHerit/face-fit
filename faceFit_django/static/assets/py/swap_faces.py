@@ -10,8 +10,8 @@ from scipy.spatial import Delaunay
 from shapely.geometry import MultiLineString
 from shapely.ops import unary_union, polygonize
 
-from FaceFit.static.assets.py.utils import dot_product, distance
-from FaceFit.static.assets.py.match_color import matching_color, find_noise_scratches
+from static.assets.py.utils import dot_product, distance
+from static.assets.py.match_color import matching_color, find_noise_scratches
 
 BG_COLOR = (0, 0, 0)
 MASK_COLOR = (255, 255, 255)

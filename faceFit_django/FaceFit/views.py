@@ -13,15 +13,14 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from djangoProject import settings
-from FaceFit.static.assets.py.swap_faces import morph
-from FaceFit.static.assets.py.utils import create_face_dict, extract_index, readb64, round_num
-from FaceFit.static.assets.py import Face_Maker as F_obj
+from static.assets.py.swap_faces import morph
+from static.assets.py.utils import create_face_dict, extract_index, readb64, round_num
+from static.assets.py import Face_Maker as F_obj
 
 
 ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
-assets_folder = os.path.join(ROOT_DIR, 'FaceFit', 'static', 'assets')
 media_folder = os.path.join(ROOT_DIR, 'media')
 
 images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
@@ -35,6 +34,7 @@ if os.getenv('HOST'):
 else:
     HOST = 'localhost'
 
+
 def home(request):
     refs = Reference.objects.all()
     print(refs)
@@ -44,6 +44,8 @@ def home(request):
         'data': refs,  # Add your data as needed
     }
     return render(request, 'FaceFit/index.html', context)
+
+
 def policy(request):
     return render(request, 'FaceFit/policy.html')
 
@@ -53,7 +55,7 @@ def set_user(request):
         # Generate a temporary user ID using UUID
         user_id = str(uuid.uuid4())
         # Create the user folder
-        user_folder = os.path.join(assets_folder, 'temp_folders', user_id)
+        user_folder = os.path.join(ROOT_DIR, 'static', 'assets', 'temp_folders', user_id)
         morphs_folder = os.path.join(user_folder, 'morphs')
         os.makedirs(morphs_folder, exist_ok=True)
         face_dict = create_face_dict(images_folder)
@@ -104,11 +106,12 @@ def get_dataset(request):
                  }
             ref_dict.append(face_dict)
         print('REFERENCES INIT DONE')
-        return JsonResponse({'ref_dict': ref_dict}, status = 200)
+        return JsonResponse({'ref_dict': ref_dict}, status=200)
 
     except Exception as e:
         # Handle any exceptions that may occur during resource initialization
-        return JsonResponse({'error': str(e)}, status = 500)
+        return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 def morph_view(request):

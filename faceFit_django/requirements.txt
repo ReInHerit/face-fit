@@ -9,4 +9,5 @@ color-matcher
 python-dotenv==1.0.0
 python-decouple==3.8
 whitenoise[brotli]>=6.0,<7.0
+django-heroku
 gunicorn

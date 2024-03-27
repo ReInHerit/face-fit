@@ -24,7 +24,6 @@
                 var imageName = $(this).val().split('\\').pop().split('/').pop().split('.')[0];
                 console.log((imageName));
                 var referenceTitleField = $('#id_reference_title');
-                {#var imageName = $(this).val().split('\\').pop().split('/').pop().split('.')[0];#}
                 var currentAnchorLink = $('.file-upload a').attr('href');
                 if (currentAnchorLink !== previousAnchorLink) {
                     // Value has changed, update the reference title field

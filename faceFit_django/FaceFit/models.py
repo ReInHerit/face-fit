@@ -1,13 +1,3 @@
-# from django.db import models
-#
-# # Create your models here.
-# class Reference(models.Model):
-#     # id = models.IntegerField(default=0, primary_key=True)
-#     reference_title = models.CharField(max_length=255)
-#     reference_text = models.CharField(max_length=500)
-#     source = models.CharField(max_length=255, choices=[], blank=True)
-#     def __str__(self):
-#         return self.reference_title
 import glob
 # class Morph(models.Model):
 #     morph_name = models.CharField(max_length=200)
@@ -118,20 +108,7 @@ class Reference(models.Model):
             print('Saving image...', self.source.name)
             self.source.name = get_upload_to(self, self.source.name)
             print('New name:', self.source.name)
-            # Use default_storage to handle file operations
-            # destination_path = default_storage.get_available_name(self.source.name)
-            # with default_storage.open(destination_path, 'wb') as destination:
-            #     print('destination:', destination)
-            #     for chunk in self.source.file.chunks():
-            #         print('chunk:', chunk)
-            #         destination.write(chunk)
-            #
 
-            # Resize the image if needed
-
-            # img = Image.open(self.source.path)
-            # # Perform image resizing or other image processing here
-            # img.save(self.source.path)
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -18,12 +18,12 @@ def get_upload_to(instance, filename):
     Generate the upload path for the image.
     If the filename already exists, append a number to make it unique.
     """
-    base_path = os.path.join('media', 'images')
-    file_path = os.path.join(base_path, filename)
+    # base_path = os.path.join('media', 'images')
+    # file_path = os.path.join(base_path, filename)
 
     # Construct the absolute file path within the project directory
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    images_path = os.path.join(project_dir, 'media', 'images')
+    images_path = os.path.join(project_dir, 'static', 'assets', 'images')
     print('Images path:', images_path)
     image_files = glob.glob(os.path.join(images_path, '*.jpg')) + glob.glob(os.path.join(images_path, '*.png'))
     print('Image files:', image_files)

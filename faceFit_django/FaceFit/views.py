@@ -21,9 +21,9 @@ from static.assets.py import Face_Maker as F_obj
 ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
-media_folder = os.path.join(ROOT_DIR, 'media')
+media_folder = os.path.join(ROOT_DIR, 'static', 'assets') #'media')
 
-images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
+images_folder = os.path.join(media_folder, 'images') #settings.MEDIA_ROOT, 'images')
 
 
 ref = []
@@ -57,6 +57,7 @@ def set_user(request):
         # Create the user folder
         user_folder = os.path.join(ROOT_DIR, 'static', 'assets', 'temp_folders', user_id)
         morphs_folder = os.path.join(user_folder, 'morphs')
+        print('Creating user folder..', user_folder)
         os.makedirs(morphs_folder, exist_ok=True)
         face_dict = create_face_dict(images_folder)
 
@@ -119,8 +120,9 @@ def morph_view(request):
         try:
             data = json.loads(request.body)
             # Use your imported function
+            print(data)
             data_img = data['c_face']
-            user = data['user_id']
+            # user = data['user_id']
             user_folder = data['user_folder']
             selected = data['selected']
             r_obj = ref_dict[selected]

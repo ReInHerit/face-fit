@@ -441,9 +441,9 @@ async function init() {
         selected = j;
         await startCamera();
         let url = `${protocol}//${host}`;
-        if (port && selected >= 0) {
+        if (selected >= 0) {
             console.log(face_arr[selected])
-            url += `:${port}/media/${face_arr[selected].src}`;
+            url += `${url_port}/media/${face_arr[selected].src}`;
 
             // url += `/${face_arr[selected]['src']}`;
             ref_img.src = url;
@@ -765,7 +765,7 @@ function draw_mask_on_ref() {
         clearMatchInterval()
         selected = -1;
         const file = "/images/Thumbs/default_view.jpg"
-        const path = protocol + '//' + host + ':' + port + file;
+        const path = protocol + '//' + host + url_port + file;
         const img = new Image();
         let errorMat;
         img.onload = function () {

@@ -17,14 +17,12 @@ from static.assets.py.swap_faces import morph
 from static.assets.py.utils import create_face_dict, extract_index, readb64, round_num
 from static.assets.py import Face_Maker as F_obj
 
-
 ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
 media_folder = os.path.join(ROOT_DIR, 'media')
 
 images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
-
 
 ref = []
 ref_dict = []
@@ -49,6 +47,7 @@ def home(request):
 def policy(request):
     return render(request, 'FaceFit/policy.html')
 
+
 @csrf_exempt
 def set_user(request):
     try:
@@ -68,6 +67,7 @@ def set_user(request):
         return JsonResponse({'user_id': user_id, 'user_folder': user_folder})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 @csrf_exempt
 def get_dataset(request):
@@ -92,19 +92,19 @@ def get_dataset(request):
             p_face = F_obj.Face('ref')
             p_face.get_landmarks(ref_img)
             face_dict = {
-                 'which': p_face.which,
-                 'id': idx,
-                 'src': data['src'],
-                 'points': p_face.points,
-                 'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
-                 'pix_points': p_face.pix_points,
-                 'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
-                 'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
-                        'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
-                        'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
-                                   p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]},
-                 'ref_text': data['text'],
-                 }
+                'which': p_face.which,
+                'id': idx,
+                'src': data['src'],
+                'points': p_face.points,
+                'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
+                'pix_points': p_face.pix_points,
+                'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
+                'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
+                       'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
+                       'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
+                                  p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]},
+                'ref_text': data['text'],
+            }
             ref_dict.append(face_dict)
         print('REFERENCES INIT DONE')
         return JsonResponse({'ref_dict': ref_dict}, status=200)
@@ -156,6 +156,7 @@ def morph_view(request):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
 
+@csrf_exempt
 def send_email(request):
     if request.method == 'POST':
         user_input = json.loads(request.body)
@@ -173,6 +174,7 @@ def send_email(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 
+@csrf_exempt
 def delete_morphs(request):
     if request.method == 'POST':
         user_input = json.loads(request.body)

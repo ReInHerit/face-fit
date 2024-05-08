@@ -1,5 +1,5 @@
 # Use the official Python image as a base image
-FROM python:3.11.5
+FROM --platform=linux/amd64 python:3.11.5
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -29,11 +29,13 @@ COPY . /app/
 
 # Expose the port the app runs on
 EXPOSE $PORT
+
+# Load environment variables from .env file
 RUN ["python", "-c", "import dotenv; dotenv.load_dotenv(dotenv_path='.env')"]
 # Collect static files
 RUN python manage.py collectstatic --noinput
 # Run the application
-ENTRYPOINT ["python", "manage.py"]
-CMD ["runserver", "0.0.0.0:8000"]
+#ENTRYPOINT ["python", "manage.py"]
+#CMD ["runserver", "0.0.0.0:8000"]
 #for heroku
-#CMD gunicorn --bind 0.0.0.0:$PORT djangoProject.wsgi
+CMD gunicorn --bind 0.0.0.0:$PORT djangoProject.wsgi

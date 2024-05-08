@@ -25,7 +25,7 @@ else:
 
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
 
-triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation2.json')
+triangulation2_json_path = os.path.join(ROOT_DIR, 'json', 'triangulation.json')
 
 with open(triangulation2_json_path, 'r') as f:
     media_pipes_tris2 = load_json(f)

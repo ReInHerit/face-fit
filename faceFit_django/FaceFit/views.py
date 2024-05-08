@@ -21,9 +21,9 @@ from static.assets.py import Face_Maker as F_obj
 ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
-media_folder = os.path.join(ROOT_DIR, 'static', 'assets') #'media')
+media_folder = os.path.join(ROOT_DIR, 'media')
 
-images_folder = os.path.join(media_folder, 'images') #settings.MEDIA_ROOT, 'images')
+images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
 
 
 ref = []
@@ -49,7 +49,7 @@ def home(request):
 def policy(request):
     return render(request, 'FaceFit/policy.html')
 
-
+@csrf_exempt
 def set_user(request):
     try:
         # Generate a temporary user ID using UUID
@@ -69,7 +69,7 @@ def set_user(request):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-
+@csrf_exempt
 def get_dataset(request):
     print('Getting dataset')
     dataset = Reference.objects.values()
@@ -120,7 +120,6 @@ def morph_view(request):
         try:
             data = json.loads(request.body)
             # Use your imported function
-            print(data)
             data_img = data['c_face']
             # user = data['user_id']
             user_folder = data['user_folder']

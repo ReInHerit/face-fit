@@ -29,14 +29,6 @@ COPY . /app/
 
 # Expose the port the app runs on
 EXPOSE $PORT
-#ARG GMAIL_EMAIL
-#ARG GMAIL_PASSWORD
-#ARG DJANGO_KEY
-#ENV GMAIL_EMAIL=$GMAIL_EMAIL
-#ENV GMAIL_PASSWORD=$GMAIL_PASSWORD
-#ENV DJANGO_KEY=$DJANGO_KEY
-#RUN echo "DJANGO_KEY: $DJANGO_KEY"
-# Load environment variables from .env file
 RUN ["python", "-c", "import dotenv; dotenv.load_dotenv(dotenv_path='.env')"]
 # Collect static files
 RUN python manage.py collectstatic --noinput

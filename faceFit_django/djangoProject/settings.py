@@ -31,7 +31,7 @@ SECRET_KEY = django_key
 # The `DYNO` env var is set on Heroku CI, but it's not a real Heroku app, so we have to
 # also explicitly exclude CI:
 # https://devcenter.heroku.com/articles/heroku-ci#immutable-environment-variables
-IS_HEROKU_APP = "DYNO" in os.environ and not "CI" in os.environ
+IS_HEROKU_APP = "DYNO" in os.environ and "CI" not in os.environ
 
 # SECURITY WARNING: don't run with debug turned on in production!
 if not IS_HEROKU_APP:
@@ -46,7 +46,6 @@ if IS_HEROKU_APP:
     print("Running on Heroku Dyno")
 else:
     ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -81,8 +80,7 @@ ROOT_URLCONF = 'djangoProject.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR, 'templates']
-        ,
+        'DIRS': [BASE_DIR, 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -97,7 +95,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'djangoProject.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
@@ -107,7 +104,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'database.sqlite3',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -127,7 +123,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
@@ -138,7 +133,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/

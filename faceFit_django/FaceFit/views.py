@@ -58,11 +58,11 @@ def set_user(request):
         morphs_folder = os.path.join(user_folder, 'morphs')
         print('Creating user folder..', user_folder)
         os.makedirs(morphs_folder, exist_ok=True)
-        face_dict = create_face_dict(images_folder)
-
-        # Update the global ref_dict with the generated face_dict
-        global ref_dict
-        ref_dict = face_dict
+        # face_dict = create_face_dict(images_folder)
+        #
+        # # Update the global ref_dict with the generated face_dict
+        # global ref_dict
+        # ref_dict = face_dict
 
         return JsonResponse({'user_id': user_id, 'user_folder': user_folder})
     except Exception as e:
@@ -118,6 +118,7 @@ def get_dataset(request):
 def morph_view(request):
     if request.method == 'POST':
         try:
+            print('Morphing..')
             data = json.loads(request.body)
             # Use your imported function
             data_img = data['c_face']

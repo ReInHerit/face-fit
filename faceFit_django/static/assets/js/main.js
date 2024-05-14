@@ -34,7 +34,7 @@ const privacy_popup = document.getElementById('privacyModal');
 const privacyWindow = document.getElementById('privacy-window');
 const camera_width = 1280;
 const camera_height = 960;
-const framerate = 15;
+const framerate = 25;
 const interval = 1000 / framerate;
 const port = window.location.port;
 const host = window.location.hostname;
@@ -577,7 +577,7 @@ async function calc_lmrks(image) {
             lastVideoTime = video.currentTime;
             results = faceLandmarker.detectForVideo(video, startTimeMs);
         }
-        if (results.faceLandmarks[0]) {
+        if (results && results.faceLandmarks[0]) {
             const landmarks = results.faceLandmarks[0];
             cam_points = processKeyPoints(landmarks);
             cam_bb = processBoundingBox(landmarks);
@@ -945,7 +945,7 @@ async function resize_all() {
 }
 
 function accessCamera() {
-    console.log("accessCamera")
+    console.log("accessCamera", camera_width, camera_height)
     return navigator.mediaDevices
         .getUserMedia({
             video: {facingMode: 'user', width: camera_width, height: camera_height},

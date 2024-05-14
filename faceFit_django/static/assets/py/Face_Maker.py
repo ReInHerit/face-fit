@@ -32,7 +32,6 @@ class FaceLandmarker:
         self.detector = vision.FaceLandmarker.create_from_options(options)
 
     def detect_landmarks(self, image):
-        # w, h, c = image.shape
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
         detection_result = self.detector.detect(mp_image)

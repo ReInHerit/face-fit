@@ -34,7 +34,7 @@ const privacy_popup = document.getElementById('privacyModal');
 const privacyWindow = document.getElementById('privacy-window');
 const camera_width = 1280;
 const camera_height = 960;
-const framerate = 15;
+const framerate = 25;
 const interval = 1000 / framerate;
 const port = window.location.port;
 const host = window.location.hostname;
@@ -441,9 +441,9 @@ async function init() {
         selected = j;
         await startCamera();
         let url = `${protocol}//${host}`;
-        if (port && selected >= 0) {
+        if (selected >= 0) {
             console.log(face_arr[selected])
-            url += `:${port}/static/${face_arr[selected].src}`;
+            url += `${url_port}/static/${face_arr[selected].src}`;
 
             // url += `/${face_arr[selected]['src']}`;
             ref_img.src = url;
@@ -582,6 +582,7 @@ async function calc_lmrks(image) {
             cam_points = processKeyPoints(landmarks);
             cam_bb = processBoundingBox(landmarks);
             cam_angles = matrixToEulerAngles(results.facialTransformationMatrixes[0].data)
+
             cam_expression = check_expression(cam_points["lmrk13"], cam_points["lmrk14"], cam_points["lmrk33"], cam_points["lmrk78"],
                 cam_points["lmrk133"], cam_points["lmrk145"], cam_points["lmrk159"], cam_points["lmrk263"], cam_points["lmrk308"], cam_points["lmrk362"],
                 cam_points["lmrk374"], cam_points["lmrk386"]);
@@ -764,7 +765,7 @@ function draw_mask_on_ref() {
         clearMatchInterval()
         selected = -1;
         const file = "/images/Thumbs/default_view.jpg"
-        const path = protocol + '//' + host + ':' + port + file;
+        const path = protocol + '//' + host + url_port + file;
         const img = new Image();
         let errorMat;
         img.onload = function () {

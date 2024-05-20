@@ -148,6 +148,7 @@ def morph_view(request):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
 
+@csrf_exempt
 def send_email(request):
     if request.method == 'POST':
         user_input = json.loads(request.body)
@@ -165,6 +166,7 @@ def send_email(request):
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 
+@csrf_exempt
 def delete_morphs(request):
     if request.method == 'POST':
         user_input = json.loads(request.body)

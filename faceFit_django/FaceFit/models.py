@@ -12,6 +12,8 @@ from django.core.files.storage import default_storage
 from django.db import models
 from PIL import Image
 
+from djangoProject import settings
+
 
 def get_upload_to(instance, filename):
     """
@@ -23,7 +25,7 @@ def get_upload_to(instance, filename):
 
     # Construct the absolute file path within the project directory
     project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    images_path = os.path.join(project_dir, 'static', 'assets', 'images')
+    images_path = os.path.join(project_dir, 'static', 'assets', 'images', 'references')
     print('Images path:', images_path)
     image_files = glob.glob(os.path.join(images_path, '*.jpg')) + glob.glob(os.path.join(images_path, '*.png'))
     print('Image files:', image_files)
@@ -100,17 +102,42 @@ def get_upload_to(instance, filename):
 class Reference(models.Model):
     reference_title = models.CharField(max_length=255)
     reference_text = models.TextField()
-    source = models.ImageField(upload_to='images/', blank=True, null=True)
+    source = models.ImageField(upload_to='assets/images/references', blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        # Override save to handle image renaming
         if self.source:
-            print('Saving image...', self.source.name)
-            self.source.name = get_upload_to(self, self.source.name)
-            print('New name:', self.source.name)
+            # Open the uploaded file
+            with self.source.open() as uploaded_file:
+                # Read the contents of the uploaded file
+                contents = uploaded_file.read()
+
+            # Create a new file in the static/assets/images/references directory
+            new_file_path = os.path.join(settings.BASE_DIR, 'static', 'assets', 'images', 'references',
+                                         os.path.basename(self.source.name))
+
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(new_file_path), exist_ok=True)
+
+            # Write the contents of the uploaded file to the new file
+            with open(new_file_path, 'wb') as new_file:
+                new_file.write(contents)
+
+            # Update the source field to point to the new file
+            self.source = os.path.join('assets', 'images', 'references', os.path.basename(self.source.name))
 
         super().save(*args, **kwargs)
+    def delete(self, *args, **kwargs):
+        # Construct the absolute file path
+        file_path = os.path.join(settings.BASE_DIR, 'static', 'assets', 'images', 'references', os.path.basename(self.source.name))
+        print('file path:', file_path)
+        # Check if the file exists
+        if os.path.isfile(file_path):
+            print('is file')
+            # Delete the file
+            os.remove(file_path)
 
+        # Call the "real" delete() method
+        super().delete(*args, **kwargs)
     def __str__(self):
         return self.reference_title
 

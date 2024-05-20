@@ -443,7 +443,7 @@ async function init() {
         let url = `${protocol}//${host}`;
         if (port && selected >= 0) {
             console.log(face_arr[selected])
-            url += `:${port}/media/${face_arr[selected].src}`;
+            url += `:${port}/static/${face_arr[selected].src}`;
 
             // url += `/${face_arr[selected]['src']}`;
             ref_img.src = url;
@@ -577,12 +577,11 @@ async function calc_lmrks(image) {
             lastVideoTime = video.currentTime;
             results = faceLandmarker.detectForVideo(video, startTimeMs);
         }
-        if (results.faceLandmarks[0]) {
+        if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
             const landmarks = results.faceLandmarks[0];
             cam_points = processKeyPoints(landmarks);
             cam_bb = processBoundingBox(landmarks);
             cam_angles = matrixToEulerAngles(results.facialTransformationMatrixes[0].data)
-
             cam_expression = check_expression(cam_points["lmrk13"], cam_points["lmrk14"], cam_points["lmrk33"], cam_points["lmrk78"],
                 cam_points["lmrk133"], cam_points["lmrk145"], cam_points["lmrk159"], cam_points["lmrk263"], cam_points["lmrk308"], cam_points["lmrk362"],
                 cam_points["lmrk374"], cam_points["lmrk386"]);

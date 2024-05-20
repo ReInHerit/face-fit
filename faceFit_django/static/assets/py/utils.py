@@ -8,6 +8,7 @@ import numpy as np
 import cv2
 from PIL import Image
 
+from djangoProject import settings
 from . import Face_Maker as F_obj
 
 
@@ -20,10 +21,11 @@ def create_face_dict(images_folder):
             ref_img = cv2.imread(file_path)
             p_face = F_obj.Face('ref')
             p_face.get_landmarks(ref_img)
+            relative_path = os.path.relpath(file_path, settings.STATIC_ROOT)
             face_dict = {
                 'which': p_face.which,
                 'id': idx,
-                'src': file_path,
+                'src': relative_path,
                 'points': p_face.points,
                 'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
                 'pix_points': p_face.pix_points,

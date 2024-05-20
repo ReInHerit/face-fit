@@ -7,6 +7,8 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from django.templatetags.static import static
+
 from .models import Reference
 import cv2
 from django.shortcuts import render
@@ -22,7 +24,7 @@ ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
 media_folder = os.path.join(ROOT_DIR, 'media')
-
+references_folder = os.path.join(settings.STATIC_ROOT, 'assets', 'images', 'references')
 images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
 
 
@@ -38,6 +40,8 @@ else:
 def home(request):
     refs = Reference.objects.all()
     print(refs)
+    for ref in refs:
+        ref.source = static('assets/images/references/' + ref.source.name)
     context = {
         'title': 'FaceFit',
         'ga_key': settings.GA_KEY,  # Replace with your Google Analytics key
@@ -59,11 +63,11 @@ def set_user(request):
         morphs_folder = os.path.join(user_folder, 'morphs')
         print('Creating user folder..', user_folder)
         os.makedirs(morphs_folder, exist_ok=True)
-        face_dict = create_face_dict(images_folder)
-
-        # Update the global ref_dict with the generated face_dict
-        global ref_dict
-        ref_dict = face_dict
+        # face_dict = create_face_dict(images_folder)
+        #
+        # # Update the global ref_dict with the generated face_dict
+        # global ref_dict
+        # ref_dict = face_dict
 
         return JsonResponse({'user_id': user_id, 'user_folder': user_folder})
     except Exception as e:
@@ -86,26 +90,14 @@ def get_dataset(request):
         for item in dataset_list
     ]
     try:
-        ref_dict = []
+        # Use create_face_dict function from utils.py
+        ref_dict = create_face_dict(references_folder)
         for idx, data in enumerate(simplified_dataset):
-            ref_img = cv2.imread(os.path.join(media_folder, data['src']))
-            p_face = F_obj.Face('ref')
-            p_face.get_landmarks(ref_img)
-            face_dict = {
-                 'which': p_face.which,
-                 'id': idx,
-                 'src': data['src'],
-                 'points': p_face.points,
-                 'expression': [p_face.status['l_e'], p_face.status['r_e'], p_face.status['lips']],
-                 'pix_points': p_face.pix_points,
-                 'angles': [round_num(p_face.alpha) + 90, round_num(p_face.beta) + 90, round_num(p_face.gamma)],
-                 'bb': {'xMin': p_face.bb_p1[0], 'xMax': p_face.bb_p2[0], 'yMin': p_face.bb_p1[1],
-                        'yMax': p_face.bb_p2[1], 'width': p_face.delta_x, 'height': p_face.delta_y,
-                        'center': [p_face.bb_p1[0] + round_num(p_face.delta_x / 2),
-                                   p_face.bb_p2[0] + round_num(p_face.delta_y / 2)]},
-                 'ref_text': data['text'],
-                 }
-            ref_dict.append(face_dict)
+            for face_dict in ref_dict:
+                print('SRC', data['src'], face_dict['src'])
+                if data['src'] == os.path.basename(face_dict['src']):
+                    face_dict['ref_text'] = data['text']
+                    break
         print('REFERENCES INIT DONE')
         return JsonResponse({'ref_dict': ref_dict}, status=200)
 
@@ -130,7 +122,7 @@ def morph_view(request):
             c_obj = F_obj.Face('cam')
             c_obj.get_landmarks(c_image)
             head, file_name = os.path.split(r_obj['src'])
-            r_obj['src'] = os.path.join(images_folder, file_name)
+            r_obj['src'] = os.path.join(references_folder, file_name)
             # Morph the faces
             print('Morphing..')
             output = morph(c_obj, r_obj)

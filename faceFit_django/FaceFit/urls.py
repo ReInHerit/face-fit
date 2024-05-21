@@ -13,6 +13,7 @@ urlpatterns = [
     path('delete_morphs/', views.delete_morphs, name='delete_morphs'),
     path('get_dataset/', views.get_dataset, name='get_dataset'),
     path('policy/', views.policy, name='policy'),
+    path('get_dataset_length/', views.get_dataset_length, name='get_dataset_length'),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
 ]

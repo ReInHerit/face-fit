@@ -1,5 +1,6 @@
 "use strict";
 import vision from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
 const {FaceLandmarker, FilesetResolver, DrawingUtils} = await vision;
 /* VIEW AND CAMERA */
 const ref_img = document.getElementById("ref_img");
@@ -80,6 +81,7 @@ const csrfToken = document.querySelector('input[name=csrfmiddlewaretoken]').valu
 localStorage.setItem('privacyConfirmed', 'false');
 let hasConfirmed = localStorage.getItem('privacyConfirmed');
 let shouldDeleteFolder = false;
+
 /* UI FUNCTIONS*/
 function init_slicks(window_aspect_ratio) {
     const sliders = [leftSlick, rightSlick];
@@ -331,7 +333,7 @@ async function fetch_delete() {
                 'Access-Control-Allow-Origin': '*',
                 'X-CSRFToken': csrfToken,
             },
-            body: JSON.stringify({ 'morphs_path': user_folder }),
+            body: JSON.stringify({'morphs_path': user_folder}),
         });
 
         if (!response.ok) {
@@ -344,6 +346,7 @@ async function fetch_delete() {
         console.error(`Fetch problem: ${err.message}`);
     }
 }
+
 async function init() {
     console.log("init");
     line_color = new cv.Scalar(255, 255, 255, 120);
@@ -404,30 +407,39 @@ async function init() {
 
         }
     });
-
     /* INITIALIZE PAINTINGS' FACE OBJECTS */
-    fetch('/FaceFit/get_dataset/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*',
-            'X-CSRFToken': csrfToken,
-        },
-        body: JSON.stringify({'user_folder': user_folder}),
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return response.json();
-        })
+    fetch('/FaceFit/get_dataset_length/')
+        .then(response => response.json())
         .then(data => {
-            face_arr = data['ref_dict'];
-            console.log('Dataset loaded:', face_arr);
+            const datasetLength = data.datasetLength;
+            // Now you can start fetching the images
+            for (let index = 0; index < datasetLength; index++) {
+                fetch('/FaceFit/get_dataset/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*',
+                        'X-CSRFToken': csrfToken,
+                    },
+                    body: JSON.stringify({'user_folder': user_folder, 'index': index}),
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        face_arr.push(data['ref_dict']);
+                        face_arr.sort((a, b) => a.id - b.id)
+                    })
+                    .catch(error => {
+                        console.error('Error loading dataset:', error);
+                    });
+            }
         })
-        .catch(error => {
-            console.error('Error loading dataset:', error);
-        });
 
+    // console.log('Dataset loaded:', face_arr);
+    console.log('Dataset loaded:', face_arr);
     /* INITIALIZE SLICKs BUTTONS AND INTERACTION */
     const reference_btns = container_left.querySelectorAll("div.slick-slide >button");
     morphed_btns = container_right.querySelectorAll("div.slick-slide >button");
@@ -537,6 +549,7 @@ async function resetOperation() {
     // Perform any additional reset logic here
     console.log('Reset operation completed');
 }
+
 /* MANAGE BARS FUNCTIONS */
 function reset_bar() {
     [percent_x, percent_y, percent_z].forEach(bar => {

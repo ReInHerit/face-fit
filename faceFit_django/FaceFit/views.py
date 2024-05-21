@@ -23,13 +23,10 @@ from static.assets.py import Face_Maker as F_obj
 ref = []
 ref_dict = []
 ROOT_DIR = settings.BASE_DIR
-media_folder = os.path.join(ROOT_DIR, 'media')
+# media_folder = os.path.join(ROOT_DIR, 'media')
 references_folder = os.path.join(settings.STATIC_ROOT, 'assets', 'images', 'references')
-images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
+# images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
 
-
-ref = []
-ref_dict = []
 
 if os.getenv('HOST'):
     HOST = os.getenv('HOST')
@@ -63,43 +60,29 @@ def set_user(request):
         morphs_folder = os.path.join(user_folder, 'morphs')
         print('Creating user folder..', user_folder)
         os.makedirs(morphs_folder, exist_ok=True)
-        # face_dict = create_face_dict(images_folder)
-        #
-        # # Update the global ref_dict with the generated face_dict
-        # global ref_dict
-        # ref_dict = face_dict
-
+        global ref_dict
+        ref_dict = create_face_dict(references_folder)
+        print('ref_dict:', ref_dict)
         return JsonResponse({'user_id': user_id, 'user_folder': user_folder})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
 @csrf_exempt
 def get_dataset(request):
-    print('Getting dataset')
-    dataset = Reference.objects.values()
-    dataset_list = list(dataset)
-    global ref_dict
-    # Extract only the necessary information
-    simplified_dataset = [
-        {
-            'id': item['id'],
-            'src': item['source'],
-            'title': item['reference_title'],
-            'text': item['reference_text'],
-        }
-        for item in dataset_list
-    ]
     try:
-        # Use create_face_dict function from utils.py
-        ref_dict = create_face_dict(references_folder)
-        for idx, data in enumerate(simplified_dataset):
-            for face_dict in ref_dict:
-                print('SRC', data['src'], face_dict['src'])
-                if data['src'] == os.path.basename(face_dict['src']):
-                    face_dict['ref_text'] = data['text']
-                    break
-        print('REFERENCES INIT DONE')
-        return JsonResponse({'ref_dict': ref_dict}, status=200)
+        global ref_dict
+
+        data = json.loads(request.body)
+        index = data.get('index', 0)  # Get the index from the request, default to 0 if not provided
+        print('index:', index)
+        print('ref_dict:', ref_dict[index]['id'])
+        dataset = Reference.objects.values()
+        dataset_list = list(dataset)
+        print('dataset:', dataset_list)
+        # Get the data for the specified index
+        data = dataset_list[index]
+        ref_dict[index]['ref_text'] = data['reference_text']
+        return JsonResponse({'ref_dict': ref_dict[index]}, status=200)
 
     except Exception as e:
         # Handle any exceptions that may occur during resource initialization
@@ -147,7 +130,9 @@ def morph_view(request):
     else:
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
-
+def get_dataset_length(request):
+    dataset_length = Reference.objects.count()
+    return JsonResponse({'datasetLength': dataset_length})
 @csrf_exempt
 def send_email(request):
     if request.method == 'POST':

@@ -15,7 +15,7 @@ from . import Face_Maker as F_obj
 def create_face_dict(images_folder):
     face_dict_list = []
 
-    for idx, filename in enumerate(os.listdir(images_folder)):
+    for idx, filename in enumerate(sorted(os.listdir(images_folder))):
         file_path = os.path.join(images_folder, filename)
         if os.path.isfile(file_path):
             ref_img = cv2.imread(file_path)

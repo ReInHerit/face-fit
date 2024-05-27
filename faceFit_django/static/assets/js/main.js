@@ -1043,6 +1043,17 @@ window.addEventListener('beforeunload', async function (event) {
     shouldDeleteFolder = true;
 });
 
+window.onload = function() {
+    var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    if (isSafari) {
+        alert("You are using Safari, which may not be compatible with this page. Please open the page using a different browser such as Chrome or Firefox.");
+    }
+    else {
+        console.log("Not Safari");
+    }
+}
+
 window.onunload = async function () {
     console.log('onunload')
     if (shouldDeleteFolder) {

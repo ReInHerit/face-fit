@@ -28,10 +28,9 @@ references_folder = os.path.join(settings.STATIC_ROOT, 'assets', 'images', 'refe
 # images_folder = os.path.join(settings.MEDIA_ROOT, 'images')
 
 
-if os.getenv('HOST'):
-    HOST = os.getenv('HOST')
-else:
-    HOST = 'localhost'
+HOST = os.getenv('HOST', 'localhost')
+PORT = os.getenv('PORT', '8000')
+PROTOCOL = os.getenv('PROTOCOL', 'http')
 
 
 def home(request):
@@ -100,6 +99,7 @@ def morph_view(request):
             # user = data['user_id']
             user_folder = data['user_folder']
             selected = data['selected']
+            print('Selected:', selected, 'User folder:', user_folder, 'References folder:', references_folder)
             r_obj = ref_dict[selected]
             c_image = readb64(data_img)
             c_image = cv2.flip(c_image, 1)
@@ -183,6 +183,16 @@ def send_mail(send_to, path):
         description = ref_dict[index]['ref_text']
         content += f'<li>{description}</li>'
 
+    privacy_policy_url = f"{PROTOCOL}://{HOST}:{PORT}/FaceFit/policy/"
+    content += f'''
+    <div style="font-size: 0.8em; color: #888;">
+        <br>You received this e-mail because, while using Face-Fit, you requested that the results be e-mailed to you. 
+        As specified in the privacy policy you accepted, the head poses captured have been used to create the attached 
+        final images. No files or images are stored in our system, and this e-mail will be promptly removed from our 
+        servers after the result images are generated and sent to you. We do not share your head pose images or personal 
+        information with any third-party services. Please see the <a href="{privacy_policy_url}"> Privacy Policy</a> for more details.
+    </div>
+    '''
     msg = MIMEMultipart()
     msg['From'] = gmail_email
     msg['To'] = send_to

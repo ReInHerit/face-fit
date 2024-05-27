@@ -48,8 +48,10 @@ def home(request):
 
 
 def policy(request):
-    return render(request, 'FaceFit/policy.html')
-
+    context = {
+        'GMAIL_EMAIL': settings.GMAIL_EMAIL,
+    }
+    return render(request, 'FaceFit/policy.html', context)
 @csrf_exempt
 def set_user(request):
     try:
@@ -62,7 +64,7 @@ def set_user(request):
         os.makedirs(morphs_folder, exist_ok=True)
         global ref_dict
         ref_dict = create_face_dict(references_folder)
-        print('ref_dict:', ref_dict)
+
         return JsonResponse({'user_id': user_id, 'user_folder': user_folder})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -74,11 +76,10 @@ def get_dataset(request):
 
         data = json.loads(request.body)
         index = data.get('index', 0)  # Get the index from the request, default to 0 if not provided
-        print('index:', index)
-        print('ref_dict:', ref_dict[index]['id'])
+
         dataset = Reference.objects.values()
         dataset_list = list(dataset)
-        print('dataset:', dataset_list)
+
         # Get the data for the specified index
         data = dataset_list[index]
         ref_dict[index]['ref_text'] = data['reference_text']

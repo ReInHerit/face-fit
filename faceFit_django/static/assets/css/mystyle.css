@@ -1,7 +1,7 @@
 :root {
     --black: #000000;
     --white: #FFFFFF;
-    --min-width: 50px; /* Minimum width value */
+    --min-width: 50px;
 }
 
 header {
@@ -25,8 +25,7 @@ h1 {
 #email-button, #reset-button {
     position: absolute;
     width: min(12vw, var(--min-width));
-    /*left: calc(100vw - 30px);*/
-    top: 4vh;
+    top: 2vh;
     border-color: transparent;
     background-color: transparent;
     z-index: 8;
@@ -38,7 +37,6 @@ h1 {
 }
 #reset-button {
     left: calc(100vw - 50px);
-    /*transform: translate(-50%, 0px);*/
 }
 #send_logo, #reset_logo {
     width: 100%;
@@ -95,10 +93,7 @@ body, html {
     font-size: 4vh;
 }
 .container {
-    /*width: calc(100vw - 10px);*/
-    height: calc(100vh - 120px);
-    min-width: 300px;
-    /*max-height: calc(100vh - 60px);*/
+    height: 84vh;
     margin: auto;
     display: grid;
     align-items: stretch;
@@ -160,11 +155,11 @@ th, td, #hints_title {
 
 #hints_title{
     text-align: center;
-    font-size: max(16px, min(2vw, 20px));;
+    font-size: max(16px, min(2vw, 18px));;
 }
 td {
     text-align: left;
-    font-size: max(12px, min(1.6vw, 15px));
+    font-size: max(12px, min(1.6vw, 13px));
     margin-left: 20px
 }
 
@@ -206,15 +201,6 @@ td {
     z-index: 0;
 }
 
-
-/*.slick-slider{*/
-/*    display: flex;*/
-/*    !*flex-direction: column;*!*/
-/*}*/
-/*.slick-track{*/
-/*    display: flex;*/
-/*    align-items: center;*/
-/*}*/
 .img_ref, .img_morph{
     position: initial;
     width: 100%;
@@ -287,6 +273,7 @@ td {
     -webkit-animation: spin 1.5s linear infinite;
     animation: spin 1.5s linear infinite;
 }
+
 @-webkit-keyframes spin {
     0%   {
         -webkit-transform: rotate(0deg);  /* Chrome, Opera 15+, Safari 3.1+ */
@@ -299,6 +286,7 @@ td {
         transform: rotate(360deg);  /* Firefox 16+, IE 10+, Opera */
     }
 }
+
 @keyframes spin {
     0%   {
         -webkit-transform: rotate(0deg);  /* Chrome, Opera 15+, Safari 3.1+ */
@@ -311,6 +299,7 @@ td {
         transform: rotate(360deg);  /* Firefox 16+, IE 10+, Opera */
     }
 }
+
 #loader-wrapper .loader-section {
     position: fixed;
     top: 0;
@@ -434,14 +423,11 @@ td {
 #footer .social-links a {
     font-size: 2vh;
     display: inline-block;
-    /* background: #11303b; */
     color: #fff;
-    /* line-height: 0; */
     padding: 0.5vh 0;
     border-radius: 50%;
      text-align: center;
     width: 3.4vh;
-    /* height: 4vh; */
     transition: 0.3s;
 }
 

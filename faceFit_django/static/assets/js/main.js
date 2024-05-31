@@ -192,49 +192,29 @@ function updateSlider() {
 }
 
 function calculateSlideWidthAndCount(vertical) {
-    // Ensure that 'container' is a valid DOM element
     if (!(container instanceof HTMLElement)) {
         throw new Error('Invalid container element.');
     }
 
     const arrowClutter = 30;
-
-    // Caching the container dimensions to minimize layout thrashing
     const width = container.offsetWidth;
     const height = container.offsetHeight;
-
-    // Determine the max value for slides
-    let maxValue = vertical ? Math.floor(height * 0.15) - 5 : Math.floor(width * 0.2) - 5;
-    maxValue = Math.min(maxValue, 150);
-
-    let slides;
-    if (vertical) {
-        const slidesMaxWidth = width - arrowClutter * 2 - 10;
-        slides = Math.floor(slidesMaxWidth / maxValue);
-    } else {
-        const slidesMaxHeight = height - arrowClutter * 2 - 20;
-        slides = Math.floor(slidesMaxHeight / maxValue);
-    }
+    const dimension = vertical ? container.offsetHeight : container.offsetWidth;
+    const maxValue = Math.min(Math.floor (vertical ? height * 0.15 : width * 0.2) - 5, 150);
+    const slidesMaxDimension = (vertical? width : height) - arrowClutter * 2 - (vertical? 10: 20);
+    const slides = Math.floor(slidesMaxDimension / maxValue);
 
     return [slides, maxValue];
 }
 
 function extract_index(path) {
     const fileName = path.split('/').pop()
-    console.log('fileName', fileName)
     const replaced = fileName.replace(/\D/g, '');
-    console.log('replaced', replaced)
     let num;
     if (replaced !== '') {
         num = Number(replaced) - 1;
     }
     return num
-}
-
-function setMorphsButtons(img) {
-    for (let i = 0; i < morphed_btns.length; i++) {
-        morphed_btns[i].firstElementChild.src = img + '?' + Math.random();
-    }
 }
 
 function drawOnCanvas(my_img) {
@@ -247,7 +227,6 @@ function drawOnCanvas(my_img) {
             cv.resize(img, img, dsize, 0, 0, cv.INTER_AREA);
             cv.imshow(canvas, img);
             img.delete();
-            // img.delete();
         } catch (error) {
             console.error('An error occurred in ref_img.onload:', error);
         }

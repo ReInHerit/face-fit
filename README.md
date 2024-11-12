@@ -26,6 +26,15 @@ The most up-to-date version of the code is in the v2.0 branch and Web-based.
 
 Each subdirectory contains a README.md that describes how to install it.
 
+## Compatibility
+
+The application has been tested on the following mobile operating systems: Android (since v. 13) and iOS (up to 18.1),
+using the default browsers of each OS (i.e. Chrome and Safari).
+The app has been tested also on Windows with Edge, Chrome, Firefox browsers, and on macOS using Chrome and Firefox
+browsers.
+Compatibility with Safari on iOS/macOS depends on the interaction with Ad-blockers, which may block the functionality of
+the app. For this reason the default setup will warn users about this issue.
+
 ## Citation
 
 If you use this software in your work please cite:
